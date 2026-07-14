@@ -76,6 +76,13 @@ public sealed class AppConfig
     public int? MonitorY { get; set; }
 
     /// <summary>
+    /// Вид виджета «Монитор»: null/"full" — полный с графиками, "mini" — три индикатора
+    /// Power/CPU/RAM в строку без графиков, "power" — только ватты. Переключается кнопкой
+    /// в самом виджете или двойным кликом по нему; выбор сохраняется автоматически.
+    /// </summary>
+    public string? MonitorView { get; set; }
+
+    /// <summary>
     /// Действие клавиши «настройки»: "charge" (по умолчанию) — переключение заряда
     /// 80/100, "settings" — открыть Параметры Windows (как в ранних версиях).
     /// </summary>

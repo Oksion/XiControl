@@ -49,6 +49,24 @@ public static class Draw
         ]);
     }
 
+    /// <summary>Кнопка «вид» (полный/мини/ватты): большой и малый прямоугольники. Hover — синяя плашка.</summary>
+    public static void ViewButton(Graphics g, Rectangle r, bool hover)
+    {
+        if (hover)
+        {
+            using var b = new SolidBrush(Color.FromArgb(60, 120, 190));
+            using var path = Rounded(r, r.Width * 0.23f);
+            g.FillPath(b, path);
+        }
+        using var pen = new Pen(hover ? Color.White : Color.FromArgb(150, 150, 155), 1.8f)
+        {
+            LineJoin = LineJoin.Round,
+        };
+        float w = r.Width, h = r.Height;
+        g.DrawRectangle(pen, r.X + w * 0.20f, r.Y + h * 0.24f, w * 0.42f, h * 0.34f);
+        g.DrawRectangle(pen, r.X + w * 0.44f, r.Y + h * 0.48f, w * 0.34f, h * 0.28f);
+    }
+
     /// <summary>Скруглённый прямоугольник (путь надо Dispose-ить).</summary>
     public static GraphicsPath Rounded(RectangleF r, float radius)
     {

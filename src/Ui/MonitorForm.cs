@@ -10,6 +10,8 @@ namespace XiControl.Ui;
 /// «Монитор»: живые графики с момента открытия — потребление (Вт, датчик батареи),
 /// CPU % и RAM %. Семплирование (1 Гц) работает только пока окно видно.
 /// Ватты честные только от батареи/на зарядке: на питании от сети датчика нет — «—».
+/// Три вида — полный (графики), мини (строка Power/CPU/RAM), только ватты;
+/// переключаются кнопкой «вид» или двойным кликом по виджету, выбор запоминается.
 /// </summary>
 public sealed class MonitorForm : Form
 {
@@ -25,6 +27,7 @@ public sealed class MonitorForm : Form
     private static readonly Font TitleFont = new("Segoe UI Semibold", 11f);
     private static readonly Font ValueFont = new("Segoe UI Semibold", 13f);
     private static readonly Font LabelFont = new("Segoe UI", 8.5f);
+    private static readonly Font BigFont = new("Segoe UI Semibold", 15f); // вид «только ватты»
 
     private const int Capacity = 180; // ~3 минуты при 1 Гц
 
@@ -37,14 +40,25 @@ public sealed class MonitorForm : Form
     private long _prevIdle, _prevKernel, _prevUser;
     private float _ramUsedGb, _ramTotalGb;
 
-    private Rectangle _close;
-    private bool _closeHover;
+    private Rectangle _close, _viewBtn;
+    private bool _closeHover, _viewHover;
+
+    // вид виджета: полный (графики) / мини (строка индикаторов) / только ватты
+    private enum ViewKind { Full, Mini, Power }
+    private ViewKind _view;
+    private int _corner; // скругление текущего вида (общее для Region и рамки)
 
     private readonly AppConfig _cfg;
 
     public MonitorForm(AppConfig cfg)
     {
         _cfg = cfg;
+        _view = cfg.MonitorView?.ToLowerInvariant() switch
+        {
+            "mini" => ViewKind.Mini,
+            "power" => ViewKind.Power,
+            _ => ViewKind.Full,
+        };
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
@@ -78,13 +92,7 @@ public sealed class MonitorForm : Form
         _prevIdle = _prevKernel = _prevUser = 0;
         Sample(); // первая точка сразу
 
-        int w = Sc(400), h = Sc(96) * 3 + Sc(52);
-        Size = new Size(w, h);
-        _close = new Rectangle(w - Sc(16) - Sc(22), Sc(14), Sc(22), Sc(22)); // как в панели
-        var old = Region;
-        using (var p = Draw.Rounded(new Rectangle(0, 0, w, h), Sc(18)))
-            Region = new Region(p);
-        old?.Dispose();
+        ApplyView();
 
         // восстановить сохранённую позицию (если она всё ещё на каком-то экране)
         var saved = _cfg.MonitorX is int mx && _cfg.MonitorY is int my ? new Point(mx, my) : (Point?)null;
@@ -95,10 +103,58 @@ public sealed class MonitorForm : Form
         else
         {
             var wa = Screen.PrimaryScreen!.WorkingArea;
-            Location = new Point(wa.Left + (wa.Width - w) / 2, wa.Top + (int)(wa.Height * 0.50));
+            Location = new Point(wa.Left + (wa.Width - Width) / 2, wa.Top + (int)(wa.Height * 0.50));
         }
         Show();
         Activate();
+    }
+
+    /// <summary>Размер, скругление и кнопки под текущий вид (позиция не трогается).</summary>
+    private void ApplyView()
+    {
+        int w, h;
+        switch (_view)
+        {
+            case ViewKind.Mini: // строка Power | CPU | RAM + кнопки «вид»/крестик справа
+                w = Sc(16) + Sc(104) + Sc(8) + Sc(72) + Sc(8) + Sc(72) + Sc(8) + Sc(18) + Sc(6) + Sc(18) + Sc(10);
+                h = Sc(56);
+                _corner = Sc(14);
+                _close = new Rectangle(w - Sc(10) - Sc(18), (h - Sc(18)) / 2, Sc(18), Sc(18));
+                _viewBtn = new Rectangle(_close.X - Sc(6) - Sc(18), _close.Y, Sc(18), Sc(18));
+                break;
+            case ViewKind.Power: // только ватты; кнопок нет — дальше по кругу двойным кликом
+                w = Sc(116); h = Sc(46);
+                _corner = Sc(12);
+                _close = Rectangle.Empty;
+                _viewBtn = Rectangle.Empty;
+                break;
+            default:
+                w = Sc(400); h = Sc(96) * 3 + Sc(52);
+                _corner = Sc(18);
+                _close = new Rectangle(w - Sc(16) - Sc(22), Sc(14), Sc(22), Sc(22)); // как в панели
+                _viewBtn = new Rectangle(_close.X - Sc(28), _close.Y, Sc(22), Sc(22));
+                break;
+        }
+        Size = new Size(w, h);
+        var old = Region;
+        using (var p = Draw.Rounded(new Rectangle(0, 0, w, h), _corner))
+            Region = new Region(p);
+        old?.Dispose();
+    }
+
+    // Полный → мини → только ватты → снова полный; выбор запоминается в конфиге
+    private void CycleView()
+    {
+        _view = _view switch
+        {
+            ViewKind.Full => ViewKind.Mini,
+            ViewKind.Mini => ViewKind.Power,
+            _ => ViewKind.Full,
+        };
+        _cfg.MonitorView = _view switch { ViewKind.Mini => "mini", ViewKind.Power => "power", _ => null };
+        _cfg.Save();
+        ApplyView();
+        Invalidate();
     }
 
     protected override void OnVisibleChanged(EventArgs e)
@@ -113,16 +169,20 @@ public sealed class MonitorForm : Form
         }
     }
 
-    // виджет: перетаскивается за любое место, кроме крестика; не прячется при потере фокуса
+    // виджет: перетаскивается за любое место, кроме кнопок; не прячется при потере фокуса
     private const int WM_NCHITTEST = 0x84, HTCLIENT = 1, HTCAPTION = 2;
+    private const int WM_NCLBUTTONDBLCLK = 0xA3;
     protected override void WndProc(ref Message m)
     {
+        // двойной клик по «шапке» (то есть почти всему виджету) — следующий вид;
+        // base не зовём, чтобы не сработало системное разворачивание окна
+        if (m.Msg == WM_NCLBUTTONDBLCLK) { CycleView(); return; }
         base.WndProc(ref m);
         if (m.Msg == WM_NCHITTEST && (int)m.Result == HTCLIENT)
         {
             long lp = m.LParam.ToInt64();
             var p = PointToClient(new Point(unchecked((short)(lp & 0xFFFF)), unchecked((short)((lp >> 16) & 0xFFFF))));
-            if (!_close.Contains(p)) m.Result = HTCAPTION;
+            if (!_close.Contains(p) && !_viewBtn.Contains(p)) m.Result = HTCAPTION;
         }
     }
     protected override void OnKeyDown(KeyEventArgs e)
@@ -134,6 +194,7 @@ public sealed class MonitorForm : Form
     {
         base.OnMouseClick(e);
         if (_close.Contains(e.Location)) Hide();
+        else if (_viewBtn.Contains(e.Location)) CycleView();
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
@@ -141,12 +202,15 @@ public sealed class MonitorForm : Form
         base.OnMouseMove(e);
         bool h = _close.Contains(e.Location);
         if (h != _closeHover) { _closeHover = h; Invalidate(_close); }
+        bool v = _viewBtn.Contains(e.Location);
+        if (v != _viewHover) { _viewHover = v; Invalidate(_viewBtn); }
     }
 
     protected override void OnMouseLeave(EventArgs e)
     {
         base.OnMouseLeave(e);
         if (_closeHover) { _closeHover = false; Invalidate(_close); }
+        if (_viewHover) { _viewHover = false; Invalidate(_viewBtn); }
     }
 
     // ---------- семплирование ----------
@@ -225,18 +289,23 @@ public sealed class MonitorForm : Form
 
         g.Clear(Card);
         using (var pen = new Pen(Border))
-        using (var path = Draw.Rounded(new Rectangle(0, 0, Width - 1, Height - 1), Sc(18)))
+        using (var path = Draw.Rounded(new Rectangle(0, 0, Width - 1, Height - 1), _corner))
             g.DrawPath(pen, path);
+
+        float pw = _power.Count > 0 ? _power[^1] : float.NaN;
+        Color pColor = float.IsNaN(pw) ? DimCol : (pw >= 0 ? ChargeCol : DischargeCol);
+
+        if (_view == ViewKind.Power) { PaintPower(g, pw, pColor); return; }
+        if (_view == ViewKind.Mini) { PaintMini(g, pw, pColor); return; }
 
         TextRenderer.DrawText(g, Loc.T("monitor.title"), TitleFont,
             new Rectangle(Sc(16), Sc(12), Width, Sc(24)), TextCol, TextFormatFlags.Left | TextFormatFlags.Top);
 
-        // крестик — общий с панелью
+        // кнопка «вид» и крестик — общие с панелью
+        Draw.ViewButton(g, _viewBtn, _viewHover);
         Draw.CloseButton(g, _close, _closeHover);
 
         int rowH = Sc(96), top = Sc(44);
-        float pw = _power.Count > 0 ? _power[^1] : float.NaN;
-        Color pColor = float.IsNaN(pw) ? DimCol : (pw >= 0 ? ChargeCol : DischargeCol);
         string powerText = !float.IsNaN(pw)
             ? (pw >= 0 ? "+" : "") + Loc.T("monitor.watts", MathF.Abs(pw))  // всегда положительное число; направление — цветом
             : Loc.T("monitor.na");
@@ -250,6 +319,37 @@ public sealed class MonitorForm : Form
         DrawRow(g, new Rectangle(Sc(16), top + rowH * 2, Width - Sc(32), rowH),
             "RAM", _ram.Count > 0 ? $"{_ram[^1]:0}%" : "—", RamCol, _ram, 100f,
             _ramTotalGb > 0 ? Loc.T("monitor.ram.of", _ramUsedGb, _ramTotalGb) : null);
+    }
+
+    // Мини-вид: три индикатора в строку без графиков, подписи латиницей во всех локалях
+    private void PaintMini(Graphics g, float pw, Color pColor)
+    {
+        string powerVal = float.IsNaN(pw) ? "—" : Loc.T("monitor.watts", MathF.Abs(pw));
+        int x = Sc(16);
+        x = MiniCell(g, x, Sc(104), "Power", powerVal, pColor);
+        x = MiniCell(g, x, Sc(72), "CPU", _cpu.Count > 0 && !float.IsNaN(_cpu[^1]) ? $"{_cpu[^1]:0}%" : "—", CpuCol);
+        MiniCell(g, x, Sc(72), "RAM", _ram.Count > 0 ? $"{_ram[^1]:0}%" : "—", RamCol);
+
+        Draw.ViewButton(g, _viewBtn, _viewHover);
+        Draw.CloseButton(g, _close, _closeHover);
+    }
+
+    private int MiniCell(Graphics g, int x, int w, string label, string value, Color color)
+    {
+        TextRenderer.DrawText(g, label, LabelFont,
+            new Rectangle(x, Sc(8), w, Sc(16)), DimCol, TextFormatFlags.Left | TextFormatFlags.Top);
+        TextRenderer.DrawText(g, value, ValueFont,
+            new Rectangle(x, Sc(24), w, Sc(26)), color, TextFormatFlags.Left | TextFormatFlags.Top);
+        return x + w + Sc(8);
+    }
+
+    // Вид «только ватты»: одно целое число во всё окно; направление тока — цветом,
+    // как на графике (зелёный — заряд, оранжевый — разряд, серое «—» — от сети)
+    private void PaintPower(Graphics g, float pw, Color pColor)
+    {
+        string text = float.IsNaN(pw) ? "—" : Loc.T("monitor.watts.scale", MathF.Abs(pw));
+        TextRenderer.DrawText(g, text, BigFont, ClientRectangle, pColor,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
     }
 
     /// <summary>Верх шкалы ватт: максимум данных с запасом, округлённый вверх до кратного 5 (мин. 10).</summary>
