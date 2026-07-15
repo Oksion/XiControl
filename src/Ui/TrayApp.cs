@@ -17,6 +17,7 @@ public sealed class TrayApp : IDisposable
     private bool _lightTaskbar = Theme.TaskbarIsLight();
     private readonly ChargeGuard _guard;
     private readonly RefreshRateGuard _hzGuard;
+    private readonly PowerProfileGuard _powerGuard;
     private readonly OsdForm _osd = new();
     private readonly MifsEventWatcher _events = new();
     private readonly QuickPanelForm _panel;
@@ -79,10 +80,22 @@ public sealed class TrayApp : IDisposable
         _hzGuard = new RefreshRateGuard(_cfg);
         _hzGuard.Reapply();
 
+        // Профили питания: режим + яркость по питанию, на старте и при его смене
+        _powerGuard = new PowerProfileGuard(_mifs, _cfg);
+        _powerGuard.ModeApplied = () =>
+        {
+            if (_osd.IsHandleCreated) _osd.BeginInvoke(new Action(() => UpdateTrayIcon()));
+        };
+
         // Режим при старте (прошивка сбрасывает его на ребуте):
-        //  • RestoreMode → восстановить последний выбранный (если он ещё видим), иначе Auto;
+        //  • PowerProfiles → применить профиль текущего питания (режим + яркость);
+        //  • иначе RestoreMode → восстановить последний выбранный (если он ещё видим), иначе Auto;
         //  • иначе, если задан ForceStartMode (только правкой конфига) → принудительно его.
-        if (_cfg.RestoreMode)
+        if (_cfg.PowerProfiles)
+        {
+            _powerGuard.Reapply();
+        }
+        else if (_cfg.RestoreMode)
         {
             if (_cfg.StartPerfMode is PerfMode saved)
                 ApplyStartMode(_modes.Any(m => m.mode == saved) ? saved : PerfMode.Auto);
@@ -442,6 +455,20 @@ public sealed class TrayApp : IDisposable
         var pinCurrent = new ToolStripMenuItem(Loc.T("menu.startmode.pin")) { Checked = _cfg.ForceStartMode is not null };
         pinCurrent.Click += (_, _) => PinCurrentStartMode();
         startMode.DropDownItems.Add(pinCurrent);
+        var powerProf = new ToolStripMenuItem(Loc.T("menu.startmode.power")) { Checked = _cfg.PowerProfiles };
+        powerProf.Click += (_, _) => SetPowerProfiles(!_cfg.PowerProfiles);
+        startMode.DropDownItems.Add(powerProf);
+
+        // профили активны — показываем выбор режима на зарядке / от батареи и опцию яркости
+        if (_cfg.PowerProfiles)
+        {
+            startMode.DropDownItems.Add(new ToolStripSeparator());
+            startMode.DropDownItems.Add(ProfilePicker("menu.profile.ac", ac: true, _cfg.AcPerfMode));
+            startMode.DropDownItems.Add(ProfilePicker("menu.profile.battery", ac: false, _cfg.BatteryPerfMode));
+            var remBright = new ToolStripMenuItem(Loc.T("menu.profile.brightness")) { Checked = _cfg.RememberBrightness };
+            remBright.Click += (_, _) => ToggleRememberBrightness();
+            startMode.DropDownItems.Add(remBright);
+        }
         TintDropDown(startMode);
         settings.DropDownItems.Add(startMode);
 
@@ -578,7 +605,8 @@ public sealed class TrayApp : IDisposable
         _cfg.RestoreMode = on;
         if (on)
         {
-            _cfg.ForceStartMode = null; // включили восстановление — снимаем закреп
+            _cfg.ForceStartMode = null;   // включили восстановление — снимаем закреп
+            _cfg.PowerProfiles = false;   // …и профили питания (три стратегии взаимоисключающи)
             if (_cfg.StartPerfMode is null)
                 _cfg.StartPerfMode = Safe<PerfMode?>(() => _mifs.GetPerfMode(), null);
         }
@@ -598,8 +626,75 @@ public sealed class TrayApp : IDisposable
         {
             _cfg.ForceStartMode = m;
             _cfg.RestoreMode = false;
+            _cfg.PowerProfiles = false; // закрепили режим — профили питания выключаем
         }
         _cfg.Save();
+    }
+
+    // «Профили питания» (взаимоисключающе с «восстанавливать»/«закрепить»): включаем —
+    // засеваем текущую яркость в слот текущего питания (чтоб было что вспоминать) и применяем.
+    private void SetPowerProfiles(bool on)
+    {
+        _cfg.PowerProfiles = on;
+        if (on)
+        {
+            _cfg.RestoreMode = false;
+            _cfg.ForceStartMode = null;
+            if (_cfg.RememberBrightness) SeedCurrentBrightness();
+        }
+        _cfg.Save();
+        if (on) _powerGuard.Reapply();
+    }
+
+    // Выбор режима профиля (ac=true — сеть, иначе батарея; mode=null — «не менять»).
+    // Если это профиль текущего питания — применяем сразу для мгновенной обратной связи.
+    private void SetProfileMode(bool ac, PerfMode? mode)
+    {
+        if (ac) _cfg.AcPerfMode = mode; else _cfg.BatteryPerfMode = mode;
+        _cfg.Save();
+        bool online = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+        if (mode is PerfMode m && ac == online)
+        {
+            if (!Safe(() => _mifs.SetPerfMode(m), false))
+                Safe(() => _mifs.SetPerfMode(PerfMode.Auto), false);
+            UpdateTrayIcon();
+        }
+    }
+
+    private void ToggleRememberBrightness()
+    {
+        _cfg.RememberBrightness = !_cfg.RememberBrightness;
+        if (_cfg.RememberBrightness) SeedCurrentBrightness();
+        _cfg.Save();
+    }
+
+    // Запомнить текущую яркость в слот текущего питания (при включении опции — чтобы был старт).
+    private void SeedCurrentBrightness()
+    {
+        if (Brightness.Get() is not int lvl) return;
+        if (SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online)
+            _cfg.AcBrightness = lvl;
+        else
+            _cfg.BatteryBrightness = lvl;
+    }
+
+    // Подменю выбора режима для одного профиля: «Не менять» + все видимые режимы (radio-галочка).
+    private ToolStripMenuItem ProfilePicker(string titleKey, bool ac, PerfMode? current)
+    {
+        var root = new ToolStripMenuItem(Loc.T(titleKey));
+        var none = new ToolStripMenuItem(Loc.T("menu.profile.nochange")) { Checked = current is null };
+        none.Click += (_, _) => SetProfileMode(ac, null);
+        root.DropDownItems.Add(none);
+        root.DropDownItems.Add(new ToolStripSeparator());
+        foreach (var (key, mode) in _modes)
+        {
+            var m = mode;
+            var it = new ToolStripMenuItem(Loc.T(key)) { Checked = current == mode };
+            it.Click += (_, _) => SetProfileMode(ac, m);
+            root.DropDownItems.Add(it);
+        }
+        TintDropDown(root);
+        return root;
     }
 
     // Авто-герцовка: вкл — сразу применить частоту по текущему питанию, выкл — частоту не трогаем
@@ -672,6 +767,7 @@ public sealed class TrayApp : IDisposable
         _events.Dispose();
         _guard.Dispose();
         _hzGuard.Dispose();
+        _powerGuard.Dispose();
         _osd.Dispose();
         _panel.Dispose();
         _monitor?.Dispose();

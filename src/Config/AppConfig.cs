@@ -36,6 +36,31 @@ public sealed class AppConfig
     public PerfMode? ForceStartMode { get; set; }
 
     /// <summary>
+    /// «Профили питания»: при подключении сети применяется AcPerfMode, при переходе на батарею —
+    /// BatteryPerfMode; яркость экрана запоминается и восстанавливается отдельно для каждого
+    /// состояния (RememberBrightness). Взаимоисключающе с RestoreMode/ForceStartMode — на старте
+    /// и при каждой смене питания режим задаёт именно этот профиль. Держит PowerProfileGuard.
+    /// </summary>
+    public bool PowerProfiles { get; set; } = false;
+
+    /// <summary>Режим при питании от сети; null — «не менять». Выбирается в меню.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public PerfMode? AcPerfMode { get; set; }
+
+    /// <summary>Режим при питании от батареи; null — «не менять». Выбирается в меню.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public PerfMode? BatteryPerfMode { get; set; }
+
+    /// <summary>Запоминать и восстанавливать яркость экрана отдельно для сети и батареи.</summary>
+    public bool RememberBrightness { get; set; } = true;
+
+    /// <summary>Запомненная яркость экрана (0–100) от сети; null — ещё не запомнена.</summary>
+    public int? AcBrightness { get; set; }
+
+    /// <summary>Запомненная яркость экрана (0–100) от батареи; null — ещё не запомнена.</summary>
+    public int? BatteryBrightness { get; set; }
+
+    /// <summary>
     /// Показывать скрытый режим Эко (0x0A) в меню, панели и цикле Mi-кнопки.
     /// Настраивается только правкой config.json (перезапуск).
     /// </summary>
