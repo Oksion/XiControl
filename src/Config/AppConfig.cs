@@ -51,8 +51,10 @@ public sealed class AppConfig
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public PerfMode? BatteryPerfMode { get; set; }
 
-    /// <summary>Запоминать и восстанавливать яркость экрана отдельно для сети и батареи.</summary>
-    public bool RememberBrightness { get; set; } = true;
+    /// <summary>Запоминать и восстанавливать яркость экрана отдельно для сети и батареи.
+    /// По умолчанию выкл: «Профили питания» правят только режим, яркость трогается лишь
+    /// если пользователь сам включит эту опцию (утилита перебивает яркость Windows — явный выбор).</summary>
+    public bool RememberBrightness { get; set; } = false;
 
     /// <summary>Запомненная яркость экрана (0–100) от сети; null — ещё не запомнена.</summary>
     public int? AcBrightness { get; set; }
