@@ -28,14 +28,17 @@ public sealed class MiButtonGesture : IDisposable
     /// без окна ожидания ~300 мс (MiDoubleAction = "none").</summary>
     public Func<bool> DoubleEnabled = () => true;
 
-    public MiButtonGesture(IAppTimer? hold = null, IAppTimer? click = null)
+    // holdMs/doubleClickMs настраиваются из config.json (AppConfig.MiHoldMs/MiDoubleClickMs);
+    // клэмп снизу — чтобы кривое значение не сломало жест (мгновенное удержание / нулевое окно).
+    public MiButtonGesture(IAppTimer? hold = null, IAppTimer? click = null,
+        int holdMs = 400, int doubleClickMs = 300)
     {
         _hold = hold ?? new UiTimer();
-        _hold.Interval = 400;
+        _hold.Interval = Math.Max(150, holdMs);
         _hold.Tick += OnHoldTimeout;
 
         _click = click ?? new UiTimer();
-        _click.Interval = 300;
+        _click.Interval = Math.Max(100, doubleClickMs);
         _click.Tick += OnClickTimeout;
     }
 
