@@ -3,20 +3,40 @@
 namespace XiControl.Ui;
 
 /// <summary>
-/// Палитра тёмных флайаутов (панель Mi-кнопки, «Монитор»; OSD пока со своей копией).
-/// Флайауты сознательно всегда тёмные — следовать ли системной теме, решается в Фазе 6.4;
-/// до тех пор единственный источник этих цветов здесь. Акценты — из docs/10-colors.md.
+/// Палитра флайаутов (панель Mi-кнопки, OSD, «Монитор») — единственный источник их цветов.
+/// Тема настраивается (Фаза 6.4): AppConfig.FlyoutTheme = null («тёмная», как исторически),
+/// "light" или "system" (следовать теме Windows). Apply() пересчитывает флаг Dark; формы
+/// берут цвета в момент отрисовки, поэтому смена темы — это Apply + Invalidate видимых окон.
+/// Акценты одинаковы в обеих темах — из docs/10-colors.md.
 /// </summary>
 public static class FlyoutPalette
 {
-    public static readonly Color Card = Color.FromArgb(28, 28, 30);    // фон карточки
-    public static readonly Color Border = Color.FromArgb(70, 70, 74);  // рамка по контуру
-    public static readonly Color Text = Color.FromArgb(238, 238, 238);
-    public static readonly Color Dim = Color.FromArgb(170, 170, 175);  // вторичный текст (≥4.5:1 к Card — WCAG AA, Фаза 6.3)
-    public static readonly Color Green = Color.FromArgb(52, 199, 89);  // ок / заряд / тихий
-    public static readonly Color Blue = Color.FromArgb(90, 170, 255);  // авто / CPU
-    public static readonly Color Orange = Color.FromArgb(255, 149, 0); // турбо / разряд / «в дорогу»
-    public static readonly Color Red = Color.FromArgb(255, 82, 82);    // полная мощность / выключено
+    /// <summary>Тёмная ли палитра флайаутов сейчас (см. Apply).</summary>
+    public static bool Dark { get; private set; } = true;
+
+    /// <summary>Пересчитать тему по настройке: null → тёмная (историческое поведение),
+    /// "light" → светлая, "system" → как тема приложений Windows.</summary>
+    public static void Apply(string? flyoutTheme) => Dark = flyoutTheme switch
+    {
+        "light" => false,
+        "system" => Theme.IsDark(),
+        _ => true,
+    };
+
+    public static Color Card => Dark ? Color.FromArgb(28, 28, 30) : Color.FromArgb(243, 243, 245);    // фон карточки
+    public static Color Border => Dark ? Color.FromArgb(70, 70, 74) : Color.FromArgb(200, 200, 205);  // рамка по контуру
+    public static Color Text => Dark ? Color.FromArgb(238, 238, 238) : Color.FromArgb(26, 26, 26);
+    public static Color Dim => Dark ? Color.FromArgb(170, 170, 175) : Color.FromArgb(96, 96, 102);    // вторичный текст (≥4.5:1 к Card — WCAG AA)
+    public static Color Cell => Dark ? Color.FromArgb(42, 42, 45) : Color.FromArgb(232, 232, 236);    // ячейка панели (чуть контрастнее карточки)
+    public static Color CellHover => Dark ? Color.FromArgb(52, 52, 56) : Color.FromArgb(222, 222, 227);
+    public static Color PlotBg => Dark ? Color.FromArgb(38, 38, 41) : Color.FromArgb(233, 233, 237);  // подложка графиков Монитора
+    public static Color PlotGrid => Dark ? Color.FromArgb(50, 50, 54) : Color.FromArgb(216, 216, 221);
+
+    // акценты — общие для обеих тем
+    public static Color Green => Color.FromArgb(52, 199, 89);   // ок / заряд / тихий
+    public static Color Blue => Color.FromArgb(90, 170, 255);   // авто / CPU
+    public static Color Orange => Color.FromArgb(255, 149, 0);  // турбо / разряд / «в дорогу»
+    public static Color Red => Color.FromArgb(255, 82, 82);     // полная мощность / выключено
 }
 
 /// <summary>

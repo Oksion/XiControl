@@ -12,9 +12,6 @@ namespace XiControl.Ui;
 /// </summary>
 public sealed class QuickPanelForm : FlyoutForm
 {
-    // палитра общая (FlyoutPalette), свой только фон ячейки — чуть светлее карточки
-    private static readonly Color Cell = Color.FromArgb(42, 42, 45);
-
     private readonly IMifsClient _mifs;
     private readonly AppConfig _cfg;
     private readonly TouchpadControl _tp;
@@ -423,13 +420,13 @@ public sealed class QuickPanelForm : FlyoutForm
             var iconR = new RectangleF(
                 r.X + (r.Width - Sc(40) - grow) / 2f, r.Y + Sc(9) - grow / 2f,
                 Sc(40) + grow, Sc(40) + grow);
-            float op = active ? 1f : 0.45f + 0.55f * t;
+            var (op, sat) = active ? (1f, 1f) : InactiveFx(t);
             // активная ячейка «живёт» всегда, остальные — по мере наведения
             float k = active ? 1f : t;
             if (_anim.Enabled && k > 0.01f)
-                DrawModeIconAnimated(g, _modes[i].mode, iconR, op, k);
+                DrawModeIconAnimated(g, _modes[i].mode, iconR, op, k, sat);
             else
-                DrawModeIcon(g, _modes[i].mode, iconR, op);
+                DrawModeIcon(g, _modes[i].mode, iconR, op, sat);
 
             TextRenderer.DrawText(g, Loc.T(_modes[i].key), LabelFont,
                 new Rectangle(r.X + Sc(3), r.Bottom - Sc(38), r.Width - Sc(6), Sc(36)),
@@ -446,12 +443,15 @@ public sealed class QuickPanelForm : FlyoutForm
         bool travelEnabled = _cfg.ChargeCare;
         DrawCell(g, _travelCell, _cfg.TravelMode, travelEnabled && _hover == 16, FlyoutPalette.Orange, Sc(10));
         float trIcon = Math.Min(_travelCell.Width, _travelCell.Height) - Sc(8);
-        float trOp = !travelEnabled ? 0.28f : (_cfg.TravelMode || _hover == 16 ? 1f : 0.6f);
+        // недоступна (постоянный 100%): в светлой теме прозрачность + почти ч/б, иначе «грязи» нет
+        var (trOp, trSat) = !travelEnabled
+            ? (FlyoutPalette.Dark ? (0.28f, 1f) : (0.45f, 0.15f))
+            : CellFx(_cfg.TravelMode || _hover == 16);
         var trRect = new RectangleF(_travelCell.X + (_travelCell.Width - trIcon) / 2f, _travelCell.Y + (_travelCell.Height - trIcon) / 2f, trIcon, trIcon);
         if (_cfg.TravelMode)
             SvgIcons.DrawTravelPulse(g, trRect, _gaugeT, trOp); // молния мигает, когда режим активен
         else
-            SvgIcons.Draw(g, SvgIcons.TravelOff, trRect, trOp);
+            SvgIcons.Draw(g, SvgIcons.TravelOff, trRect, trOp, trSat);
 
         DrawPill(g, _care80, "80%", _cfg.ChargeCare, _hover == 10, FlyoutPalette.Green, PillFont);
         DrawPill(g, _care100, "100%", !_cfg.ChargeCare, _hover == 11, Color.FromArgb(120, 120, 125), PillFont);
@@ -461,10 +461,11 @@ public sealed class QuickPanelForm : FlyoutForm
         {
             DrawCell(g, _tpCell, !_tpOn, _hover == 17, FlyoutPalette.Red, Sc(10));
             float tpIcon = Math.Min(_tpCell.Width, _tpCell.Height) - Sc(8);
+            var (tpOp, tpSat) = CellFx(!_tpOn || _hover == 17);
             SvgIcons.Draw(g,
                 _tpOn ? SvgIcons.Touchpad : SvgIcons.TouchpadOff,
                 new RectangleF(_tpCell.X + (_tpCell.Width - tpIcon) / 2f, _tpCell.Y + (_tpCell.Height - tpIcon) / 2f, tpIcon, tpIcon),
-                !_tpOn || _hover == 17 ? 1f : 0.6f);
+                tpOp, tpSat);
         }
 
         // сенсорный экран: та же логика подсветки «выключен = заметнее», что и у тачпада
@@ -472,19 +473,21 @@ public sealed class QuickPanelForm : FlyoutForm
         {
             DrawCell(g, _tsCell, !_tsOn, _hover == 18, FlyoutPalette.Red, Sc(10));
             float tsIcon = Math.Min(_tsCell.Width, _tsCell.Height) - Sc(8);
+            var (tsOp, tsSat) = CellFx(!_tsOn || _hover == 18);
             SvgIcons.Draw(g,
                 _tsOn ? SvgIcons.Touchscreen : SvgIcons.TouchscreenOff,
                 new RectangleF(_tsCell.X + (_tsCell.Width - tsIcon) / 2f, _tsCell.Y + (_tsCell.Height - tsIcon) / 2f, tsIcon, tsIcon),
-                !_tsOn || _hover == 18 ? 1f : 0.6f);
+                tsOp, tsSat);
         }
 
         // авто-герцовка: монитор с круговыми стрелками, активна при включённой опции
         DrawCell(g, _hzCell, _cfg.AutoRefreshRate, _hover == 15, FlyoutPalette.Blue, Sc(10));
         float hzIcon = Math.Min(_hzCell.Width, _hzCell.Height) - Sc(8);
+        var (hzOp, hzSat) = CellFx(_cfg.AutoRefreshRate || _hover == 15);
         SvgIcons.Draw(g,
             _cfg.AutoRefreshRate ? SvgIcons.RefreshRate : SvgIcons.RefreshRateOff,
             new RectangleF(_hzCell.X + (_hzCell.Width - hzIcon) / 2f, _hzCell.Y + (_hzCell.Height - hzIcon) / 2f, hzIcon, hzIcon),
-            _cfg.AutoRefreshRate || _hover == 15 ? 1f : 0.6f);
+            hzOp, hzSat);
 
         // сова: ячейка в стиле режимов, бодрая при включённом «Не спать»
         if (!_awake.IsEmpty)
@@ -494,10 +497,11 @@ public sealed class QuickPanelForm : FlyoutForm
 
             DrawCell(g, _awake, _cfg.Awake, _hover == 13, FlyoutPalette.Blue, Sc(10));
             float owlIcon = Math.Min(_awake.Width, _awake.Height) - Sc(8);
+            var (owlOp, owlSat) = CellFx(_cfg.Awake || _hover == 13);
             SvgIcons.Draw(g,
                 _cfg.Awake ? SvgIcons.OwlAwake : SvgIcons.OwlAsleep,
                 new RectangleF(_awake.X + (_awake.Width - owlIcon) / 2f, _awake.Y + (_awake.Height - owlIcon) / 2f, owlIcon, owlIcon),
-                _cfg.Awake || _hover == 13 ? 1f : 0.6f);
+                owlOp, owlSat);
         }
 
         // клавиатурный фокус: пунктирное кольцо вокруг текущей ячейки
@@ -511,7 +515,9 @@ public sealed class QuickPanelForm : FlyoutForm
 
     private static void DrawCell(Graphics g, Rectangle r, bool active, bool hover, Color accent, int corner)
     {
-        using var bg = new SolidBrush(active ? Blend(Cell, accent, 0.18f) : (hover ? Color.FromArgb(52, 52, 56) : Cell));
+        using var bg = new SolidBrush(active
+            ? Blend(FlyoutPalette.Cell, accent, 0.18f)
+            : (hover ? FlyoutPalette.CellHover : FlyoutPalette.Cell));
         using var path = Draw.Rounded(r, corner);
         g.FillPath(bg, path);
         if (active)
@@ -522,20 +528,30 @@ public sealed class QuickPanelForm : FlyoutForm
     }
 
     // при наведении: та же иконка, но живая; k = прогресс hover (амплитуда вкатывается плавно)
-    private void DrawModeIconAnimated(Graphics g, PerfMode m, RectangleF r, float opacity, float k)
+    // Эффект неактивной иконки, зависящий от темы: тёмная гасит прозрачностью (исторический
+    // вид), светлая — приглушает насыщенность при полной яркости: полупрозрачные цветные иконки
+    // на светлом фоне выглядят белёсыми, десатурация — нет. t — прогресс hover (0..1).
+    private static (float Op, float Sat) InactiveFx(float t)
+        => FlyoutPalette.Dark ? (0.45f + 0.55f * t, 1f) : (1f, 0.55f + 0.45f * t);
+
+    // То же для ячеек нижнего ряда (у них hover без плавности — состояние бинарное)
+    private static (float Op, float Sat) CellFx(bool lit)
+        => lit ? (1f, 1f) : FlyoutPalette.Dark ? (0.6f, 1f) : (1f, 0.6f);
+
+    private void DrawModeIconAnimated(Graphics g, PerfMode m, RectangleF r, float opacity, float k, float saturation = 1f)
     {
         switch (m)
         {
-            case PerfMode.Eco: SvgIcons.DrawMoonTwinkle(g, r, _gaugeT, k, opacity); break;
-            case PerfMode.Quiet: SvgIcons.DrawLeafSway(g, r, _gaugeT, k, opacity); break;
-            case PerfMode.Auto: SvgIcons.DrawGauge(g, r, k * OsdForm.SweepAngle(_gaugeT), opacity); break;
-            case PerfMode.Turbo: SvgIcons.DrawBoltPulse(g, r, _gaugeT, k, opacity); break;
-            case PerfMode.FullSpeed: SvgIcons.DrawRocket(g, r, _gaugeT, k, opacity); break;
-            default: DrawModeIcon(g, m, r, opacity); break;
+            case PerfMode.Eco: SvgIcons.DrawMoonTwinkle(g, r, _gaugeT, k, opacity, saturation); break;
+            case PerfMode.Quiet: SvgIcons.DrawLeafSway(g, r, _gaugeT, k, opacity, saturation); break;
+            case PerfMode.Auto: SvgIcons.DrawGauge(g, r, k * OsdForm.SweepAngle(_gaugeT), opacity, saturation); break;
+            case PerfMode.Turbo: SvgIcons.DrawBoltPulse(g, r, _gaugeT, k, opacity, saturation); break;
+            case PerfMode.FullSpeed: SvgIcons.DrawRocket(g, r, _gaugeT, k, opacity, saturation); break;
+            default: DrawModeIcon(g, m, r, opacity, saturation); break;
         }
     }
 
-    private static void DrawModeIcon(Graphics g, PerfMode m, RectangleF r, float opacity)
+    private static void DrawModeIcon(Graphics g, PerfMode m, RectangleF r, float opacity, float saturation = 1f)
     {
         string name = m switch
         {
@@ -546,12 +562,12 @@ public sealed class QuickPanelForm : FlyoutForm
             PerfMode.FullSpeed => SvgIcons.PerfFull,
             _ => SvgIcons.PerfAuto,
         };
-        SvgIcons.Draw(g, name, r, opacity);
+        SvgIcons.Draw(g, name, r, opacity, saturation);
     }
 
     private static void DrawPill(Graphics g, Rectangle r, string text, bool active, bool hover, Color accent, Font font)
     {
-        Color bg = active ? accent : (hover ? Color.FromArgb(52, 52, 56) : Cell);
+        Color bg = active ? accent : (hover ? FlyoutPalette.CellHover : FlyoutPalette.Cell);
         using (var b = new SolidBrush(bg))
         using (var path = Draw.Rounded(r, r.Height / 2f))
             g.FillPath(b, path);

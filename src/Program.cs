@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using XiControl.Config;
 using XiControl.Localization;
 using XiControl.SystemIntegration;
@@ -46,6 +46,7 @@ internal static class Program
         var cfg = provider.GetRequiredService<AppConfig>();
         Log.Enabled = cfg.LogEnabled; // до этой строчки лог включён — ошибки старта не теряем
         provider.GetRequiredService<ILocalizer>().Current = cfg.Language ?? ""; // Loc нормализует пустую/неизвестную культуру
+        Ui.FlyoutPalette.Apply(cfg.FlyoutTheme); // тема панелей/OSD — до создания форм
 
         try
         {

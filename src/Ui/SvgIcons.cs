@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Svg;
 
 namespace XiControl.Ui;
@@ -113,25 +113,46 @@ public static class SvgIcons
     private static RectangleF CenteredDest(RectangleF r, int size) =>
         new(r.X + (r.Width - size) / 2f, r.Y + (r.Height - size) / 2f, size, size);
 
-    private static void DrawBitmap(Graphics g, Bitmap bmp, RectangleF dest, float alpha = 1f, float brightness = 1f)
+    // Единый фильтр отрисовки: прозрачность × яркость × насыщенность. Десатурация — по весам
+    // Rec.709, воспринимаемая яркость не меняется (нужна светлой теме: полупрозрачные цветные
+    // иконки на светлом фоне выглядят белёсыми, приглушение насыщенности — нет).
+    private static System.Drawing.Imaging.ColorMatrix Fx(float alpha, float brightness, float saturation)
+    {
+        float s = Math.Clamp(saturation, 0f, 1f);
+        float sr = (1f - s) * 0.2126f, sg = (1f - s) * 0.7152f, sb = (1f - s) * 0.0722f;
+        float b = brightness;
+        return new()
+        {
+            Matrix00 = (sr + s) * b,
+            Matrix01 = sr * b,
+            Matrix02 = sr * b,
+            Matrix10 = sg * b,
+            Matrix11 = (sg + s) * b,
+            Matrix12 = sg * b,
+            Matrix20 = sb * b,
+            Matrix21 = sb * b,
+            Matrix22 = (sb + s) * b,
+            Matrix33 = Math.Clamp(alpha, 0f, 1f),
+            Matrix44 = 1f,
+        };
+    }
+
+    private static void DrawBitmap(Graphics g, Bitmap bmp, RectangleF dest, float alpha = 1f, float brightness = 1f, float saturation = 1f)
     {
         var pts = new[] { new PointF(dest.X, dest.Y), new PointF(dest.Right, dest.Y), new PointF(dest.X, dest.Bottom) };
         var src = new RectangleF(0, 0, bmp.Width, bmp.Height);
-        if (alpha >= 0.999f && Math.Abs(brightness - 1f) < 0.001f)
+        if (alpha >= 0.999f && Math.Abs(brightness - 1f) < 0.001f && saturation >= 0.999f)
         {
             g.DrawImage(bmp, pts, src, GraphicsUnit.Pixel);
             return;
         }
         using var attrs = new System.Drawing.Imaging.ImageAttributes();
-        attrs.SetColorMatrix(new System.Drawing.Imaging.ColorMatrix
-        {
-            Matrix00 = brightness, Matrix11 = brightness, Matrix22 = brightness, Matrix33 = Math.Clamp(alpha, 0f, 1f),
-        });
+        attrs.SetColorMatrix(Fx(alpha, brightness, saturation));
         g.DrawImage(bmp, pts, src, GraphicsUnit.Pixel, attrs);
     }
 
     /// <summary>Лист (Тихий): покачивание вокруг основания черешка, как от ветерка.</summary>
-    public static void DrawLeafSway(Graphics g, RectangleF r, float t, float k, float opacity = 1f)
+    public static void DrawLeafSway(Graphics g, RectangleF r, float t, float k, float opacity = 1f, float saturation = 1f)
     {
         int size = (int)Math.Round(Math.Min(r.Width, r.Height));
         var dest = CenteredDest(r, size);
@@ -139,20 +160,20 @@ public static class SvgIcons
         float px = dest.X + dest.Width * 0.25f, py = dest.Y + dest.Height * 0.84f; // основание черешка
         var st = g.Save();
         g.TranslateTransform(px, py); g.RotateTransform(ang); g.TranslateTransform(-px, -py);
-        DrawBitmap(g, Render(PerfQuiet, size), dest, opacity);
+        DrawBitmap(g, Render(PerfQuiet, size), dest, opacity, 1f, saturation);
         g.Restore(st);
     }
 
     /// <summary>Молния (Турбо): пульсация яркости.</summary>
-    public static void DrawBoltPulse(Graphics g, RectangleF r, float t, float k, float opacity = 1f)
+    public static void DrawBoltPulse(Graphics g, RectangleF r, float t, float k, float opacity = 1f, float saturation = 1f)
     {
         int size = (int)Math.Round(Math.Min(r.Width, r.Height));
         float b = 1f + 0.28f * k * (0.5f + 0.5f * MathF.Sin(t * 3.2f));
-        DrawBitmap(g, Render(PerfTurbo, size), CenteredDest(r, size), opacity, b);
+        DrawBitmap(g, Render(PerfTurbo, size), CenteredDest(r, size), opacity, b, saturation);
     }
 
     /// <summary>Ракета (Полная): микротряска корпуса + подрагивающее пламя.</summary>
-    public static void DrawRocket(Graphics g, RectangleF r, float t, float k, float opacity = 1f)
+    public static void DrawRocket(Graphics g, RectangleF r, float t, float k, float opacity = 1f, float saturation = 1f)
     {
         int size = (int)Math.Round(Math.Min(r.Width, r.Height));
         var dest = CenteredDest(r, size);
@@ -163,26 +184,26 @@ public static class SvgIcons
         float ax = dest.X + dest.Width * 0.375f, ay = dest.Y + dest.Height * 0.66f;
         var st = g.Save();
         g.TranslateTransform(ax, ay); g.ScaleTransform(fs, fs); g.TranslateTransform(-ax, -ay);
-        DrawBitmap(g, Render(PerfFullFlame, size), dest, opacity * fa);
+        DrawBitmap(g, Render(PerfFullFlame, size), dest, opacity * fa, 1f, saturation);
         g.Restore(st);
 
         // корпус: едва заметное плавное покачивание
         float sh = 0.006f * size * k;
         var body = dest;
         body.Offset(sh * MathF.Sin(t * 5f), sh * MathF.Sin(t * 7f + 2f));
-        DrawBitmap(g, Render(PerfFullBody, size), body, opacity);
+        DrawBitmap(g, Render(PerfFullBody, size), body, opacity, 1f, saturation);
     }
 
     /// <summary>Луна (Эко): звёзды мерцают в противофазе.</summary>
-    public static void DrawMoonTwinkle(Graphics g, RectangleF r, float t, float k, float opacity = 1f)
+    public static void DrawMoonTwinkle(Graphics g, RectangleF r, float t, float k, float opacity = 1f, float saturation = 1f)
     {
         int size = (int)Math.Round(Math.Min(r.Width, r.Height));
         var dest = CenteredDest(r, size);
-        DrawBitmap(g, Render(PerfEcoMoon, size), dest, opacity);
+        DrawBitmap(g, Render(PerfEcoMoon, size), dest, opacity, 1f, saturation);
         float a1 = 1f - 0.7f * k * (0.5f + 0.5f * MathF.Sin(t * 2.1f));
         float a2 = 1f - 0.7f * k * (0.5f + 0.5f * MathF.Sin(t * 2.1f + 2.2f));
-        DrawBitmap(g, Render(PerfEcoStar1, size), dest, opacity * a1);
-        DrawBitmap(g, Render(PerfEcoStar2, size), dest, opacity * a2);
+        DrawBitmap(g, Render(PerfEcoStar1, size), dest, opacity * a1, 1f, saturation);
+        DrawBitmap(g, Render(PerfEcoStar2, size), dest, opacity * a2, 1f, saturation);
     }
 
     /// <summary>Батарея на зарядке: молния внутри мягко пульсирует.</summary>
@@ -209,9 +230,9 @@ public static class SvgIcons
     /// Спидометр с поворачиваемой стрелкой: циферблат статично + стрелка под углом
     /// angleDeg (0 = как в исходной иконке) вокруг центра. Для анимации «настройки».
     /// </summary>
-    public static void DrawGauge(Graphics g, RectangleF r, float angleDeg, float opacity = 1f)
+    public static void DrawGauge(Graphics g, RectangleF r, float angleDeg, float opacity = 1f, float saturation = 1f)
     {
-        Draw(g, PerfAutoDial, r, opacity);
+        Draw(g, PerfAutoDial, r, opacity, saturation);
 
         int size = (int)Math.Round(Math.Min(r.Width, r.Height));
         var needle = Render(PerfAutoNeedle, size);
@@ -221,33 +242,34 @@ public static class SvgIcons
         g.TranslateTransform(r.X + r.Width / 2f, r.Y + r.Height / 2f);
         g.RotateTransform(angleDeg);
         var dest = new Rectangle(-size / 2, -size / 2, size, size);
-        if (opacity >= 0.999f)
+        if (opacity >= 0.999f && saturation >= 0.999f)
         {
             g.DrawImage(needle, dest);
         }
         else
         {
             using var attrs = new System.Drawing.Imaging.ImageAttributes();
-            attrs.SetColorMatrix(new System.Drawing.Imaging.ColorMatrix { Matrix33 = opacity });
+            attrs.SetColorMatrix(Fx(opacity, 1f, saturation));
             g.DrawImage(needle, dest, 0, 0, needle.Width, needle.Height, GraphicsUnit.Pixel, attrs);
         }
         g.Restore(state);
     }
 
-    /// <summary>Нарисовать иконку в прямоугольник с заданной непрозрачностью (для неактивных состояний).</summary>
-    public static void Draw(Graphics g, string name, RectangleF r, float opacity = 1f)
+    /// <summary>Нарисовать иконку с прозрачностью и/или приглушенной насыщенностью
+    /// (эффекты неактивных состояний; см. Fx).</summary>
+    public static void Draw(Graphics g, string name, RectangleF r, float opacity = 1f, float saturation = 1f)
     {
         int size = (int)Math.Round(Math.Min(r.Width, r.Height));
         var bmp = Render(name, size);
         var dest = new Rectangle((int)(r.X + (r.Width - size) / 2), (int)(r.Y + (r.Height - size) / 2), size, size);
 
-        if (opacity >= 0.999f)
+        if (opacity >= 0.999f && saturation >= 0.999f)
         {
             g.DrawImage(bmp, dest);
             return;
         }
         using var attrs = new System.Drawing.Imaging.ImageAttributes();
-        attrs.SetColorMatrix(new System.Drawing.Imaging.ColorMatrix { Matrix33 = opacity });
+        attrs.SetColorMatrix(Fx(opacity, 1f, saturation));
         g.DrawImage(bmp, dest, 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel, attrs);
     }
 }

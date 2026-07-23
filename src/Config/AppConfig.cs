@@ -14,6 +14,10 @@ public sealed class AppConfig
     /// <summary>Одноразовая подсказка при первом запуске уже показана (balloon-tip трея).</summary>
     public bool FirstRunShown { get; set; } = false;
 
+    /// <summary>Тема панелей/OSD/«Монитора»: null — тёмная (исторический вид),
+    /// "light" — светлая, "system" — следовать теме приложений Windows.</summary>
+    public string? FlyoutTheme { get; set; }
+
     public bool ChargeCare { get; set; } = false;
     public bool AutoStart { get; set; } = false;
 

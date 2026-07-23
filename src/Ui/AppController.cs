@@ -44,6 +44,7 @@ public sealed class AppController
     public Action? OwlFeatureChanged;          // фича «сова» показана/скрыта
     public Action? AwakeChanged;               // сам режим совы переключён
     public Action? LanguageChanged;            // язык интерфейса сменился
+    public Action? FlyoutThemeChanged;         // тема панелей/OSD сменилась — перерисовать видимые
     public Action<bool>? TouchpadToggled;      // тачпад вкл/выкл (колбэк с фонового потока!)
     public Action<bool>? TouchscreenToggled;   // сенсорный экран вкл/выкл (тоже фон)
     public Action? FirmwareFailed;             // команда прошивке не прошла — UI показывает честную ошибку
@@ -399,6 +400,16 @@ public sealed class AppController
 
     /// <summary>Текущий язык интерфейса (культурный код).</summary>
     public string CurrentLanguage => _loc.Current;
+
+    /// <summary>Тема флайаутов (панель/OSD/«Монитор»): null — тёмная, "light", "system".
+    /// Применяется сразу; TrayApp перерисует видимые окна по колбэку.</summary>
+    public void SetFlyoutTheme(string? theme)
+    {
+        _cfg.FlyoutTheme = theme;
+        _cfg.Save();
+        FlyoutPalette.Apply(theme);
+        FlyoutThemeChanged?.Invoke();
+    }
 
     /// <summary>Смена языка (культурный код): применяется сразу; UI сам пересоберёт свои подписи.</summary>
     public void SetLanguage(string culture)

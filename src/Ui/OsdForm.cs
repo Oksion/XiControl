@@ -13,10 +13,11 @@ public enum ChargeBadge { None, Slow, NoPd }
 /// </summary>
 public sealed class OsdForm : Form
 {
-    private static readonly Color Card = Color.FromArgb(28, 28, 30);
-    private static readonly Color Border = Color.FromArgb(70, 70, 74);
-    private static readonly Color TextCol = Color.FromArgb(240, 240, 240);
-    private static readonly Color DimCol = Color.FromArgb(170, 170, 175); // ≥4.5:1 к Card (WCAG AA, Фаза 6.3)
+    // палитра общая с флайаутами (FlyoutPalette) — тема настраивается (Фаза 6.4)
+    private static Color Card => FlyoutPalette.Card;
+    private static Color Border => FlyoutPalette.Border;
+    private static Color TextCol => FlyoutPalette.Text;
+    private static Color DimCol => FlyoutPalette.Dim;
 
     // сколько OSD висит до затухания. Единая база, чтобы всплывашки читались одинаково;
     // «Авто» чуть дольше — стрелка спидометра успевает плавно «настроиться».

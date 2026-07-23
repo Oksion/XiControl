@@ -21,6 +21,13 @@ public sealed class GeneralTab : SettingsPane
         ui.AddRow(this, "settings.autostart", "settings.autostart.desc",
             ui.Toggle(act.GetAutoStart(), act.SetAutoStart));
 
+        // тема панелей/OSD/«Монитора»: значения соответствуют AppConfig.FlyoutTheme
+        string?[] themeValues = [null, "light", "system"];
+        int curTheme = Math.Max(0, Array.IndexOf(themeValues, cfg.FlyoutTheme));
+        ui.AddRow(this, "settings.flyout.theme", "settings.flyout.theme.desc",
+            ui.Combo([Loc.T("theme.dark"), Loc.T("theme.light"), Loc.T("theme.system")], curTheme,
+                i => act.SetFlyoutTheme(themeValues[i]), ui.Sc(150)));
+
         ui.AddGroup(this, "settings.general.comfort");
         ui.AddRow(this, "settings.profile.brightness", "settings.brightness.desc",
             ui.Toggle(cfg.RememberBrightness, act.SetRememberBrightness));
