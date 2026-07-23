@@ -94,6 +94,14 @@ public sealed class SettingsForm : Form
         FormChrome.SetDwmDark(this, Theme.IsDark());
     }
 
+    /// <summary>Windows сменила тему, окно открыто — пересобрать с новой палитрой «на лету»
+    /// (Фаза 6.4; раньше тема перечитывалась только при следующем Popup).</summary>
+    public void ThemeChanged()
+    {
+        if (Theme.IsDark() == _ui.T.Dark) return; // тема приложений не менялась — не мигаем
+        BuildAll();
+    }
+
     // ---- Построение ----
 
     private void BuildAll()

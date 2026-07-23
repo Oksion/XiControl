@@ -137,6 +137,7 @@ public sealed class TrayApp : IDisposable
         _controller.OwlFeatureChanged = _panel.ReloadModes; // сова появляется/уходит из раскладки
         _controller.AwakeChanged = () => { if (_panel.Visible) _panel.RefreshUi(); };
         _controller.LanguageChanged = () => _icon.Refresh(); // Polled обновит тултип на новом языке
+        _controller.FlyoutThemeChanged = RepaintFlyouts;     // палитру уже пересчитал контроллер
         // честная обратная связь: команда прошивке не прошла — говорим прямо, а не «успех»
         _controller.FirmwareFailed = () => _osd.Flash(OsdKind.Error, Loc.T("osd.failed"), Loc.T("osd.failed.sub"));
         // тачпад/экран: колбэк приходит с фонового потока — маршалим в UI
@@ -231,6 +232,19 @@ public sealed class TrayApp : IDisposable
         if (e.Category != UserPreferenceCategory.General) return;
         _menu.ThemeChanged(); // перекрасить меню, если тема реально сменилась
         _icon.ThemeChanged(); // перечитать цвет панели задач и перерисовать значок
+        // флайауты в режиме «как в Windows» следуют теме тоже; в остальных Apply — no-op
+        FlyoutPalette.Apply(_cfg.FlyoutTheme);
+        RepaintFlyouts();
+        // открытое окно настроек перечитывает тему «на лету» (Фаза 6.4)
+        if (_settings is { IsDisposed: false, Visible: true }) _settings.ThemeChanged();
+    }
+
+    // Перерисовать видимые флайауты после смены их палитры (закрытые перерисуются при показе)
+    private void RepaintFlyouts()
+    {
+        if (_panel.Visible) _panel.Invalidate();
+        if (_monitor is { Visible: true }) _monitor.Invalidate();
+        if (_osd.Visible) _osd.Invalidate();
     }
 
     private void OnKey(byte code, byte value)
@@ -356,6 +370,7 @@ public sealed class TrayApp : IDisposable
                 Languages = () => _controller.Languages,
                 CurrentLanguage = () => _controller.CurrentLanguage,
                 SetLanguage = _controller.SetLanguage,
+                SetFlyoutTheme = _controller.SetFlyoutTheme,
                 SetModeVisibility = _controller.ToggleModeVisibility,
                 GetStartStrategy = () => _controller.CurrentStartStrategy,
                 SetStartStrategy = _controller.SetStartStrategy,

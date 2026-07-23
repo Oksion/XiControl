@@ -441,7 +441,7 @@ public sealed class MonitorForm : FlyoutForm
                 new Rectangle(r.X, r.Y + Sc(54), Sc(112), Sc(16)), FlyoutPalette.Dim, TextFormatFlags.Left | TextFormatFlags.Top);
 
         var plot = new Rectangle(r.X + Sc(116), r.Y + Sc(8), r.Width - Sc(116), r.Height - Sc(20));
-        using (var bg = new SolidBrush(Color.FromArgb(38, 38, 41)))
+        using (var bg = new SolidBrush(FlyoutPalette.PlotBg))
         using (var path = Draw.Rounded(plot, Sc(8)))
             g.FillPath(bg, path);
 
@@ -452,7 +452,7 @@ public sealed class MonitorForm : FlyoutForm
                 TextFormatFlags.Right | TextFormatFlags.Top);
 
         // сетка: горизонтали через 20% шкалы, вертикали каждые 30 секунд
-        using (var grid = new Pen(Color.FromArgb(50, 50, 54)))
+        using (var grid = new Pen(FlyoutPalette.PlotGrid))
         {
             for (int i = 1; i <= 4; i++)
             {
