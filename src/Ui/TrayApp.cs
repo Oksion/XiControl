@@ -156,7 +156,7 @@ public sealed class TrayApp : IDisposable
         }));
         // Жесты Mi: одинарный/двойной клик настраиваются (MiClickAction/MiDoubleAction);
         // двойной = "none" — жест отключён, одинарный срабатывает мгновенно; удержание → панель
-        _mi = new MiButtonGesture
+        _mi = new MiButtonGesture(holdMs: _cfg.MiHoldMs, doubleClickMs: _cfg.MiDoubleClickMs)
         {
             Click = () => _router!.Run(_cfg.MiClickAction, _cfg.MiClickCommand),
             DoubleClick = () => _router!.Run(_cfg.MiDoubleAction, _cfg.MiDoubleCommand),
@@ -195,6 +195,8 @@ public sealed class TrayApp : IDisposable
     /// </summary>
     public void Start()
     {
+        _osd.DurationMs = _cfg.OsdDurationMs; // настраиваемая длительность (config.json) — до первых OSD
+
         _controller.Startup();
 
         // слушатель клавиш прошивки + значок по реальному режиму (и его лёгкий опрос)

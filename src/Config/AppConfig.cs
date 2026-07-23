@@ -154,6 +154,20 @@ public sealed class AppConfig
     /// </summary>
     public string? MonitorView { get; set; }
 
+    // ---- Тайминги (мс) ----
+    // Правятся только в config.json (UI нет); применяются при следующем запуске.
+    // Дефолты = историческим константам; при чтении клэмпятся снизу, чтобы кривое
+    // значение не сломало жест / не сделало OSD мгновенным.
+
+    /// <summary>Порог «долгого» нажатия Mi-кнопки (открывает панель). Дефолт 400 мс.</summary>
+    public int MiHoldMs { get; set; } = 400;
+
+    /// <summary>Окно ожидания второго клика Mi-кнопки. Дефолт 300 мс.</summary>
+    public int MiDoubleClickMs { get; set; } = 300;
+
+    /// <summary>Сколько OSD висит до затухания. Дефолт 2800 мс («Авто»-режим — на 600 мс дольше).</summary>
+    public int OsdDurationMs { get; set; } = 2800;
+
     // ---- Действия клавиш ----
     // На каждый слот — своё действие из общего списка: "modes" (цикл режимов), "charge"
     // (заряд 80/100), "panel" (быстрая панель), "owl", "monitor", "travel", "projection"

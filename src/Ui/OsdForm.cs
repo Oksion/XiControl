@@ -20,11 +20,14 @@ public sealed class OsdForm : Form
     private static Color DimCol => FlyoutPalette.Dim;
 
     // сколько OSD висит до затухания. Единая база, чтобы всплывашки читались одинаково;
-    // «Авто» чуть дольше — стрелка спидометра успевает плавно «настроиться».
-    private const int DisplayMs = 2800;
-    private const int DisplayMsAuto = 3400;
+    // «Авто» чуть дольше (+600 мс) — стрелка спидометра успевает плавно «настроиться».
+    // DurationMs настраивается из config.json (AppConfig.OsdDurationMs); клэмп снизу,
+    // чтобы всплывашка не мигала мгновенно. TrayApp выставляет её на старте.
+    private int _displayMs = 2800;
+    public int DurationMs { get => _displayMs; set => _displayMs = Math.Max(500, value); }
+    private int DisplayMsAuto => _displayMs + 600;
 
-    private readonly System.Windows.Forms.Timer _display = new() { Interval = DisplayMs };
+    private readonly System.Windows.Forms.Timer _display = new() { Interval = 2800 };
     private readonly System.Windows.Forms.Timer _fade = new() { Interval = 16 };
 
     // шрифты — от текущего DPI (как и вся геометрия Sc): пропорции с иконкой
@@ -131,7 +134,7 @@ public sealed class OsdForm : Form
         Opacity = 1.0;
         _gauge.Stop();
         // для «Авто» показываем дольше — стрелка успевает плавно «настроиться»
-        _display.Interval = kind == OsdKind.Auto ? DisplayMsAuto : DisplayMs;
+        _display.Interval = kind == OsdKind.Auto ? DisplayMsAuto : _displayMs;
         if (IsAnimated(kind)) { _gaugeT = 0f; _gauge.Start(); }
         Invalidate();
         if (!Visible) Show();
