@@ -134,6 +134,7 @@ public sealed class TrayApp : IDisposable
                                     Loc.T("osd.hz.on.sub", _cfg.AcRefreshRate, _cfg.BatteryRefreshRate));
             else _osd.Flash(OsdKind.RefreshRateOff, Loc.T("osd.hz.off"));
         };
+        _controller.RefreshRateFeatureChanged = _panel.ReloadModes; // ячейка герцовки появляется/уходит
         _controller.OwlFeatureChanged = _panel.ReloadModes; // сова появляется/уходит из раскладки
         _controller.AwakeChanged = () => { if (_panel.Visible) _panel.RefreshUi(); };
         _controller.LanguageChanged = () => _icon.Refresh(); // Polled обновит тултип на новом языке
@@ -377,6 +378,7 @@ public sealed class TrayApp : IDisposable
                 SetProfileMode = _controller.SetProfileMode,
                 SetRememberBrightness = _controller.SetRememberBrightness,
                 SetAutoHz = _controller.ToggleAutoHz,
+                SetRefreshRateFeature = _controller.ToggleRefreshRateFeature,
                 SetRefreshRates = _controller.SetRefreshRates,
                 SetOwlFeature = _controller.ToggleOwlFeature,
                 GetBatteryReport = () =>

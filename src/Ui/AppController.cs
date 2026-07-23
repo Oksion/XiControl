@@ -41,6 +41,7 @@ public sealed class AppController
     public Action? ProfileModeApplied;         // режим применён из-за смены профиля питания
     public Action? ModesReloaded;              // набор видимых режимов изменился
     public Action<bool>? AutoHzChanged;        // авто-герцовка вкл/выкл
+    public Action? RefreshRateFeatureChanged;  // фича «управление частотой» показана/скрыта
     public Action? OwlFeatureChanged;          // фича «сова» показана/скрыта
     public Action? AwakeChanged;               // сам режим совы переключён
     public Action? LanguageChanged;            // язык интерфейса сменился
@@ -352,6 +353,32 @@ public sealed class AppController
         _cfg.Save();
         if (on) _hz.Reapply();
         AutoHzChanged?.Invoke(on);
+    }
+
+    /// <summary>
+    /// Показ/скрытие «управления частотой» как фичи (меню/панель/вкладка «Экран»).
+    /// Выключаем — активная авто-герцовка гасится (как <see cref="ToggleOwlFeature"/> гасит
+    /// активный Awake): сначала возвращаем сеть-частоту, если «батарейная» успела примениться
+    /// (иначе пользователь остался бы на 60 Гц без UI, чтобы это поправить), затем снимаем
+    /// флаг — «взведённый» AutoRefreshRate без единой видимой поверхности врал бы читателям
+    /// (OSD питания рисовал «• N Гц» при выключенной фиче), а повторное включение фичи
+    /// молча возобновляло бы переключения.
+    /// </summary>
+    public void ToggleRefreshRateFeature(bool on)
+    {
+        _cfg.RefreshRateFeature = on;
+        if (!on && _cfg.AutoRefreshRate)
+        {
+            int ac = _cfg.AcRefreshRate; // снять возможный батарейный троттлинг, не блокируя UI-поток
+            Task.Run(() => Safe(() => RefreshRate.Apply(ac), false));
+            _cfg.AutoRefreshRate = false;
+        }
+        else if (on && _cfg.AutoRefreshRate)
+        {
+            _hz.Reapply(); // флаг взведён только ручной правкой config.json — уважаем и применяем
+        }
+        _cfg.Save();
+        RefreshRateFeatureChanged?.Invoke(); // перестроить панель/меню (ячейка герцовки уходит/появляется)
     }
 
     /// <summary>Частоты из окна настроек: сохранить и, если режим включён, применить сейчас.</summary>

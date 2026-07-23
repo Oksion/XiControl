@@ -4,7 +4,7 @@ using XiControl.Localization;
 namespace XiControl.Ui.Settings;
 
 /// <summary>Глифы навигации (рисуем сами — без иконочных шрифтов и ресурсов).</summary>
-public enum NavGlyph { General, Battery, Display, Perf, Keys, About }
+public enum NavGlyph { General, Features, Battery, Display, Perf, Keys, About }
 
 /// <summary>
 /// Левая навигация окна настроек (кастомная отрисовка): подсветка hover/выбора,
@@ -139,6 +139,17 @@ public sealed class NavStrip : Panel
                     float cx = x + w / 2f, cy = y + h / 2f;
                     g.DrawLine(pen, cx + (float)Math.Cos(ang) * w * 0.32f, cy + (float)Math.Sin(ang) * h * 0.32f,
                         cx + (float)Math.Cos(ang) * w * 0.48f, cy + (float)Math.Sin(ang) * h * 0.48f);
+                }
+                break;
+            case NavGlyph.Features:
+                // два «ползунка» на рельсах — набор включаемых функций
+                g.DrawLine(pen, x + w * 0.16f, y + h * 0.34f, x + w * 0.84f, y + h * 0.34f);
+                g.DrawLine(pen, x + w * 0.16f, y + h * 0.66f, x + w * 0.84f, y + h * 0.66f);
+                using (var knob = new SolidBrush(c))
+                {
+                    float kr = w * 0.11f;
+                    g.FillEllipse(knob, x + w * 0.64f - kr, y + h * 0.34f - kr, kr * 2, kr * 2); // верхний — справа
+                    g.FillEllipse(knob, x + w * 0.32f - kr, y + h * 0.66f - kr, kr * 2, kr * 2); // нижний — слева
                 }
                 break;
             case NavGlyph.Battery:

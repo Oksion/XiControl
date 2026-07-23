@@ -119,6 +119,13 @@ public sealed class AppConfig
     public bool OwlMode { get; set; } = true;
 
     /// <summary>
+    /// «Управление частотой экрана» как фича: пункт меню, ячейка панели и вкладка «Экран»
+    /// в настройках. false — прошивку/экран не трогаем совсем (авто-герцовка не применяется),
+    /// вся ветка скрыта из UI (как OwlMode у совы) — для тех, кому герцовка не нужна.
+    /// </summary>
+    public bool RefreshRateFeature { get; set; } = true;
+
+    /// <summary>
     /// Авто-герцовка: при подключении зарядки экран переводится на AcRefreshRate Гц,
     /// при отключении — на BatteryRefreshRate. Переключается в меню трея и в панели.
     /// </summary>

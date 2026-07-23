@@ -31,12 +31,7 @@ public sealed class GeneralTab : SettingsPane
         ui.AddGroup(this, "settings.general.comfort");
         ui.AddRow(this, "settings.profile.brightness", "settings.brightness.desc",
             ui.Toggle(cfg.RememberBrightness, act.SetRememberBrightness));
-        ui.AddRow(this, "settings.owl.feature", "settings.owl.feature.desc",
-            ui.Toggle(cfg.OwlMode, act.SetOwlFeature));
-        ui.AddRow(this, "settings.touchpad.feature", "settings.touchpad.feature.desc",
-            ui.Toggle(cfg.TouchpadFeature, on => { cfg.TouchpadFeature = on; cfg.Save(); }));
-        ui.AddRow(this, "settings.touchscreen.feature", "settings.touchscreen.feature.desc",
-            ui.Toggle(cfg.TouchscreenFeature, on => { cfg.TouchscreenFeature = on; cfg.Save(); }));
+        // «Режим совы», тачпад и сенсорный экран как функции переехали на вкладку «Функции».
         ui.AddRow(this, "settings.log", "settings.log.desc",
             ui.Toggle(cfg.LogEnabled, on =>
             {
