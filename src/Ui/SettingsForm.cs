@@ -19,7 +19,11 @@ public sealed class SettingsForm : Form
     private SettingsToolkit _ui;
     private NavStrip _nav = null!;
     private Panel _host = null!;
-    private readonly List<Panel> _panes = [];
+    // ленивое построение вкладок: _factories[i] строит панель при первом заходе на неё,
+    // _panes[i] — кэш построенной (null = ещё не строили). Так тяжёлые вкладки (BatteryTab
+    // с синхронным WMI-запросом) не платятся, пока их не открыли.
+    private readonly List<Func<Panel>> _factories = [];
+    private readonly List<Panel?> _panes = [];
     private int _tab;
 
     // MifsClient сюда сознательно не передаётся: окно железо не трогает — все «умные»
@@ -133,6 +137,7 @@ public sealed class SettingsForm : Form
         Controls.Clear();
         foreach (var c in stale) c.Dispose();
         _panes.Clear();
+        _factories.Clear();
 
         _host = new Panel { Dock = DockStyle.Fill, BackColor = _ui.T.WinBg, Tag = "host" };
         Controls.Add(_host);
@@ -147,29 +152,28 @@ public sealed class SettingsForm : Form
 
         // вкладки строим списком: «Экран» показываем, только пока «управление частотой» —
         // включённая функция (её мастер-тумблер живёт на вкладке «Функции»)
+        // регистрируем вкладки фабриками (панель строится лениво в SelectTab, не тут):
+        // так открытие окна и смена языка не конструируют неоткрытые вкладки
         var tabs = new List<(string key, NavGlyph glyph)>();
-        void AddTab(string key, NavGlyph glyph, Panel pane) { tabs.Add((key, glyph)); _panes.Add(pane); }
+        void AddTab(string key, NavGlyph glyph, Func<Panel> make)
+        {
+            tabs.Add((key, glyph));
+            _factories.Add(make);
+            _panes.Add(null);
+        }
 
-        AddTab("settings.tab.general", NavGlyph.General, new GeneralTab(_ui, _cfg, _act, rebuild));
-        AddTab("settings.tab.features", NavGlyph.Features, new FeaturesTab(_ui, _cfg, _act, rebuild));
-        AddTab("settings.tab.battery", NavGlyph.Battery, new BatteryTab(_ui, _cfg, _act));
+        AddTab("settings.tab.general", NavGlyph.General, () => new GeneralTab(_ui, _cfg, _act, rebuild));
+        AddTab("settings.tab.features", NavGlyph.Features, () => new FeaturesTab(_ui, _cfg, _act, rebuild));
+        AddTab("settings.tab.battery", NavGlyph.Battery, () => new BatteryTab(_ui, _cfg, _act));
         if (_cfg.RefreshRateFeature)
-            AddTab("settings.tab.display", NavGlyph.Display, new DisplayTab(_ui, _cfg, _act));
-        AddTab("settings.tab.perf", NavGlyph.Perf, new PerfTab(_ui, _cfg, _act, rebuild));
-        AddTab("settings.tab.keys", NavGlyph.Keys, new KeysTab(_ui, _cfg, rebuild));
-        AddTab("settings.tab.about", NavGlyph.About, new AboutTab(_ui));
+            AddTab("settings.tab.display", NavGlyph.Display, () => new DisplayTab(_ui, _cfg, _act));
+        AddTab("settings.tab.perf", NavGlyph.Perf, () => new PerfTab(_ui, _cfg, _act, rebuild));
+        AddTab("settings.tab.keys", NavGlyph.Keys, () => new KeysTab(_ui, _cfg, rebuild));
+        AddTab("settings.tab.about", NavGlyph.About, () => new AboutTab(_ui));
 
         _nav.Tabs = [.. tabs];
         if (_tab >= _panes.Count) _tab = 0; // раскладка сузилась (скрыли «Экран») — на первую вкладку
         _nav.Selected = _tab;
-        // хвостовой «воздух»: FlowLayoutPanel.AutoScroll не учитывает нижний Padding — без спейсера
-        // последняя карточка обрезается при прокрутке
-        foreach (var p in _panes)
-        {
-            p.Controls.Add(new Panel { Width = _ui.RowW, Height = _ui.Sc(20), BackColor = _ui.T.WinBg, Margin = new Padding(0) });
-            p.Visible = false;
-            _host.Controls.Add(p);
-        }
 
         SelectTab(_tab);
         ResumeLayout();
@@ -178,7 +182,18 @@ public sealed class SettingsForm : Form
     private void SelectTab(int i)
     {
         _tab = i;
-        for (int k = 0; k < _panes.Count; k++) _panes[k].Visible = k == i;
+        // ленивое построение: панель вкладки создаётся при первом заходе на неё
+        if (_panes[i] is null)
+        {
+            var pane = _factories[i]();
+            // хвостовой «воздух»: FlowLayoutPanel.AutoScroll не учитывает нижний Padding — без
+            // спейсера последняя карточка обрезается при прокрутке
+            pane.Controls.Add(new Panel { Width = _ui.RowW, Height = _ui.Sc(20), BackColor = _ui.T.WinBg, Margin = new Padding(0) });
+            _host.Controls.Add(pane);
+            _panes[i] = pane;
+        }
+        for (int k = 0; k < _panes.Count; k++)
+            if (_panes[k] is Panel p) p.Visible = k == i;
         _nav.Selected = i;
         _nav.Invalidate();
     }
