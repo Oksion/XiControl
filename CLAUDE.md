@@ -142,14 +142,17 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   палитра — единственный источник тёмных цветов флайаутов), `FormChrome` (DWM-тёмный
   заголовок + WM_SETREDRAW), `ModeUi` (режим → ключ локализации / вид OSD / акцент),
   `SettingsForm` (хост окна настроек: хром, навигация, пересборка на каждый показ),
-  `SettingsActions` (сумка колбэков в контроллер), `ToggleSwitch` (рисованный Win11-тумблер),
+  `SettingsActions` (сумка колбэков в контроллер; поля `required` — забытый mount ловится
+  компилятором, CS9035), `ToggleSwitch` (рисованный Win11-тумблер),
   `ScaledFonts` (**шрифты только отсюда** — пиксельные под DeviceDpi, иначе после смены
   разрешения текст расходится с геометрией Sc), `SvgIcons` (рендер встроенных SVG через
   Svg.NET + кэш битмапов), `Draw` (общие примитивы), `TrayIcons`, `DarkMenu` (тёмное меню).
 - `src/Ui/Settings/` — начинка окна настроек: `SettingsToolkit` (фабрика виджетов: карточки,
   тумблеры, комбо; раздаёт `AccessibleName`), `SettingsTheme` (палитра под системную тему),
   `NavStrip` (левая навигация, доступна с клавиатуры), вкладки-контролы `GeneralTab` /
-  `BatteryTab` / `DisplayTab` / `PerfTab` / `KeysTab` / `AboutTab` (собирают себя в ctor).
+  `FeaturesTab` (доступность фич: сова/тачпад/тачскрин/`RefreshRateFeature`) / `BatteryTab` /
+  `DisplayTab` (скрыта, если `RefreshRateFeature=false`) / `PerfTab` / `KeysTab` / `AboutTab`
+  (собирают себя в ctor).
 - `src/SystemIntegration/` — `ChargeGuard` (переустанавливает лимит заряда после сна/смены
   питания И перед уходом в сон/shutdown — EC теряет его на переходах), `RefreshRateGuard`/
   `RefreshRate` (авто-герцовка, чистый `ChangeDisplaySettings`), `PowerProfileGuard` (режим
