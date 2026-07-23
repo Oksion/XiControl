@@ -9,10 +9,13 @@ namespace XiControl.SystemIntegration;
 /// Прошивочный путь (WMI 0x0C, TPLock) на TM2424 к железу не подключён, поэтому только Win32.
 ///
 /// Устройство ищется по своей HID-коллекции (Top-Level Collection, <see cref="CompatId"/>;
-/// признак бывает и в hardware, и в compatible ids), но отключается её РОДИТЕЛЬ — узел
-/// «HID на шине I2C». Отключать саму коллекцию нельзя: у устройства их может быть несколько
-/// (у тачпада — мышь + панель), и погашение одной оставило бы ввод живым через другую;
-/// у родителя гаснет весь контроллер сразу. ID родителя запоминается в конфиге
+/// признак бывает и в hardware, и в compatible ids). Обычно гасим её РОДИТЕЛЯ — узел «HID
+/// на шине I2C»: у устройства коллекций может быть несколько (у тачпада — мышь + панель),
+/// и погашение одной оставило бы ввод живым через другую, а у родителя гаснет всё разом.
+/// НО если родитель коллекции — сам PCI-контроллер шины (на Meteor Lake HID-коллекция
+/// тачскрина подцеплена прямо к Intel Serial IO I2C / Touch Host Controller), гасить его
+/// нельзя — это утащит контроллер целиком, а не «сенсор»; тогда целимся в саму коллекцию
+/// (см. <see cref="IsBusOrController"/>). ID выбранного узла запоминается в конфиге
 /// (<see cref="DeviceId"/>): у выключенного устройства HID-коллекции исчезают из системы,
 /// и после перезапуска приложения искать больше нечем.
 ///
@@ -89,15 +92,26 @@ public abstract class HidNodeToggle
     {
         if (Find() is not uint inst) return false;
 
+        // страховка: никогда не гасим шину/хост-контроллер (напр. PCI Touch Host Controller) —
+        // это валит контроллер целиком. Обычно сюда не попадаем (FindViaHid уже целится в
+        // безопасный узел), но DeviceId из конфига старой версии мог указывать на контроллер.
+        if (DeviceIdOf(inst) is string tid && IsBusOrController(tid))
+        {
+            Log.Write($"{LogName}: ОТКАЗ отключать — целевой узел это шина/контроллер ({tid})");
+            return false;
+        }
+
         int cr = CM_Disable_DevNode(inst, DisableUiNotOk);
         if (cr != 0) Log.Write($"{LogName}: CM_Disable_DevNode → CR 0x{cr:X}");
         if (WaitState(enabled: false)) return true;
 
         // мягкое отключение заветировано/не сработало — отключаем как Диспетчер устройств
-        // (персистентно; на старте приложения RestoreAfterBoot вернёт устройство)
+        // (персистентно; на старте приложения RestoreAfterBoot вернёт устройство). Тот же
+        // запрет на шину/контроллер, что и выше, — этот путь переживает перезагрузку, погасить
+        // им контроллер было бы вдвойне опасно (без валидного/безопасного ID не лезем).
+        if (DeviceId is not string id || IsBusOrController(id)) return false;
         Log.Write($"{LogName}: мягкое отключение не сработало — пробую персистентное (SetupAPI)");
-        if (DeviceId is not string id || !SetupDiChangeState(id, DICS_DISABLE))
-            return false;
+        if (!SetupDiChangeState(id, DICS_DISABLE)) return false;
         if (!WaitState(enabled: false)) return false;
         PersistOff = true;
         SaveConfig();
@@ -158,7 +172,10 @@ public abstract class HidNodeToggle
         try
         {
             if (FindViaHid() is uint inst) { _devInst = inst; return inst; }
-            if (!string.IsNullOrEmpty(DeviceId))
+            // кэшированный ID из старой версии мог указывать на PCI-контроллер — игнорируем
+            // его (иначе Toggle стал бы гасить шину); FindViaHid перезапишет ID, когда
+            // устройство снова включат и его коллекция появится в системе.
+            if (!string.IsNullOrEmpty(DeviceId) && !IsBusOrController(DeviceId))
             {
                 if (CM_Locate_DevNode(out uint located, DeviceId, 0) == 0 ||
                     CM_Locate_DevNode(out located, DeviceId, LocatePhantom) == 0)
@@ -205,25 +222,47 @@ public abstract class HidNodeToggle
 
                 if (CM_Get_Parent(out uint parent, info.DevInst, 0) != 0) continue;
 
-                // запомнить ID родителя — иначе после перезапуска выключенное устройство не найти
-                var idBuf = new char[256]; // char-буфер вместо StringBuilder (CA1838: без лишнего маршалинга)
-                if (CM_Get_Device_ID(parent, idBuf, idBuf.Length, 0) == 0)
+                // по умолчанию гасим РОДИТЕЛЯ коллекции (у тачпада коллекций две — мышь +
+                // панель — и гасить надо их общий узел). Но если родитель — сам PCI-контроллер
+                // шины (Meteor Lake: коллекция тачскрина висит прямо под Serial IO I2C / THC),
+                // гасить его нельзя — утащит контроллер целиком; целимся в саму коллекцию.
+                uint target = parent;
+                if (DeviceIdOf(parent) is string pid && IsBusOrController(pid))
                 {
-                    int len = Array.IndexOf(idBuf, '\0') is int z && z >= 0 ? z : idBuf.Length;
-                    string id = new(idBuf, 0, len);
-                    if (!string.Equals(DeviceId, id, StringComparison.OrdinalIgnoreCase))
-                    {
-                        DeviceId = id;
-                        SaveConfig();
-                        Log.Write($"{LogName}: найден узел {id}");
-                    }
+                    Log.Write($"{LogName}: родитель коллекции — шина/контроллер ({pid}), гашу саму коллекцию");
+                    target = info.DevInst;
                 }
-                return parent;
+
+                // запомнить ID выбранного узла — иначе после перезапуска выключенное устройство не найти
+                if (DeviceIdOf(target) is string id &&
+                    !string.Equals(DeviceId, id, StringComparison.OrdinalIgnoreCase))
+                {
+                    DeviceId = id;
+                    SaveConfig();
+                    Log.Write($"{LogName}: найден узел {id}");
+                }
+                return target;
             }
         }
         finally { SetupDiDestroyDeviceInfoList(set); }
         return null;
     }
+
+    // Прочитать instance-id узла в строку; null — если CfgMgr вернул ошибку.
+    private static string? DeviceIdOf(uint devInst)
+    {
+        var buf = new char[256]; // char-буфер без лишнего маршалинга (CA1838), как в FindViaHid
+        if (CM_Get_Device_ID(devInst, buf, buf.Length, 0) != 0) return null;
+        int len = Array.IndexOf(buf, '\0') is int z && z >= 0 ? z : buf.Length;
+        return new string(buf, 0, len);
+    }
+
+    // Узел шины/хост-контроллера — гасить его нельзя: утащит весь контроллер, а не «сенсор».
+    // Наблюдалось на Meteor Lake (TM2424): HID-коллекция тачскрина подцеплена прямо к PCI —
+    // Intel Serial IO I2C / Touch Host Controller (напр. PCI\VEN_8086&DEV_E448), и слепое
+    // отключение родителя валило контроллер целиком.
+    internal static bool IsBusOrController(string instanceId) =>
+        instanceId.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase);
 
     // ---- Путь Диспетчера устройств: DIF_PROPERTYCHANGE / DICS_* (персистентный) ----
 
