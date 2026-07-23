@@ -19,6 +19,12 @@ public sealed class TrayApp : IDisposable
     private readonly QuickPanelForm _panel;
     private bool _lastOnline;  // прошлое состояние питания (для OSD только на реальном переходе)
 
+    // Кэш отчёта о батарее (BatteryTab): износ/циклы/ёмкость меняются раз в сутки-недели, а окно
+    // настроек пересобирается на каждый Popup/смену языка — держим короткий TTL, чтобы не дёргать
+    // WMI+MIFS повторно (даже поверх ленивого построения вкладок — на случай rebuild «на Батарее»).
+    private const long BatteryReportTtlMs = 60_000;
+    private (SystemIntegration.BatteryReport report, long at)? _batteryCache;
+
     // командный слой: все Set*/Toggle* и стартовая логика — в AppController
     private readonly AppController _controller;
 
@@ -385,10 +391,13 @@ public sealed class TrayApp : IDisposable
                 SetOwlFeature = _controller.ToggleOwlFeature,
                 GetBatteryReport = () =>
                 {
+                    if (_batteryCache is (var cached, var at) && Environment.TickCount64 - at < BatteryReportTtlMs)
+                        return cached; // свежий кэш — WMI/MIFS не трогаем
                     var r = SystemIntegration.BatteryInfo.Read(); // штатные WMI-классы (циклы, ёмкость, износ)
                     // здоровье WMI нет → падаем на SOH1 из прошивки (MIFS), это тоже оценка ёмкости
                     if (r.HealthPercent is null && Safe(() => _mifs.GetBatteryHealth(), (int?)null) is int soh && soh > 0)
                         r = r with { HealthPercent = soh };
+                    _batteryCache = (r, Environment.TickCount64);
                     return r;
                 },
             };
