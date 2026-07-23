@@ -10,22 +10,27 @@ public enum StartStrategy { None, Restore, Pin, Profiles }
 /// Колбэки в TrayApp/AppController: окно настроек не дублирует логику (взаимоисключения режимов
 /// старта, переармливание гардов, применение профиля) — оно меняет то, что тривиально
 /// (config.json), а «умные» операции делегирует сюда.
+///
+/// Все поля <c>required</c> (заглушек-дефолтов нет намеренно): забыть примонтировать колбэк в
+/// <see cref="TrayApp"/> — теперь ошибка компиляции CS9035, а не молчаливый вызов пустышки.
+/// Так закрыта грабля Фазы 6.4 (незамонтированный SetFlyoutTheme тихо звал заглушку).
 /// </summary>
 public sealed class SettingsActions
 {
-    public Func<bool> GetAutoStart = () => false;
-    public Action<bool> SetAutoStart = _ => { };
-    public Func<IReadOnlyList<LangInfo>> Languages = () => [];  // доступные языки (data-driven)
-    public Func<string> CurrentLanguage = () => "";            // текущий культурный код
-    public Action<string> SetLanguage = _ => { };             // сменить язык по культурному коду
-    public Action<string?> SetFlyoutTheme = _ => { };         // тема панелей/OSD: null/"light"/"system"
-    public Action<bool, bool> SetModeVisibility = (_, _) => { };   // eco, full
-    public Func<StartStrategy> GetStartStrategy = () => StartStrategy.None;
-    public Action<StartStrategy> SetStartStrategy = _ => { };
-    public Action<bool, PerfMode?> SetProfileMode = (_, _) => { }; // ac, mode
-    public Action<bool> SetRememberBrightness = _ => { };
-    public Action<bool> SetAutoHz = _ => { };
-    public Action<int, int> SetRefreshRates = (_, _) => { };       // ac, batt
-    public Action<bool> SetOwlFeature = _ => { };
-    public Func<SystemIntegration.BatteryReport> GetBatteryReport = () => default; // здоровье батареи (WMI + SOH1)
+    public required Func<bool> GetAutoStart;
+    public required Action<bool> SetAutoStart;
+    public required Func<IReadOnlyList<LangInfo>> Languages;  // доступные языки (data-driven)
+    public required Func<string> CurrentLanguage;             // текущий культурный код
+    public required Action<string> SetLanguage;              // сменить язык по культурному коду
+    public required Action<string?> SetFlyoutTheme;          // тема панелей/OSD: null/"light"/"system"
+    public required Action<bool, bool> SetModeVisibility;    // eco, full
+    public required Func<StartStrategy> GetStartStrategy;
+    public required Action<StartStrategy> SetStartStrategy;
+    public required Action<bool, PerfMode?> SetProfileMode;  // ac, mode
+    public required Action<bool> SetRememberBrightness;
+    public required Action<bool> SetAutoHz;
+    public required Action<bool> SetRefreshRateFeature;      // «управление частотой» как фича вкл/выкл
+    public required Action<int, int> SetRefreshRates;        // ac, batt
+    public required Action<bool> SetOwlFeature;
+    public required Func<SystemIntegration.BatteryReport> GetBatteryReport; // здоровье батареи (WMI + SOH1)
 }

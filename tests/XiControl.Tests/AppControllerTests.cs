@@ -320,4 +320,51 @@ public sealed class AppControllerTests
         _cfg.AutoRefreshRate.Should().BeFalse();
         _events.Should().Equal("hz:False");
     }
+
+    // «Управление частотой» как фича — только флаг + колбэк; AutoRefreshRate держим выключенным,
+    // чтобы не дёрнуть живой ChangeDisplaySettings (тот же приём, что и с ToggleAutoHz выше).
+    [Fact]
+    public void ToggleRefreshRateFeature_Off_SavesAndNotifies()
+    {
+        _cfg.RefreshRateFeature = true;
+        _cfg.AutoRefreshRate = false;
+        bool changed = false;
+        _c.RefreshRateFeatureChanged = () => changed = true;
+
+        _c.ToggleRefreshRateFeature(false);
+
+        _cfg.RefreshRateFeature.Should().BeFalse();
+        changed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ToggleRefreshRateFeature_On_SavesAndNotifies()
+    {
+        _cfg.RefreshRateFeature = false;
+        _cfg.AutoRefreshRate = false;
+        bool changed = false;
+        _c.RefreshRateFeatureChanged = () => changed = true;
+
+        _c.ToggleRefreshRateFeature(true);
+
+        _cfg.RefreshRateFeature.Should().BeTrue();
+        changed.Should().BeTrue();
+    }
+
+    // Скрытие фичи гасит активную авто-герцовку (прецедент ToggleOwlFeature/Awake): иначе
+    // флаг оставался бы «взведённым» без UI — OSD питания врал бы «• N Гц», а повторное
+    // включение фичи молча возобновляло бы переключения. AcRefreshRate=0 — чтобы фоновое
+    // восстановление сеть-частоты упёрлось в guard Apply (hz<=0) и не тронуло живой экран.
+    [Fact]
+    public void ToggleRefreshRateFeature_Off_DisarmsActiveAutoHz()
+    {
+        _cfg.RefreshRateFeature = true;
+        _cfg.AutoRefreshRate = true;
+        _cfg.AcRefreshRate = 0;
+
+        _c.ToggleRefreshRateFeature(false);
+
+        _cfg.RefreshRateFeature.Should().BeFalse();
+        _cfg.AutoRefreshRate.Should().BeFalse("скрытая фича не должна оставлять авто-герцовку взведённой");
+    }
 }

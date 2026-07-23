@@ -99,11 +99,14 @@ public sealed class TrayMenuBuilder : IDisposable
             Menu.Items.Add(owl);
         }
 
-        // --- Авто-герцовка (частота экрана по питанию) ---
-        var hz = new ToolStripMenuItem(Loc.T("menu.hz", _cfg.AcRefreshRate, _cfg.BatteryRefreshRate))
-        { Checked = _cfg.AutoRefreshRate };
-        hz.Click += (_, _) => _controller.ToggleAutoHz(!_cfg.AutoRefreshRate);
-        Menu.Items.Add(hz);
+        // --- Авто-герцовка (частота экрана по питанию) — если фича не скрыта конфигом ---
+        if (_cfg.RefreshRateFeature)
+        {
+            var hz = new ToolStripMenuItem(Loc.T("menu.hz", _cfg.AcRefreshRate, _cfg.BatteryRefreshRate))
+            { Checked = _cfg.AutoRefreshRate };
+            hz.Click += (_, _) => _controller.ToggleAutoHz(!_cfg.AutoRefreshRate);
+            Menu.Items.Add(hz);
+        }
 
         // --- Монитор (Вт / CPU / RAM) ---
         var monitor = new ToolStripMenuItem(Loc.T("menu.monitor")) { Checked = MonitorVisible() };

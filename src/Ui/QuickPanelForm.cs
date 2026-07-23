@@ -157,11 +157,12 @@ public sealed class QuickPanelForm : FlyoutForm
 
         // ряд заряда: [В дорогу] [80%] [100%] … [тачскрин] [тачпад] [авто-герцовка] [Не спать]
         int owlW = _cfg.OwlMode ? Sc(56) : 0;
-        int hzW = Sc(56);
+        int hzW = _cfg.RefreshRateFeature ? Sc(56) : 0;
         int tpW = _tpAvail ? Sc(56) : 0;
         int tsW = _tsAvail ? Sc(56) : 0;
         int travelW = Sc(46);
-        int pillsW = content - travelW - gap - hzW - gap
+        int pillsW = content - travelW - gap
+            - (hzW > 0 ? hzW + gap : 0)
             - (tpW > 0 ? tpW + gap : 0) - (tsW > 0 ? tsW + gap : 0) - (_cfg.OwlMode ? owlW + gap : 0);
         int half = (pillsW - gap) / 2;
         _travelCell = new Rectangle(p, pillsY, travelW, pillsH);
@@ -171,8 +172,9 @@ public sealed class QuickPanelForm : FlyoutForm
         int afterTs = tsW > 0 ? _tsCell.Right : _care100.Right;
         _tpCell = tpW > 0 ? new Rectangle(afterTs + gap, pillsY, tpW, pillsH) : Rectangle.Empty;
         int afterTp = tpW > 0 ? _tpCell.Right : afterTs;
-        _hzCell = new Rectangle(afterTp + gap, pillsY, hzW, pillsH);
-        _awake = _cfg.OwlMode ? new Rectangle(_hzCell.Right + gap, pillsY, owlW, pillsH) : Rectangle.Empty;
+        _hzCell = hzW > 0 ? new Rectangle(afterTp + gap, pillsY, hzW, pillsH) : Rectangle.Empty;
+        int afterHz = hzW > 0 ? _hzCell.Right : afterTp;
+        _awake = _cfg.OwlMode ? new Rectangle(afterHz + gap, pillsY, owlW, pillsH) : Rectangle.Empty;
         _close = new Rectangle(width - p - Sc(22), p - Sc(2), Sc(22), Sc(22));
         _monBtn = new Rectangle(_close.X - Sc(28), _close.Y, Sc(22), Sc(22));
 
@@ -185,7 +187,7 @@ public sealed class QuickPanelForm : FlyoutForm
         _order.Add(16); _order.Add(10); _order.Add(11);
         if (!_tsCell.IsEmpty) _order.Add(18);
         if (!_tpCell.IsEmpty) _order.Add(17);
-        _order.Add(15);
+        if (!_hzCell.IsEmpty) _order.Add(15);
         if (!_awake.IsEmpty) _order.Add(13);
         _order.Add(14); _order.Add(12);
         if (_focus >= _order.Count) _focus = -1; // раскладка сузилась — сбросить
@@ -357,7 +359,7 @@ public sealed class QuickPanelForm : FlyoutForm
         {
             ToggleOwl?.Invoke(); // «Не спать»: экран/сон + крышка на AC (см. AwakeMode)
         }
-        else if (h == 15)
+        else if (h == 15 && !_hzCell.IsEmpty)
         {
             SetAutoHz?.Invoke(!_cfg.AutoRefreshRate); // вкл — контроллер сразу применит частоту
         }
@@ -481,13 +483,17 @@ public sealed class QuickPanelForm : FlyoutForm
         }
 
         // авто-герцовка: монитор с круговыми стрелками, активна при включённой опции
-        DrawCell(g, _hzCell, _cfg.AutoRefreshRate, _hover == 15, FlyoutPalette.Blue, Sc(10));
-        float hzIcon = Math.Min(_hzCell.Width, _hzCell.Height) - Sc(8);
-        var (hzOp, hzSat) = CellFx(_cfg.AutoRefreshRate || _hover == 15);
-        SvgIcons.Draw(g,
-            _cfg.AutoRefreshRate ? SvgIcons.RefreshRate : SvgIcons.RefreshRateOff,
-            new RectangleF(_hzCell.X + (_hzCell.Width - hzIcon) / 2f, _hzCell.Y + (_hzCell.Height - hzIcon) / 2f, hzIcon, hzIcon),
-            hzOp, hzSat);
+        // (ячейки нет, если «управление частотой» отключено фичей)
+        if (!_hzCell.IsEmpty)
+        {
+            DrawCell(g, _hzCell, _cfg.AutoRefreshRate, _hover == 15, FlyoutPalette.Blue, Sc(10));
+            float hzIcon = Math.Min(_hzCell.Width, _hzCell.Height) - Sc(8);
+            var (hzOp, hzSat) = CellFx(_cfg.AutoRefreshRate || _hover == 15);
+            SvgIcons.Draw(g,
+                _cfg.AutoRefreshRate ? SvgIcons.RefreshRate : SvgIcons.RefreshRateOff,
+                new RectangleF(_hzCell.X + (_hzCell.Width - hzIcon) / 2f, _hzCell.Y + (_hzCell.Height - hzIcon) / 2f, hzIcon, hzIcon),
+                hzOp, hzSat);
+        }
 
         // сова: ячейка в стиле режимов, бодрая при включённом «Не спать»
         if (!_awake.IsEmpty)

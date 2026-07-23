@@ -138,28 +138,30 @@ public sealed class SettingsForm : Form
         Controls.Add(_host);
 
         _nav = new NavStrip(_ui) { Dock = DockStyle.Left, Width = _ui.Sc(212) };
-        _nav.Tabs =
-        [
-            ("settings.tab.general", NavGlyph.General),
-            ("settings.tab.battery", NavGlyph.Battery),
-            ("settings.tab.display", NavGlyph.Display),
-            ("settings.tab.perf", NavGlyph.Perf),
-            ("settings.tab.keys", NavGlyph.Keys),
-            ("settings.tab.about", NavGlyph.About),
-        ];
-        _nav.Selected = _tab;
         _nav.SelectedChanged = SelectTab;
         Controls.Add(_nav); // Fill(_host) добавлен раньше → Left(_nav) резервирует левую полосу
 
         // пересборка — после выхода из обработчика: иначе смена языка/действия клавиши
         // диспозит контрол прямо под его же событием
         Action rebuild = () => BeginInvoke(new Action(BuildAll));
-        _panes.Add(new GeneralTab(_ui, _cfg, _act, rebuild));
-        _panes.Add(new BatteryTab(_ui, _cfg, _act));
-        _panes.Add(new DisplayTab(_ui, _cfg, _act));
-        _panes.Add(new PerfTab(_ui, _cfg, _act, rebuild));
-        _panes.Add(new KeysTab(_ui, _cfg, rebuild));
-        _panes.Add(new AboutTab(_ui));
+
+        // вкладки строим списком: «Экран» показываем, только пока «управление частотой» —
+        // включённая функция (её мастер-тумблер живёт на вкладке «Функции»)
+        var tabs = new List<(string key, NavGlyph glyph)>();
+        void AddTab(string key, NavGlyph glyph, Panel pane) { tabs.Add((key, glyph)); _panes.Add(pane); }
+
+        AddTab("settings.tab.general", NavGlyph.General, new GeneralTab(_ui, _cfg, _act, rebuild));
+        AddTab("settings.tab.features", NavGlyph.Features, new FeaturesTab(_ui, _cfg, _act, rebuild));
+        AddTab("settings.tab.battery", NavGlyph.Battery, new BatteryTab(_ui, _cfg, _act));
+        if (_cfg.RefreshRateFeature)
+            AddTab("settings.tab.display", NavGlyph.Display, new DisplayTab(_ui, _cfg, _act));
+        AddTab("settings.tab.perf", NavGlyph.Perf, new PerfTab(_ui, _cfg, _act, rebuild));
+        AddTab("settings.tab.keys", NavGlyph.Keys, new KeysTab(_ui, _cfg, rebuild));
+        AddTab("settings.tab.about", NavGlyph.About, new AboutTab(_ui));
+
+        _nav.Tabs = [.. tabs];
+        if (_tab >= _panes.Count) _tab = 0; // раскладка сузилась (скрыли «Экран») — на первую вкладку
+        _nav.Selected = _tab;
         // хвостовой «воздух»: FlowLayoutPanel.AutoScroll не учитывает нижний Padding — без спейсера
         // последняя карточка обрезается при прокрутке
         foreach (var p in _panes)
