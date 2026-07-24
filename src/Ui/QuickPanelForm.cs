@@ -36,6 +36,9 @@ public sealed class QuickPanelForm : FlyoutForm
     // (~120 мс на цикл) + время t для живых иконок (стрелка, лист, пламя, звёзды...)
     private const float HoverMs = 120f;
     private readonly System.Windows.Forms.Timer _anim = new() { Interval = 15 };
+
+    // системный тултип по иконочным ячейкам: рисует Windows, наш GDI+-холст не трогаем (XIC-8)
+    private readonly ToolTip _tip = new();
     private float[] _hoverT = [];
     private float _gaugeT;
 
@@ -316,12 +319,34 @@ public sealed class QuickPanelForm : FlyoutForm
     protected override void OnDeactivate(EventArgs e) { base.OnDeactivate(e); Hide(); }
 
     // ---- ввод ----
+    // DPI монитора сменился — пересобрать раскладку (Size/Region/ячейки) под новый DeviceDpi
+    protected override void OnDpiRescaled() => DoLayout();
+
     protected override void OnMouseMove(MouseEventArgs e)
     {
         int h = HitTest(e.Location);
-        if (h != _hover) { _hover = h; Invalidate(); }
+        if (h != _hover) { _hover = h; UpdateTip(h, e.Location); Invalidate(); }
     }
-    protected override void OnMouseLeave(EventArgs e) { if (_hover != -1) { _hover = -1; Invalidate(); } }
+    protected override void OnMouseLeave(EventArgs e) { if (_hover != -1) { _hover = -1; _tip.Hide(this); Invalidate(); } }
+
+    // Показать/спрятать системный тултип на смене hover-ячейки (иконочные — остальные подписаны).
+    private void UpdateTip(int id, Point at)
+    {
+        if (TipFor(id) is not string text) { _tip.Hide(this); return; }
+        _tip.Show(text, this, at.X, at.Y + Sc(22), 4000); // чуть ниже курсора; за экран ToolTip не даст уехать
+    }
+
+    private static string? TipFor(int id) => id switch
+    {
+        12 => Loc.T("panel.close"),
+        13 => Loc.T("panel.awake"),
+        14 => Loc.T("menu.monitor"),
+        15 => Loc.T("panel.hz"),
+        16 => Loc.T("panel.travel"),
+        17 => Loc.T("panel.touchpad"),
+        18 => Loc.T("panel.touchscreen"),
+        _ => null, // режимы и пилюли 80/100 подписаны текстом — тултип не нужен
+    };
 
     // ведём прогресс каждой ячейки к цели (1 — под курсором, 0 — нет)
     private void StepHoverAnim()
@@ -589,7 +614,7 @@ public sealed class QuickPanelForm : FlyoutForm
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { _anim.Dispose(); RemoveMouseHook(); }
+        if (disposing) { _anim.Dispose(); _tip.Dispose(); RemoveMouseHook(); }
         base.Dispose(disposing);
     }
 }
