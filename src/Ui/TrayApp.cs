@@ -98,6 +98,7 @@ public sealed class TrayApp : IDisposable
         // команды идут в контроллер, обратная связь — его колбэками ниже.
         _panel = new QuickPanelForm(_mifs, _cfg, touchpad, touchscreen);
         _panel.MonitorRequested = ShowMonitor;
+        _panel.SettingsRequested = OpenSettings;
         _panel.SetMode = _controller.SetMode;
         _panel.SetCare = _controller.ToggleCare;
         _panel.SetTravel = _controller.SetTravel;

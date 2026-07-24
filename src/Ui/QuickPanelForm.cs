@@ -20,12 +20,12 @@ public sealed class QuickPanelForm : FlyoutForm
     // видимые режимы (Эко/Полная мощность скрываются в Настройках или config.json)
     private (PerfMode mode, string key, Color accent)[] _modes = [];
     private Rectangle[] _modeRects = [];
-    private Rectangle _care80, _care100, _travelCell, _tpCell, _tsCell, _hzCell, _awake, _close, _monBtn;
+    private Rectangle _care80, _care100, _travelCell, _tpCell, _tsCell, _hzCell, _awake, _close, _monBtn, _settingsBtn;
 
     private PerfMode? _mode;
     private bool _tpAvail, _tpOn; // тачпад: найден в системе / включён
     private bool _tsAvail, _tsOn; // сенсорный экран: найден в системе / включён
-    private int _hover = -1; // 0..N-1 режимы, 10=80, 11=100, 12=close, 13=сова, 14=монитор, 15=герцовка, 16=в дорогу, 17=тачпад, 18=тачскрин
+    private int _hover = -1; // 0..N-1 режимы, 10=80, 11=100, 12=close, 13=сова, 14=монитор, 15=герцовка, 16=в дорогу, 17=тачпад, 18=тачскрин, 19=настройки
 
     // клавиатурная навигация (Фаза 6.3): порядок обхода ячеек стрелками ←/→,
     // _focus — индекс в _order (-1 = фокуса нет, до первого нажатия стрелки)
@@ -63,6 +63,9 @@ public sealed class QuickPanelForm : FlyoutForm
 
     /// <summary>Кнопка-график слева от крестика: открыть окно «Монитор» (владелец — трей).</summary>
     public Action? MonitorRequested;
+
+    /// <summary>Кнопка-шестерёнка левее «Монитора»: открыть окно настроек (владелец — трей).</summary>
+    public Action? SettingsRequested;
 
     public QuickPanelForm(IMifsClient mifs, AppConfig cfg, TouchpadControl touchpad, TouchscreenControl touchscreen)
     {
@@ -182,6 +185,7 @@ public sealed class QuickPanelForm : FlyoutForm
         _awake = _cfg.OwlMode ? new Rectangle(afterHz + gap, pillsY, owlW, pillsH) : Rectangle.Empty;
         _close = new Rectangle(width - p - Sc(22), p - Sc(2), Sc(22), Sc(22));
         _monBtn = new Rectangle(_close.X - Sc(28), _close.Y, Sc(22), Sc(22));
+        _settingsBtn = new Rectangle(_monBtn.X - Sc(28), _close.Y, Sc(22), Sc(22));
 
         Size = new Size(width, height);
         SetRoundedRegion(Sc(18));
@@ -194,7 +198,7 @@ public sealed class QuickPanelForm : FlyoutForm
         if (!_tpCell.IsEmpty) _order.Add(17);
         if (!_hzCell.IsEmpty) _order.Add(15);
         if (!_awake.IsEmpty) _order.Add(13);
-        _order.Add(14); _order.Add(12);
+        _order.Add(19); _order.Add(14); _order.Add(12); // шестерёнка, монитор, крестик
         if (_focus >= _order.Count) _focus = -1; // раскладка сузилась — сбросить
     }
 
@@ -205,6 +209,7 @@ public sealed class QuickPanelForm : FlyoutForm
         12 => _close,
         13 => _awake,
         14 => _monBtn,
+        19 => _settingsBtn,
         15 => _hzCell,
         16 => _travelCell,
         17 => _tpCell,
@@ -340,6 +345,7 @@ public sealed class QuickPanelForm : FlyoutForm
         12 => Loc.T("panel.close"),
         13 => Loc.T("panel.awake"),
         14 => Loc.T("menu.monitor"),
+        19 => Loc.T("menu.settings"),
         15 => Loc.T("panel.hz"),
         16 => Loc.T("panel.travel"),
         17 => Loc.T("panel.touchpad"),
@@ -366,6 +372,7 @@ public sealed class QuickPanelForm : FlyoutForm
     {
         if (h == 12) { Hide(); return; }
         if (h == 14) { MonitorRequested?.Invoke(); return; }
+        if (h == 19) { SettingsRequested?.Invoke(); return; } // окно настроек заберёт фокус → панель скроется
         if (h >= 0 && h < _modes.Length)
         {
             SetMode?.Invoke(_modes[h].mode);
@@ -408,6 +415,7 @@ public sealed class QuickPanelForm : FlyoutForm
     {
         if (_close.Contains(pt)) return 12;
         if (_monBtn.Contains(pt)) return 14;
+        if (_settingsBtn.Contains(pt)) return 19;
         for (int i = 0; i < _modes.Length; i++) if (_modeRects[i].Contains(pt)) return i;
         if (_travelCell.Contains(pt)) return 16;
         if (_care80.Contains(pt)) return 10;
@@ -428,9 +436,10 @@ public sealed class QuickPanelForm : FlyoutForm
         TextRenderer.DrawText(g, Loc.T("panel.title"), TitleFont,
             new Rectangle(Sc(16), Sc(12), Width, Sc(22)), FlyoutPalette.Text, TextFormatFlags.Left | TextFormatFlags.Top);
 
-        // крестик и кнопка «Монитор» слева от него
+        // крестик, «Монитор» и шестерёнка «Настройки» слева от него
         Draw.CloseButton(g, _close, _hover == 12);
         Draw.MonitorButton(g, _monBtn, _hover == 14);
+        Draw.SettingsButton(g, _settingsBtn, _hover == 19);
 
         // режимы
         for (int i = 0; i < _modes.Length; i++)
