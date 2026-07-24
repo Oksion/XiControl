@@ -51,6 +51,10 @@ public sealed class ApiTab : SettingsPane
             tokenField.SelectAll(); // сразу под Ctrl+C — второго показа не будет
         });
         gen.Enabled = s.Enabled;
+        // ширина кнопки — явно и сразу: AutoSize досчитывает её уже ПОСЛЕ того, как Pair
+        // расставил контролы по текущим ширинам, и поле наезжало на кнопку
+        gen.AutoSize = false;
+        gen.Width = TextRenderer.MeasureText(gen.Text, gen.Font).Width + ui.Sc(24);
         ui.AddRow(this, "settings.api.token", "settings.api.token.desc", ui.Pair(gen, tokenField));
 
         // Пер-командные разрешения. Тумблер команды, чья фича выключена в «Функциях», —
