@@ -132,14 +132,7 @@ public sealed class NavStrip : Panel
         switch (k)
         {
             case NavGlyph.General:
-                g.DrawEllipse(pen, x + w * 0.35f, y + h * 0.35f, w * 0.3f, h * 0.3f);
-                for (int a = 0; a < 8; a++)
-                {
-                    double ang = a * Math.PI / 4;
-                    float cx = x + w / 2f, cy = y + h / 2f;
-                    g.DrawLine(pen, cx + (float)Math.Cos(ang) * w * 0.32f, cy + (float)Math.Sin(ang) * h * 0.32f,
-                        cx + (float)Math.Cos(ang) * w * 0.48f, cy + (float)Math.Sin(ang) * h * 0.48f);
-                }
+                Draw.Gear(g, r, c); // общий силуэт с кнопкой панели — не «солнышко» из лучей
                 break;
             case NavGlyph.Features:
                 // два «ползунка» на рельсах — набор включаемых функций

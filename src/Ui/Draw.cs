@@ -49,6 +49,51 @@ public static class Draw
         ]);
     }
 
+    /// <summary>
+    /// Шестерёнка-силуэт: 8 трапециевидных зубьев + отверстие втулки (evenodd). Общая для
+    /// кнопки «Настройки» панели и глифа «Общие» в навигации настроек — раньше оба рисовались
+    /// «кругом с лучами» и читались как солнышко, а не шестерня.
+    /// </summary>
+    public static void Gear(Graphics g, RectangleF r, Color c)
+    {
+        float w = r.Width, cx = r.X + w / 2f, cy = r.Y + r.Height / 2f;
+        float ro = w * 0.48f, rm = w * 0.365f, hole = w * 0.16f;
+        var pts = new PointF[32];
+        for (int k = 0; k < 8; k++)
+        {
+            float b = k * 45f + 22.5f; // зуб по центру между осями — глиф стоит «на зубе», привычный силуэт
+            pts[k * 4 + 0] = P(b - 13, rm);
+            pts[k * 4 + 1] = P(b - 8, ro);
+            pts[k * 4 + 2] = P(b + 8, ro);
+            pts[k * 4 + 3] = P(b + 13, rm);
+        }
+        using var path = new GraphicsPath(FillMode.Alternate);
+        path.AddPolygon(pts);
+        path.AddEllipse(cx - hole, cy - hole, hole * 2, hole * 2);
+        using var brush = new SolidBrush(c);
+        g.FillPath(brush, path);
+
+        PointF P(float deg, float rad)
+        {
+            double a = deg * Math.PI / 180.0;
+            return new PointF(cx + (float)Math.Cos(a) * rad, cy + (float)Math.Sin(a) * rad);
+        }
+    }
+
+    /// <summary>Кнопка «Настройки» (шестерёнка) в стиле «Монитора»: hover — синяя плашка.</summary>
+    public static void SettingsButton(Graphics g, Rectangle r, bool hover)
+    {
+        if (hover)
+        {
+            using var b = new SolidBrush(Color.FromArgb(60, 120, 190));
+            using var path = Rounded(r, r.Width * 0.23f);
+            g.FillPath(b, path);
+        }
+        float inset = r.Width * 0.15f;
+        Gear(g, new RectangleF(r.X + inset, r.Y + inset, r.Width - inset * 2, r.Height - inset * 2),
+            hover ? Color.White : Color.FromArgb(150, 150, 155));
+    }
+
     /// <summary>Кнопка «вид» (полный/мини/ватты): большой и малый прямоугольники. Hover — синяя плашка.</summary>
     public static void ViewButton(Graphics g, Rectangle r, bool hover)
     {
