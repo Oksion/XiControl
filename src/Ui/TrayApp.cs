@@ -18,6 +18,7 @@ public sealed class TrayApp : IDisposable
     private readonly IKeyEventSource _events;
     private readonly QuickPanelForm _panel;
     private bool _lastOnline;  // прошлое состояние питания (для OSD только на реальном переходе)
+    private bool _locked;      // сессия заблокирована (Win+L): OSD не виден — обратная связь звуком/тостом (XIC-11)
 
     // Кэш отчёта о батарее (BatteryTab): износ/циклы/ёмкость меняются раз в сутки-недели, а окно
     // настроек пересобирается на каждый Popup/смену языка — держим короткий TTL, чтобы не дёргать
@@ -91,6 +92,7 @@ public sealed class TrayApp : IDisposable
         _ = _osd.Handle; // форсируем создание хэндла для маршалинга событий в UI-поток
         _lastOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
         SystemEvents.PowerModeChanged += OnPower;
+        SystemEvents.SessionSwitch += OnSessionSwitch; // блокировка/разблокировка — для «слепой» обратной связи
 
         // Панель по Mi-кнопке + слушатель клавиш прошивки. Панель — чистый view:
         // команды идут в контроллер, обратная связь — его колбэками ниже.
@@ -114,6 +116,17 @@ public sealed class TrayApp : IDisposable
         };
         _controller.TravelChanged = on =>
         {
+            // экран заблокирован: OSD под локскрином не виден (secure desktop) — «слепая» обратная
+            // связь: различимый джингл вкл/выкл + toast (Windows сама показывает его на локскрине).
+            // В обычном режиме — как раньше, без звука и тостов (XIC-11)
+            if (_locked)
+            {
+                Sound.PlayToggle(on);
+                Safe(() => { _tray.ShowBalloonTip(4000, Loc.T("app.name"),
+                    on ? $"{Loc.T("osd.travel")} — {Loc.T("osd.travel.sub")}" : Loc.T("osd.travel.off"),
+                    ToolTipIcon.Info); return true; }, false);
+                return;
+            }
             if (_panel.Visible) _panel.RefreshUi();
             else if (on) _osd.Flash(OsdKind.Travel, Loc.T("osd.travel"), Loc.T("osd.travel.sub"));
             else _osd.Flash(OsdKind.TravelOff, Loc.T("osd.travel.off"));
@@ -297,6 +310,14 @@ public sealed class TrayApp : IDisposable
         _osd.Flash(kind, Loc.T("osd.backlight"), sub);
     }
 
+    // Флаг «сессия заблокирована»: прочие типы SessionSwitch (logon/logoff/remote) не трогают —
+    // logoff и так завершает приложение, а RDP-переключения к видимости OSD отношения не имеют
+    private void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
+    {
+        if (e.Reason == SessionSwitchReason.SessionLock) _locked = true;
+        else if (e.Reason == SessionSwitchReason.SessionUnlock) _locked = false;
+    }
+
     private void OnPower(object? sender, PowerModeChangedEventArgs e)
     {
         if (e.Mode is not (PowerModes.StatusChange or PowerModes.Resume)) return;
@@ -433,6 +454,7 @@ public sealed class TrayApp : IDisposable
         _controller.Shutdown(); // вернуть действие крышки (сова)
 
         SystemEvents.PowerModeChanged -= OnPower;
+        SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.UserPreferenceChanged -= OnUserPref;
         _mi.Dispose();
         // _events / guard-ы / IPowerEvents / IMifsClient диспоузит DI-провайдер
