@@ -33,4 +33,6 @@ public sealed class SettingsActions
     public required Action<int, int> SetRefreshRates;        // ac, batt
     public required Action<bool> SetOwlFeature;
     public required Func<SystemIntegration.BatteryReport> GetBatteryReport; // здоровье батареи (WMI + SOH1)
+    public required Func<SystemIntegration.ApiSettings> GetApiSettings;    // настройки HTTP API (api.json, XIC-13)
+    public required Action ApiApplied; // вкладка изменила настройки API → сохранить + перезапустить хост/фаервол
 }

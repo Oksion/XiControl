@@ -20,11 +20,18 @@ public sealed class TrayApp : IDisposable
     private bool _lastOnline;  // прошлое состояние питания (для OSD только на реальном переходе)
     private bool _locked;      // сессия заблокирована (Win+L): OSD не виден — обратная связь звуком/тостом (XIC-11)
 
-    // Кэш отчёта о батарее (BatteryTab): износ/циклы/ёмкость меняются раз в сутки-недели, а окно
-    // настроек пересобирается на каждый Popup/смену языка — держим короткий TTL, чтобы не дёргать
-    // WMI+MIFS повторно (даже поверх ленивого построения вкладок — на случай rebuild «на Батарее»).
+    // Кэш отчёта о батарее (BatteryTab + /status API): износ/циклы/ёмкость меняются раз в
+    // сутки-недели, а окно настроек пересобирается на каждый Popup/смену языка — держим короткий
+    // TTL, чтобы не дёргать WMI+MIFS повторно. Lock: к кэшу ходит и поток API-запросов.
     private const long BatteryReportTtlMs = 60_000;
+    private readonly object _apiLock = new();
     private (SystemIntegration.BatteryReport report, long at)? _batteryCache;
+
+    // HTTP API (XIC-13): хост живёт только пока фича включена; PowerDraw — свой (ленивый),
+    // чтобы не делить хэндл батареи с «Монитором» между потоками
+    private readonly ApiSettings _api;
+    private HttpApi? _apiHost;
+    private PowerDraw? _apiDraw;
 
     // командный слой: все Set*/Toggle* и стартовая логика — в AppController
     private readonly AppController _controller;
@@ -43,7 +50,7 @@ public sealed class TrayApp : IDisposable
     // панель, подписки, колбэки контроллера). Стартовая бизнес-логика — в Start().
     public TrayApp(IMifsClient mifs, AppConfig cfg, IKeyEventSource events,
         PowerProfileGuard powerGuard, TouchpadControl touchpad, TouchscreenControl touchscreen,
-        TravelChargeMonitor travel, TrayIconController icon, AppController controller)
+        TravelChargeMonitor travel, TrayIconController icon, AppController controller, ApiSettings api)
     {
         _mifs = mifs;
         _cfg = cfg;
@@ -51,6 +58,7 @@ public sealed class TrayApp : IDisposable
         _travel = travel;
         _icon = icon;
         _controller = controller;
+        _api = api;
 
         // меню трея: построение/тема/показ — в TrayMenuBuilder, окна и выход — наши колбэки
         _menu = new TrayMenuBuilder(cfg, mifs, controller)
@@ -223,6 +231,10 @@ public sealed class TrayApp : IDisposable
         _events.Start();
         _icon.Start();
 
+        // HTTP API: поднять хост, если фича включена (api.json); firewall на старте не трогаем —
+        // правило создаётся/удаляется только явным тумблером во вкладке (как schtasks у автозапуска)
+        if (_api.Enabled) StartApiHost();
+
         // «Прогрев» трей-меню: без него самый первый клик по значку проглатывается —
         // первый показ ContextMenuStrip после старта инициализирует ленивые ресурсы
         // (хэндл меню, первый WMI-вызов в BuildMenu, передний план приложения), и до
@@ -387,6 +399,76 @@ public sealed class TrayApp : IDisposable
     // Склейка строк подписи OSD через « • » (любая часть может быть null).
     private static string? Append(string? a, string? b) => a is null ? b : b is null ? a : $"{a} • {b}";
 
+    // ---- HTTP API (XIC-13) ----
+
+    // Поднять хост по текущим настройкам. Команды маршалим в UI-поток через _osd (хэндл форсирован
+    // в ctor) — запросы приходят с пула потоков, а контроллер трогает конфиг/OSD/значок.
+    private void StartApiHost()
+    {
+        var router = new ApiRouter(_api)
+        {
+            SetMode = m => _osd.BeginInvoke(new Action(() => _controller.SetMode(m))),
+            SetCare = on => _osd.BeginInvoke(new Action(() => _controller.ToggleCare(on))),
+            SetTravel = on => _osd.BeginInvoke(new Action(() => _controller.SetTravel(on))),
+            // контроллер умеет только переключать сову — приводим к желаемому состоянию сами
+            SetOwl = on => _osd.BeginInvoke(new Action(() => { if (_cfg.Awake != on) _controller.ToggleAwake(); })),
+            OwlFeature = () => _cfg.OwlMode,
+            Status = ApiStatusSnapshot,
+        };
+        // занятый порт и т.п. — API просто не поднялся (ошибка в логе), приложение живёт дальше
+        _apiHost = Safe<HttpApi?>(() => new HttpApi(_api, router), null);
+    }
+
+    // Вкладка «HTTP API» изменила настройки: сохранить api.json (с ACL) и пересоздать хост.
+    // Firewall-правило — только здесь, по явному действию пользователя (LAN-режим вкл/выкл).
+    private void ApiApplied()
+    {
+        ApiSettingsStore.Save(_api);
+        _apiHost?.Dispose();
+        _apiHost = null;
+        if (_api.Enabled) StartApiHost();
+        bool fw = _api.Enabled && _api.LanAccess;
+        int port = _api.Port;
+        Task.Run(() => ApiFirewall.Set(fw, port)); // netsh с WaitForExit — не на UI-потоке
+    }
+
+    // Снимок для GET /status: конфиг + PowerStatus (мгновенно), режим/здоровье — WMI/MIFS
+    // (мы на потоке API, не UI). PowerDraw под замком: запросы могут прийти параллельно.
+    private ApiStatus ApiStatusSnapshot()
+    {
+        var ps = SystemInformation.PowerStatus;
+        float f = ps.BatteryLifePercent;
+        int? pct = (f >= 0f && f <= 1f) ? (int)Math.Round(f * 100) : null;
+        float? watts = null;
+        lock (_apiLock)
+        {
+            _apiDraw ??= new PowerDraw();
+            if (_apiDraw.TryReadWatts(out float w) && !float.IsNaN(w)) watts = w;
+        }
+        var mode = Safe<PerfMode?>(() => _mifs.GetPerfMode(), null);
+        return new ApiStatus(
+            mode?.ToString() ?? "unknown",
+            _cfg.ChargeCare, _cfg.TravelMode, _cfg.Awake,
+            pct, ps.PowerLineStatus == PowerLineStatus.Online, watts,
+            BatteryReportCached().HealthPercent);
+    }
+
+    // Отчёт о батарее с TTL-кэшем — общий для BatteryTab и /status (см. комментарий у кэша).
+    private SystemIntegration.BatteryReport BatteryReportCached()
+    {
+        lock (_apiLock)
+        {
+            if (_batteryCache is (var cached, var at) && Environment.TickCount64 - at < BatteryReportTtlMs)
+                return cached; // свежий кэш — WMI/MIFS не трогаем
+            var r = SystemIntegration.BatteryInfo.Read(); // штатные WMI-классы (циклы, ёмкость, износ)
+            // здоровья в WMI нет → падаем на SOH1 из прошивки (MIFS), это тоже оценка ёмкости
+            if (r.HealthPercent is null && Safe(() => _mifs.GetBatteryHealth(), (int?)null) is int soh && soh > 0)
+                r = r with { HealthPercent = soh };
+            _batteryCache = (r, Environment.TickCount64);
+            return r;
+        }
+    }
+
     private SettingsForm? _settings;
 
     // Открыть окно настроек (лениво создаётся, дальше — из спрятанного состояния).
@@ -411,17 +493,9 @@ public sealed class TrayApp : IDisposable
                 SetRefreshRateFeature = _controller.ToggleRefreshRateFeature,
                 SetRefreshRates = _controller.SetRefreshRates,
                 SetOwlFeature = _controller.ToggleOwlFeature,
-                GetBatteryReport = () =>
-                {
-                    if (_batteryCache is (var cached, var at) && Environment.TickCount64 - at < BatteryReportTtlMs)
-                        return cached; // свежий кэш — WMI/MIFS не трогаем
-                    var r = SystemIntegration.BatteryInfo.Read(); // штатные WMI-классы (циклы, ёмкость, износ)
-                    // здоровье WMI нет → падаем на SOH1 из прошивки (MIFS), это тоже оценка ёмкости
-                    if (r.HealthPercent is null && Safe(() => _mifs.GetBatteryHealth(), (int?)null) is int soh && soh > 0)
-                        r = r with { HealthPercent = soh };
-                    _batteryCache = (r, Environment.TickCount64);
-                    return r;
-                },
+                GetBatteryReport = BatteryReportCached,
+                GetApiSettings = () => _api,
+                ApiApplied = ApiApplied,
             };
             _settings = new SettingsForm(_cfg, act);
         }
@@ -453,6 +527,9 @@ public sealed class TrayApp : IDisposable
     public void Dispose()
     {
         _controller.Shutdown(); // вернуть действие крышки (сова)
+
+        _apiHost?.Dispose();    // остановить слушатель API (firewall-правило не трогаем — фича включена)
+        _apiDraw?.Dispose();
 
         SystemEvents.PowerModeChanged -= OnPower;
         SystemEvents.SessionSwitch -= OnSessionSwitch;
