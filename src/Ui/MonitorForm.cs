@@ -56,8 +56,8 @@ public sealed class MonitorForm : FlyoutForm
 
     private Rectangle _close, _viewBtn, _expandBtn;
 
-    // системный тултип по кнопкам заголовка: рисует Windows, холст не трогаем (XIC-8)
-    private readonly ToolTip _tip = new();
+    // тултип по кнопкам заголовка: FlyoutTip — палитра флайаутов + dwell, холст не трогаем (XIC-8)
+    private readonly FlyoutTip _tip;
     private int _tipBtn; // 0 нет, 1 close, 2 view, 3 expand — чтобы не пере-показывать на той же
     private bool _closeHover, _viewHover, _expandHover;
 
@@ -73,6 +73,7 @@ public sealed class MonitorForm : FlyoutForm
     {
         _cfg = cfg;
         _mifs = mifs;
+        _tip = new FlyoutTip(this);
         _view = cfg.MonitorView?.ToLowerInvariant() switch
         {
             "mini" => ViewKind.Mini,
@@ -167,6 +168,7 @@ public sealed class MonitorForm : FlyoutForm
         else
         {
             _tick.Stop(); // скрыт — не семплируем вообще
+            _tip.Hide(); // отложенный dwell-показ не должен всплыть над скрытым виджетом
             _cfg.MonitorX = Left; _cfg.MonitorY = Top;
             _cfg.Save();
         }
@@ -209,12 +211,11 @@ public sealed class MonitorForm : FlyoutForm
         bool x = _expandBtn.Contains(e.Location);
         if (x != _expandHover) { _expandHover = x; Invalidate(_expandBtn); }
 
-        int btn = h ? 1 : v ? 2 : x ? 3 : 0; // системный тултип по кнопке под курсором
+        int btn = h ? 1 : v ? 2 : x ? 3 : 0; // тултип по кнопке под курсором
         if (btn != _tipBtn)
         {
             _tipBtn = btn;
-            if (TipFor(btn) is string text) _tip.Show(text, this, e.Location.X, e.Location.Y + Sc(20), 4000);
-            else _tip.Hide(this);
+            _tip.Update(TipFor(btn), e.Location);
         }
     }
 
@@ -232,7 +233,7 @@ public sealed class MonitorForm : FlyoutForm
         if (_closeHover) { _closeHover = false; Invalidate(_close); }
         if (_viewHover) { _viewHover = false; Invalidate(_viewBtn); }
         if (_expandHover) { _expandHover = false; Invalidate(_expandBtn); }
-        if (_tipBtn != 0) { _tipBtn = 0; _tip.Hide(this); }
+        if (_tipBtn != 0) { _tipBtn = 0; _tip.Hide(); }
     }
 
     // ---------- семплирование ----------

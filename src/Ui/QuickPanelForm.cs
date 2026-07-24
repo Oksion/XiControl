@@ -37,8 +37,9 @@ public sealed class QuickPanelForm : FlyoutForm
     private const float HoverMs = 120f;
     private readonly System.Windows.Forms.Timer _anim = new() { Interval = 15 };
 
-    // системный тултип по иконочным ячейкам: рисует Windows, наш GDI+-холст не трогаем (XIC-8)
-    private readonly ToolTip _tip = new();
+    // тултип по иконочным ячейкам: FlyoutTip — OwnerDraw в палитре флайаутов + dwell-задержка,
+    // отрисовка в окне тултипа, наш GDI+-холст не трогается (XIC-8)
+    private readonly FlyoutTip _tip;
     private float[] _hoverT = [];
     private float _gaugeT;
 
@@ -69,6 +70,7 @@ public sealed class QuickPanelForm : FlyoutForm
         _cfg = cfg;
         _tp = touchpad;
         _ts = touchscreen;
+        _tip = new FlyoutTip(this);
         ReloadModes();
         _anim.Tick += (_, _) =>
         {
@@ -274,6 +276,7 @@ public sealed class QuickPanelForm : FlyoutForm
         {
             _hiddenAt = Environment.TickCount64; // для защиты Toggle от мгновенного реопена
             _anim.Stop();
+            _tip.Hide(); // иначе отложенный dwell-показ всплывёт над уже скрытой панелью
             UnregisterHotKey(Handle, HkEscId);
             RemoveMouseHook();
         }
@@ -327,14 +330,10 @@ public sealed class QuickPanelForm : FlyoutForm
         int h = HitTest(e.Location);
         if (h != _hover) { _hover = h; UpdateTip(h, e.Location); Invalidate(); }
     }
-    protected override void OnMouseLeave(EventArgs e) { if (_hover != -1) { _hover = -1; _tip.Hide(this); Invalidate(); } }
+    protected override void OnMouseLeave(EventArgs e) { if (_hover != -1) { _hover = -1; _tip.Hide(); Invalidate(); } }
 
-    // Показать/спрятать системный тултип на смене hover-ячейки (иконочные — остальные подписаны).
-    private void UpdateTip(int id, Point at)
-    {
-        if (TipFor(id) is not string text) { _tip.Hide(this); return; }
-        _tip.Show(text, this, at.X, at.Y + Sc(22), 4000); // чуть ниже курсора; за экран ToolTip не даст уехать
-    }
+    // Показать/спрятать тултип на смене hover-ячейки (иконочные — остальные подписаны).
+    private void UpdateTip(int id, Point at) => _tip.Update(TipFor(id), at);
 
     private static string? TipFor(int id) => id switch
     {
