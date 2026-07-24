@@ -171,7 +171,7 @@ public sealed class QuickPanelForm : FlyoutForm
         int travelW = Sc(46);
         int pillsW = content - travelW - gap
             - (hzW > 0 ? hzW + gap : 0)
-            - (tpW > 0 ? tpW + gap : 0) - (tsW > 0 ? tsW + gap : 0) - (_cfg.OwlMode ? owlW + gap : 0);
+            - (tpW > 0 ? tpW + gap : 0) - (tsW > 0 ? tsW + gap : 0) - (owlW > 0 ? owlW + gap : 0);
         int half = (pillsW - gap) / 2;
         _travelCell = new Rectangle(p, pillsY, travelW, pillsH);
         _care80 = new Rectangle(_travelCell.Right + gap, pillsY, half, pillsH);
@@ -182,7 +182,7 @@ public sealed class QuickPanelForm : FlyoutForm
         int afterTp = tpW > 0 ? _tpCell.Right : afterTs;
         _hzCell = hzW > 0 ? new Rectangle(afterTp + gap, pillsY, hzW, pillsH) : Rectangle.Empty;
         int afterHz = hzW > 0 ? _hzCell.Right : afterTp;
-        _awake = _cfg.OwlMode ? new Rectangle(afterHz + gap, pillsY, owlW, pillsH) : Rectangle.Empty;
+        _awake = owlW > 0 ? new Rectangle(afterHz + gap, pillsY, owlW, pillsH) : Rectangle.Empty;
         _close = new Rectangle(width - p - Sc(22), p - Sc(2), Sc(22), Sc(22));
         _monBtn = new Rectangle(_close.X - Sc(28), _close.Y, Sc(22), Sc(22));
         _settingsBtn = new Rectangle(_monBtn.X - Sc(28), _close.Y, Sc(22), Sc(22));
