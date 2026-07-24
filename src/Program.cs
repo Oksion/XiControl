@@ -22,6 +22,9 @@ internal static class Program
         var services = new ServiceCollection();
         services.AddSingleton<IConfigStore>(new JsonConfigStore());
         services.AddSingleton(sp => sp.GetRequiredService<IConfigStore>().Load());
+        // настройки HTTP API — отдельный файл с ACL (ProgramData), НЕ config.json: включить API
+        // или подменить токен правкой пользовательского конфига невозможно (XIC-13)
+        services.AddSingleton(ApiSettingsStore.Load());
         services.AddSingleton<ILocalizer, Localizer>();
         services.AddSingleton<IMifsClient, MifsClient>();
         services.AddSingleton<IKeyEventSource, MifsEventWatcher>();
