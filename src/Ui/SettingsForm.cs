@@ -190,6 +190,7 @@ public sealed class SettingsForm : Form
             // спейсера последняя карточка обрезается при прокрутке
             pane.Controls.Add(new Panel { Width = _ui.RowW, Height = _ui.Sc(20), BackColor = _ui.T.WinBg, Margin = new Padding(0) });
             _host.Controls.Add(pane);
+            FormChrome.SetDarkScrollbars(pane, _ui.T.Dark); // системная полоса в тон темы, не классическая светлая
             _panes[i] = pane;
         }
         for (int k = 0; k < _panes.Count; k++)

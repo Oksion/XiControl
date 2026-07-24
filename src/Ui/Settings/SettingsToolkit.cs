@@ -141,9 +141,12 @@ public sealed class SettingsToolkit
     public Panel SubRow(string titleKey, Control ctl)
     {
         if (string.IsNullOrEmpty(ctl.AccessibleName)) ctl.AccessibleName = Loc.T(titleKey);
-        var row = new Panel { Width = RowW, Height = Sc(42), BackColor = T.WinBg, Margin = new Padding(Sc(30), 0, 0, 0) };
+        // ширина минус отступ: Margin.Left + RowW вылезал за клиентскую область — FlowLayoutPanel
+        // добавлял горизонтальную полосу прокрутки («странный скролл» на Производительности)
+        int w = RowW - Sc(30);
+        var row = new Panel { Width = w, Height = Sc(42), BackColor = T.WinBg, Margin = new Padding(Sc(30), 0, 0, 0) };
         row.Controls.Add(new Label { Text = Loc.T(titleKey), AutoSize = true, ForeColor = T.Text, BackColor = Color.Transparent, Font = CtlFont, Location = new Point(Sc(2), Sc(11)) });
-        ctl.Location = new Point(RowW - ctl.Width - Sc(16) - Sc(30), (Sc(42) - ctl.Height) / 2);
+        ctl.Location = new Point(w - ctl.Width - Sc(16), (Sc(42) - ctl.Height) / 2);
         ctl.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         row.Controls.Add(ctl);
         return row;
@@ -212,6 +215,20 @@ public sealed class SettingsToolkit
         };
         if (index >= 0 && index < items.Length) cb.SelectedIndex = index;
         cb.SelectedIndexChanged += (_, _) => { if (cb.SelectedIndex >= 0) changed(cb.SelectedIndex); };
+        // колесо над ЗАКРЫТЫМ комбо — скроллим вкладку, а не крутим значение: иначе прокрутка
+        // страницы случайно меняла настройку (язык, частоту), стоило курсору попасть на комбо.
+        // Раскрытый список листается колесом как обычно.
+        cb.MouseWheel += (_, e) =>
+        {
+            if (cb.DroppedDown) return;
+            ((HandledMouseEventArgs)e).Handled = true;
+            for (Control? p = cb.Parent; p is not null; p = p.Parent)
+                if (p is ScrollableControl { AutoScroll: true } pane)
+                {
+                    pane.AutoScrollPosition = new Point(0, -pane.AutoScrollPosition.Y - e.Delta);
+                    break;
+                }
+        };
         return cb;
     }
 
