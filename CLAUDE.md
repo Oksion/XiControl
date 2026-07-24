@@ -8,7 +8,8 @@
 **XiControl** — трей-утилита для ноутбуков Xiaomi/Redmi (Windows 10/11 x64): защита заряда
 батареи (+ разовый заряд «В дорогу»), режимы производительности, OSD, переназначаемые
 Mi-кнопка и «мёртвые» клавиши, авто-герцовка, запоминание яркости по питанию, «режим совы»,
-тачпад и сенсорный экран вкл/выкл, виджет «Монитор», окно настроек в стиле Win11. Всё управление железом —
+тачпад и сенсорный экран вкл/выкл, виджет «Монитор», окно настроек в стиле Win11, опциональный
+HTTP API для управления из локальной сети (телефон/Home Assistant). Всё управление железом —
 через штатный WMI-интерфейс прошивки `MiCommonInterface` (протокол MIFS, ODM Bitland).
 То, что делается чистым Win32 (частота экрана, яркость, тачпад, электропитание), делается
 чистым Win32.
@@ -151,7 +152,8 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   тумблеры, комбо; раздаёт `AccessibleName`), `SettingsTheme` (палитра под системную тему),
   `NavStrip` (левая навигация, доступна с клавиатуры), вкладки-контролы `GeneralTab` /
   `FeaturesTab` (доступность фич: сова/тачпад/тачскрин/`RefreshRateFeature`) / `BatteryTab` /
-  `DisplayTab` (скрыта, если `RefreshRateFeature=false`) / `PerfTab` / `KeysTab` / `AboutTab`
+  `DisplayTab` (скрыта, если `RefreshRateFeature=false`) / `PerfTab` / `KeysTab` /
+  `ApiTab` (HTTP API: тумблеры, порт, токен, пер-командные разрешения) / `AboutTab`
   (собирают себя в ctor).
 - `src/SystemIntegration/` — `ChargeGuard` (переустанавливает лимит заряда после сна/смены
   питания И перед уходом в сон/shutdown — EC теряет его на переходах), `RefreshRateGuard`/
@@ -162,7 +164,14 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   SetupAPI/CfgMgr32 — отключается родительский узел I2C HID, без PERSIST; общая механика в
   базовом `HidNodeToggle`, разница лишь в HID-коллекции: тачпад U:0005, экран U:0004),
   `AutoStart` (задача планировщика + самопочинка пути), `AwakeMode` («режим совы»),
-  `MicControl`, `KeyActions`, `Sound` (WAV-джинглы), `BatteryInfo`, `PowerDraw`.
+  `MicControl`, `KeyActions`, `Sound` (WAV-джинглы), `BatteryInfo`, `PowerDraw`;
+  **HTTP API (XIC-13, opt-in)** — `HttpApi` (хост на `HttpListener`/http.sys, без ASP.NET Core;
+  создаётся только при включённой фиче → выключено = 0 CPU), `ApiRouter` (авторизация Bearer+SHA-256
+  constant-time и белый список маршрутов — тестируется на фейках), `ApiSettings`/`ApiSettingsStore`
+  (настройки в `%ProgramData%\XiControl\api.json` под ACL «запись только Administrators/SYSTEM» +
+  проверка владельца при чтении — правкой config.json API не включить), `ApiFirewall` (правило
+  netsh `LocalSubnet` только по явному LAN-тумблеру). Команды идут в тот же `AppController`,
+  маршалятся в UI-поток; bind `127.0.0.1` по умолчанию, LAN — отдельным тумблером.
 - `src/Config/` — `AppConfig` (POCO: config.json + миграции в `MigrateKeyActions`; `Save()`
   остался на объекте, но persistence — за `IConfigStore`/`JsonConfigStore`);
   `src/Localization/` — `Loc.cs` RU/EN/ZH (+ тонкий шов `ILocalizer`).

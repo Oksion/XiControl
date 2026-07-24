@@ -102,6 +102,11 @@
   что у Windows).
 - 🌐 Язык интерфейса: русский / английский / китайский (中文).
 - 🚀 Автозапуск через Планировщик заданий (без UAC-запроса при входе, работает на батарее).
+- 🛰️ **HTTP API для локальной сети** (опционально, по умолчанию **выключен**) — управляй с
+  телефона или из автоматизаций Home Assistant: чтение статуса и заряда (`GET /status`),
+  переключение режима, защиты заряда, «В дорогу» и совы. Белый список команд, авторизация по
+  токену (хранится только SHA-256), bind на `127.0.0.1` по умолчанию — доступ из сети включается
+  отдельным тумблером. См. «HTTP API» ниже.
 
 ## Совместимость
 
@@ -327,6 +332,41 @@ dotnet publish src/XiControl.csproj -c Release -r win-x64 --self-contained -p:Pu
 Старые опции (`MiShortPress`, `MiDoubleClick`, `SettingsKey`, `AiKeyProgram`/`AiKeyArgs`)
 переносятся автоматически при первом запуске новой версии.
 
+### HTTP API (управление из локальной сети)
+
+Опциональный веб-API, чтобы дёргать XiControl с телефона или из автоматизаций Home Assistant.
+**По умолчанию выключен** — включается в **Настройки → HTTP API**. Там же задаётся порт,
+генерируется токен (показывается **один раз** — скопируй сразу; хранится только SHA-256) и
+поштучно разрешаются команды. По умолчанию доступно только чтение состояния.
+
+Маршруты (все — с заголовком `Authorization: Bearer <токен>`, тело — JSON):
+
+| Метод / путь | Что делает |
+|---|---|
+| `GET /status` | Режим, защита заряда, «В дорогу», сова, % заряда, факт зарядки, ватты, здоровье батареи |
+| `POST /mode` `{"value":"turbo"}` | Режим производительности (`eco`/`quiet`/`auto`/`turbo`/`fullspeed`) |
+| `POST /care` `{"on":true}` | «Беречь ~80%» вкл/выкл |
+| `POST /travel` `{"on":true}` | Режим «В дорогу» (разовый заряд до 100%) |
+| `POST /owl` `{"on":true}` | «Режим совы» (не спать) вкл/выкл |
+
+```bash
+curl -X POST http://192.168.1.50:58125/travel \
+  -H "Authorization: Bearer <токен>" -d '{"on":true}'
+```
+
+Безопасность (утилита работает от администратора, поэтому — осознанно и с оговорками):
+
+- **По умолчанию только `127.0.0.1`** — из сети не достучаться даже с токеном. Доступ из
+  локалки — отдельный тумблер «Доступ из локальной сети» с предупреждением; тогда создаётся
+  правило брандмауэра со скоупом **LocalSubnet** (только твоя подсеть) и удаляется при выключении.
+- **Белый список команд зашит в код** — настройки, автозапуск и запуск программ через API
+  невозможны; выключенная команда отвечает `403`, неизвестный путь — `404`, без токена — `401`.
+- **Настройки API — в `%ProgramData%\XiControl\api.json` под ACL «запись только администраторам»**:
+  сторонний процесс без прав администратора не может ни включить сервер, ни подменить токен.
+- Плейнтекст-HTTP (без TLS) — сознательный компромисс: радиус поражения белого списка мал.
+
+Ничего из этого не работает и не тратит ресурсы, пока API выключен (сервер попросту не запускается).
+
 ## Ограничения
 
 - Порог «беречь батарею» зашит в прошивку — произвольный процент через WMI невозможен.
@@ -391,8 +431,9 @@ battery charge limit (~80% / 100%) with automatic re-arm after sleep, a one-off
 "travel charge" to 100%, performance modes (Eco / Quiet / Auto / Turbo / Full speed),
 OSD overlays, auto refresh rate and brightness memory per power source, touchpad
 and touchscreen on/off, a Windows 11-style settings window, remappable Mi button and special keys
-(any function on any key, including launching your own program), and fixes for
-otherwise dead keys.
+(any function on any key, including launching your own program), fixes for
+otherwise dead keys, and an optional local-network HTTP API (off by default) for control
+from a phone or Home Assistant.
 
 Everything is driven through the firmware's stock WMI interface (`MiCommonInterface`,
 Bitland "MIFS") — **no WinRing0, no third-party drivers**. Requires Windows 10/11 x64

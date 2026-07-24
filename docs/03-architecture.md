@@ -118,12 +118,13 @@ xi_control/
  │   │                         FormChrome, ModeUi, SettingsForm, SettingsActions, ToggleSwitch,
  │   │                         ScaledFonts, SvgIcons, Draw, TrayIcons, DarkMenu
  │   ├─ Ui/Settings/        — SettingsToolkit (фабрика виджетов), SettingsTheme, NavStrip,
- │   │                         вкладки-контролы General/Battery/Display/Perf/Keys/AboutTab
+ │   │                         вкладки-контролы General/Features/Battery/Display/Perf/Keys/Api/AboutTab
  │   ├─ SystemIntegration/  — ChargeGuard, RefreshRate(+Guard), PowerProfileGuard,
  │   │                         TravelChargeMonitor, IPowerEvents/SystemPowerEvents,
  │   │                         IAppTimer/UiTimer, Brightness, TouchpadControl/TouchscreenControl
  │   │                         (общий HidNodeToggle), AwakeMode, MicControl, KeyActions,
- │   │                         AutoStart, Sound, BatteryInfo, PowerDraw
+ │   │                         AutoStart, Sound, BatteryInfo, PowerDraw,
+ │   │                         HttpApi/ApiRouter/ApiSettings/ApiFirewall (opt-in HTTP API, XIC-13)
  │   ├─ Config/             — AppConfig (POCO + миграции), IConfigStore/JsonConfigStore
  │   └─ Localization/       — Loc.cs RU/EN/ZH (+ ILocalizer)
  └─ tests/XiControl.Tests/  — юнит-тесты чистой логики на фейках (Fakes.cs), без железа
