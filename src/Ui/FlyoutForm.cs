@@ -71,6 +71,19 @@ public abstract class FlyoutForm : Form
     protected float S => DeviceDpi / 96f;
     protected int Sc(float v) => (int)Math.Round(v * S);
 
+    /// <summary>Окно переехало на монитор с другим DPI (PerMonitorV2 в манифесте). WinForms уже
+    /// применил предложенные границы; подкласс пересчитывает свою геометрию под новый DeviceDpi —
+    /// наши Sc/шрифты берутся от DeviceDpi, но кэшированная раскладка (ячейки, Region, Size)
+    /// осталась бы в старом масштабе без перекомпоновки.</summary>
+    protected virtual void OnDpiRescaled() { }
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        OnDpiRescaled();
+        Invalidate();
+    }
+
     /// <summary>
     /// Скруглить окно под текущий Size. Прежний Region освобождаем сами:
     /// присваивание не отдаёт старый GDI-хэндл.

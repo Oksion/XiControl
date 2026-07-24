@@ -55,6 +55,10 @@ public sealed class MonitorForm : FlyoutForm
     private float HotAt => _critC > 0 ? _critC - 15f : 88f;
 
     private Rectangle _close, _viewBtn, _expandBtn;
+
+    // системный тултип по кнопкам заголовка: рисует Windows, холст не трогаем (XIC-8)
+    private readonly ToolTip _tip = new();
+    private int _tipBtn; // 0 нет, 1 close, 2 view, 3 expand — чтобы не пере-показывать на той же
     private bool _closeHover, _viewHover, _expandHover;
 
     // вид виджета: полный (графики) / мини (строка индикаторов) / только ватты
@@ -192,6 +196,9 @@ public sealed class MonitorForm : FlyoutForm
         else if (_expandBtn.Contains(e.Location)) SetView(ViewKind.Full); // из мини — сразу в полный
     }
 
+    // DPI монитора сменился — пересчитать размер/Region/кнопки под новый DeviceDpi
+    protected override void OnDpiRescaled() => ApplyView();
+
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
@@ -201,7 +208,23 @@ public sealed class MonitorForm : FlyoutForm
         if (v != _viewHover) { _viewHover = v; Invalidate(_viewBtn); }
         bool x = _expandBtn.Contains(e.Location);
         if (x != _expandHover) { _expandHover = x; Invalidate(_expandBtn); }
+
+        int btn = h ? 1 : v ? 2 : x ? 3 : 0; // системный тултип по кнопке под курсором
+        if (btn != _tipBtn)
+        {
+            _tipBtn = btn;
+            if (TipFor(btn) is string text) _tip.Show(text, this, e.Location.X, e.Location.Y + Sc(20), 4000);
+            else _tip.Hide(this);
+        }
     }
+
+    private static string? TipFor(int btn) => btn switch
+    {
+        1 => Loc.T("panel.close"),
+        2 => Loc.T("monitor.view"),
+        3 => Loc.T("monitor.expand"),
+        _ => null,
+    };
 
     protected override void OnMouseLeave(EventArgs e)
     {
@@ -209,6 +232,7 @@ public sealed class MonitorForm : FlyoutForm
         if (_closeHover) { _closeHover = false; Invalidate(_close); }
         if (_viewHover) { _viewHover = false; Invalidate(_viewBtn); }
         if (_expandHover) { _expandHover = false; Invalidate(_expandBtn); }
+        if (_tipBtn != 0) { _tipBtn = 0; _tip.Hide(this); }
     }
 
     // ---------- семплирование ----------
@@ -517,6 +541,7 @@ public sealed class MonitorForm : FlyoutForm
         if (disposing)
         {
             _tick.Dispose();
+            _tip.Dispose();
             _battery?.Dispose();
             _thermal?.Dispose();
             _powerDraw.Dispose();
