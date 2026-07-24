@@ -48,6 +48,12 @@ public sealed class ToggleSwitch : Control
         base.OnKeyDown(e);
     }
 
+    protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
+
+    // Enabled=false: клики блокирует сам Control, а «серость» рисуем полупрозрачностью —
+    // недоступный тумблер (напр. команда API при выключенной фиче) виден, но явно погашен
+    private Color A(Color c) => Enabled ? c : Color.FromArgb(80, c);
+
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -61,14 +67,14 @@ public sealed class ToggleSwitch : Control
         using var path = Draw.Rounded(track, rad);
         if (_checked)
         {
-            using var b = new SolidBrush(_hover ? Blend(Accent, Color.White, 0.12f) : Accent);
+            using var b = new SolidBrush(A(_hover && Enabled ? Blend(Accent, Color.White, 0.12f) : Accent));
             g.FillPath(b, path);
         }
         else
         {
-            using var pen = new Pen(OffLine, 1.2f);
+            using var pen = new Pen(A(OffLine), 1.2f);
             g.DrawPath(pen, path);
-            if (_hover)
+            if (_hover && Enabled)
             {
                 using var b = new SolidBrush(Color.FromArgb(28, OffLine));
                 g.FillPath(b, path);
@@ -79,7 +85,7 @@ public sealed class ToggleSwitch : Control
         float knob = _checked ? track.Height * 0.62f : track.Height * 0.5f;
         float cy = track.Y + track.Height / 2f;
         float cx = _checked ? track.Right - rad : track.X + rad;
-        using var kb = new SolidBrush(_checked ? OnKnob : OffLine);
+        using var kb = new SolidBrush(A(_checked ? OnKnob : OffLine));
         g.FillEllipse(kb, cx - knob / 2f, cy - knob / 2f, knob, knob);
 
         // фокус с клавиатуры (Tab) должен быть виден
