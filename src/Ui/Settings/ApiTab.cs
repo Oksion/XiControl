@@ -38,9 +38,15 @@ public sealed class ApiTab : SettingsPane
         lan.Enabled = s.Enabled;
         ui.AddRow(this, "settings.api.lan", "settings.api.lan.desc", lan);
 
-        // токен: плейнтекст живёт только в этом поле до пересборки окна — хранится лишь SHA-256
-        var tokenField = ui.TextField("", ui.Sc(210), _ => { });
+        // Токен — карточка в два этажа: верх как у обычной строки (текст слева, кнопка справа),
+        // низ — поле во всю ширину карточки: 64-hex токен целиком не влезает ни в какой правый
+        // столбец. Плейнтекст живёт только в этом поле до пересборки окна — хранится лишь SHA-256.
+        string tokenTitle = Localization.Loc.T("settings.api.token");
+        string tokenDesc = Localization.Loc.T("settings.api.token.desc");
+
+        var tokenField = ui.TextField("", ui.RowW - ui.Sc(32), _ => { });
         tokenField.ReadOnly = true;
+        tokenField.AccessibleName = tokenTitle;
         var gen = ui.LinkButton("settings.api.token.generate", () =>
         {
             string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
@@ -51,11 +57,24 @@ public sealed class ApiTab : SettingsPane
             tokenField.SelectAll(); // сразу под Ctrl+C — второго показа не будет
         });
         gen.Enabled = s.Enabled;
-        // ширина кнопки — явно и сразу: AutoSize досчитывает её уже ПОСЛЕ того, как Pair
-        // расставил контролы по текущим ширинам, и поле наезжало на кнопку
+        // ширина кнопки — явно и сразу: AutoSize досчитал бы её после расстановки контролов
         gen.AutoSize = false;
         gen.Width = TextRenderer.MeasureText(gen.Text, gen.Font).Width + ui.Sc(24);
-        ui.AddRow(this, "settings.api.token", "settings.api.token.desc", ui.Pair(gen, tokenField));
+
+        int textW = Math.Max(ui.Sc(120), ui.RowW - gen.Width - ui.Sc(48)); // текст не лезет под кнопку
+        int descH = TextRenderer.MeasureText(tokenDesc, ui.DescFont, new Size(textW, 0), TextFormatFlags.WordBreak).Height;
+        int fieldY = ui.Sc(29) + descH + ui.Sc(10);
+        int cardH = fieldY + tokenField.Height + ui.Sc(14);
+        var card = new Panel { Width = ui.RowW, Height = cardH, BackColor = ui.T.Card, Margin = new Padding(0, 0, 0, ui.Sc(4)) };
+        card.Region = new Region(Draw.Rounded(new RectangleF(0, 0, ui.RowW, cardH), ui.Sc(6)));
+        card.Paint += (_, e) => ui.PaintCardBorder(e.Graphics, ui.RowW, cardH);
+        card.Controls.Add(new Label { Text = tokenTitle, AutoSize = false, Width = textW, Height = ui.Sc(20), ForeColor = ui.T.Text, BackColor = Color.Transparent, Font = ui.TitleFont, Location = new Point(ui.Sc(16), ui.Sc(9)), AutoEllipsis = true });
+        card.Controls.Add(new Label { Text = tokenDesc, AutoSize = false, Width = textW, Height = descH + ui.Sc(2), ForeColor = ui.T.Text2, BackColor = Color.Transparent, Font = ui.DescFont, Location = new Point(ui.Sc(16), ui.Sc(29)) });
+        gen.Location = new Point(ui.RowW - gen.Width - ui.Sc(16), (fieldY - gen.Height) / 2); // по центру текстового блока
+        tokenField.Location = new Point(ui.Sc(16), fieldY);
+        card.Controls.Add(gen);
+        card.Controls.Add(tokenField);
+        Controls.Add(card);
 
         // Пер-командные разрешения. Тумблер команды, чья фича выключена в «Функциях», —
         // серый: сначала включите фичу, потом открывайте её в API.
