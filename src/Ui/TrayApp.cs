@@ -121,8 +121,8 @@ public sealed class TrayApp : IDisposable
             // В обычном режиме — как раньше, без звука и тостов (XIC-11)
             if (_locked)
             {
-                Sound.PlayToggle(on);
-                Safe(() => { _tray.ShowBalloonTip(4000, Loc.T("app.name"),
+                if (_cfg.TravelLockSound) Sound.PlayToggle(on);
+                if (_cfg.TravelLockToast) Safe(() => { _tray.ShowBalloonTip(4000, Loc.T("app.name"),
                     on ? $"{Loc.T("osd.travel")} — {Loc.T("osd.travel.sub")}" : Loc.T("osd.travel.off"),
                     ToolTipIcon.Info); return true; }, false);
                 return;

@@ -33,6 +33,14 @@ public sealed class BatteryTab : SettingsPane
         browse.Size = new Size(ui.Sc(92), ui.Sc(28));
         ui.AddRow(this, "settings.travel.file", "settings.travel.file.desc", ui.Pair(soundBox, browse));
 
+        // «слепая» обратная связь на заблокированном экране (XIC-11): OSD под локскрином
+        // не виден, поэтому джингл + toast; сноска — как включить показ содержимого в Windows
+        ui.AddRow(this, "settings.travel.lock.sound", "settings.travel.lock.sound.desc",
+            ui.Toggle(cfg.TravelLockSound, on => { cfg.TravelLockSound = on; cfg.Save(); }));
+        ui.AddRow(this, "settings.travel.lock.toast", "settings.travel.lock.toast.desc",
+            ui.Toggle(cfg.TravelLockToast, on => { cfg.TravelLockToast = on; cfg.Save(); }));
+        ui.AddNote(this, "settings.travel.lock.note");
+
         ui.AddGroup(this, "settings.charger");
         ui.AddRow(this, "settings.charger.watts", "settings.charger.watts.desc",
             ui.Toggle(cfg.ChargerWattsOsd, on => { cfg.ChargerWattsOsd = on; cfg.Save(); }));

@@ -36,6 +36,14 @@ public sealed class AppConfig
     /// <summary>Проигрывать джингл при достижении 100% в режиме «В дорогу».</summary>
     public bool TravelSound { get; set; } = true;
 
+    /// <summary>Джингл при переключении «В дорогу» с клавиши на заблокированном экране
+    /// (OSD под локскрином не виден — «слепая» обратная связь, XIC-11).</summary>
+    public bool TravelLockSound { get; set; } = true;
+
+    /// <summary>Toast-уведомление при переключении «В дорогу» на заблокированном экране.
+    /// Показ содержимого на локскрине управляется настройками уведомлений Windows.</summary>
+    public bool TravelLockToast { get; set; } = true;
+
     /// <summary>Свой WAV для звука готовности «В дорогу» (поддерживаются `%ПЕРЕМЕННЫЕ%`).
     /// Пусто или файл не найден → встроенный джингл. Только WAV/PCM. Правится в config.json.</summary>
     public string? TravelSoundFile { get; set; }
