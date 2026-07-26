@@ -134,6 +134,27 @@ Get-CimClass -Namespace root/wmi -ClassName MiCommonInterface
 Запуск — от администратора (это требование WMI-интерфейса прошивки — даже чтение
 без elevation не работает).
 
+### Антивирусы и ложные срабатывания
+
+Xi Control не подписан сертификатом, работает от администратора и правит системные вещи
+(лимит заряда в прошивке, частоту экрана, правило брандмауэра для опционального HTTP API,
+задачу автозапуска) — некоторым «слишком умным» эвристикам этого набора хватает, чтобы
+занервничать. Проверить легко: залейте exe на [VirusTotal](https://www.virustotal.com/) —
+как правило, из ~70 движков срабатывает разве что **Bkav Pro** (generic-сигнатура вида
+`W32.Malware.*`; этот вендор знаменит щедростью на ложные срабатывания), а **Microsoft
+Defender и все остальные молчат**. Это ложный сигнал, и это не наш баг.
+
+Почему сборке можно доверять:
+
+- **исходный код открыт** — читайте и компилируйте сами;
+- **релизы собираются в GitHub Actions** из этого репозитория (видно в логах Actions),
+  а не «с чьего-то ноутбука»;
+- exe воспроизводится командой `dotnet publish` (ниже) — сверьте сами.
+
+Так что если антивирус заругался — это повод извиниться ему, а не паниковать вам. При
+желании отправьте файл вендору как false positive: такие generic-сигнатуры обычно
+отваливаются со следующим обновлением баз.
+
 Сборка из исходников:
 
 ```powershell
@@ -441,3 +462,12 @@ and administrator rights (a firmware WMI requirement). UI is available in Englis
 
 Check compatibility: `Get-CimClass -Namespace root/wmi -ClassName MiCommonInterface`.
 Build: `dotnet build XiControl.sln -c Release`. License: GPL-3.0.
+
+**Antivirus false positives.** Xi Control is unsigned, runs as administrator and touches
+system settings (firmware charge limit, refresh rate, a firewall rule for the optional
+HTTP API, an autostart task) — enough for some over-eager heuristics to twitch. On
+VirusTotal typically only **Bkav Pro** flags it (a generic `W32.Malware.*` signature from
+a vendor notorious for false positives); Microsoft Defender and the rest stay clean. It's
+a false positive, not a bug in Xi Control: the source is open and release binaries are
+built in public GitHub Actions from this repo, so you can read, rebuild and verify them
+yourself. Don't panic — feel free to report the file to the vendor as a false positive.
