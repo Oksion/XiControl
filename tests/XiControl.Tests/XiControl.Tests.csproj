@@ -16,6 +16,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!-- Сбор покрытия для SonarCloud (OpenCover через coverlet.runsettings) -->
+    <PackageReference Include="coverlet.collector" Version="6.0.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <!-- FluentAssertions удержан на 6.x: 7+ перешёл на коммерческую лицензию -->
     <PackageReference Include="FluentAssertions" Version="6.12.1" />
   </ItemGroup>

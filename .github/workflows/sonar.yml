@@ -1,0 +1,58 @@
+# SonarCloud: статический анализ + покрытие. Для C# нужен именно SonarScanner
+# для .NET (Automatic Analysis язык не поддерживает) — begin → build → test → end.
+# Результат уезжает на sonarcloud.io. Секрет SONAR_TOKEN секретам форков не виден,
+# поэтому анализ гоняем на push в main и вручную, а не на PR из форков.
+name: sonarcloud
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sonar:
+    name: Analyze
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # полная история — SonarCloud точнее считает «новый код» и авторство
+          fetch-depth: 0
+
+      # Сканеру нужен JDK 17+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install SonarScanner
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: SonarCloud begin
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          dotnet-sonarscanner begin
+          /k:"Oksion_XiControl"
+          /o:"oksion"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.token="$env:SONAR_TOKEN"
+          /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
+          /d:sonar.scanner.scanAll=false
+
+      - name: Build
+        run: dotnet build XiControl.sln -c Release
+
+      - name: Test with coverage
+        run: >
+          dotnet test XiControl.sln -c Release --no-build
+          --settings coverlet.runsettings
+
+      - name: SonarCloud end
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"

@@ -11,5 +11,9 @@
 publish/
 *.zip
 
+# Test coverage output (coverlet)
+[Tt]est[Rr]esults/
+.sonarqube/
+
 # рабочие материалы исследования — только локально
 reference/
