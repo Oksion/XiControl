@@ -95,6 +95,10 @@ public static class ApiFirewall
 {
     private const string RuleName = "XiControl API";
 
+    // Полный путь к netsh — не полагаемся на PATH (как SchTasks у автозапуска).
+    private static readonly string Netsh =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "netsh.exe");
+
     /// <summary>Привести правило к желаемому состоянию (идемпотентно: сначала удаляем старое —
     /// заодно подхватывается смена порта, затем при необходимости создаём заново).</summary>
     public static void Set(bool on, int port)
@@ -108,7 +112,7 @@ public static class ApiFirewall
     {
         try
         {
-            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("netsh", args)
+            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Netsh, args)
             {
                 CreateNoWindow = true,
                 UseShellExecute = false,
