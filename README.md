@@ -141,8 +141,11 @@ Xi Control не подписан сертификатом, работает от
 задачу автозапуска) — некоторым «слишком умным» эвристикам этого набора хватает, чтобы
 занервничать. Проверить легко: залейте exe на [VirusTotal](https://www.virustotal.com/) —
 как правило, из ~70 движков срабатывает разве что **Bkav Pro** (generic-сигнатура вида
-`W32.Malware.*`; этот вендор знаменит щедростью на ложные срабатывания), а **Microsoft
-Defender и все остальные молчат**. Это ложный сигнал, и это не наш баг.
+`W32.Malware.*`), а **Microsoft Defender и все остальные молчат**. Движок Bkav построен
+на AI/ML-эвристике — это позиционирование самого вендора, и их generic-детект так и
+называется, `W32.AIDetectMalware`. Такой анализ ищет «подозрительные» паттерны кода,
+общие и для легитимных, и для вредоносных программ, — отсюда его печальная слава по
+ложным срабатываниям. Это ложный сигнал, и это не наш баг.
 
 Почему сборке можно доверять:
 
@@ -466,8 +469,11 @@ Build: `dotnet build XiControl.sln -c Release`. License: GPL-3.0.
 **Antivirus false positives.** Xi Control is unsigned, runs as administrator and touches
 system settings (firmware charge limit, refresh rate, a firewall rule for the optional
 HTTP API, an autostart task) — enough for some over-eager heuristics to twitch. On
-VirusTotal typically only **Bkav Pro** flags it (a generic `W32.Malware.*` signature from
-a vendor notorious for false positives); Microsoft Defender and the rest stay clean. It's
-a false positive, not a bug in Xi Control: the source is open and release binaries are
+VirusTotal typically only **Bkav Pro** flags it (a generic `W32.Malware.*` signature);
+Microsoft Defender and the rest stay clean. Bkav's engine is AI/ML-based (the vendor's own
+positioning — their generic detection is literally named `W32.AIDetectMalware`), and that
+kind of analysis flags code patterns common to both legitimate and malicious software,
+which is exactly why it is notorious for false positives. It's a false positive, not a bug
+in Xi Control: the source is open and release binaries are
 built in public GitHub Actions from this repo, so you can read, rebuild and verify them
 yourself. Don't panic — feel free to report the file to the vendor as a false positive.
