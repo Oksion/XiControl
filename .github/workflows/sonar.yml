@@ -43,6 +43,7 @@ jobs:
           /d:sonar.token="$env:SONAR_TOKEN"
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
           /d:sonar.scanner.scanAll=false
+          /d:sonar.coverage.exclusions="src/Ui/**,src/SystemIntegration/**,src/Program.cs,tools/**"
 
       - name: Build
         run: dotnet build XiControl.sln -c Release

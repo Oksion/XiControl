@@ -39,7 +39,7 @@ public static class AutoStart
         var xml = RunRead("/query", "/tn", TaskName, "/xml");
         if (xml is null) return null;
         var m = System.Text.RegularExpressions.Regex.Match(xml, @"<Command>\s*(.*?)\s*</Command>",
-            System.Text.RegularExpressions.RegexOptions.Singleline);
+            System.Text.RegularExpressions.RegexOptions.Singleline, TimeSpan.FromSeconds(1));
         return m.Success ? System.Net.WebUtility.HtmlDecode(m.Groups[1].Value) : null;
     }
 
