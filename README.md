@@ -5,296 +5,296 @@
 ![License](https://img.shields.io/badge/license-GPLv3-blue)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-FFDD00)](https://buymeacoffee.com/3CLiAI1)
 
-Лёгкая утилита в трее для ноутбуков **Xiaomi / Redmi (Redmibook)** — в первую очередь
-для **Xiaomi Book Pro 14 (2026)**, на котором она разработана и обкатана, но не только
-для него. Защита заряда батареи, режимы производительности, OSD и «оживление»
-фирменных клавиш.
+🌐 **English** · [Русский](README.ru.md)
 
-Всё управление идёт **через штатный WMI-интерфейс прошивки** (`MiCommonInterface`, ODM Bitland «MIFS») —
-тот же канал, которым пользуется официальный Xiaomi PC Manager.
-**Никакого WinRing0**, никаких сторонних драйверов и прямого доступа к EC.
+A lightweight tray utility for **Xiaomi / Redmi (Redmibook)** laptops — first and foremost
+for the **Xiaomi Book Pro 14 (2026)**, on which it was developed and tested, but not limited
+to it. Battery charge protection, performance modes, OSD and "revival" of the vendor keys.
+
+All hardware control goes **through the firmware's stock WMI interface** (`MiCommonInterface`,
+ODM Bitland "MIFS") — the same channel the official Xiaomi PC Manager uses.
+**No WinRing0**, no third-party drivers and no direct EC access.
 
 <p align="center">
-  <img src="docs/img/quick-panel.png" width="560" alt="Панель быстрых настроек">
+  <img src="docs/img/quick-panel.png" width="560" alt="Quick settings panel">
 </p>
 
-*Панель быстрых настроек (удержание кнопки Mi): пять режимов производительности,
-лимит заряда, «В дорогу» (разовый заряд до 100%), тачпад и сенсорный экран вкл/выкл,
-авто-герцовка и «режим совы» (не спать).*
+*Quick settings panel (hold the Mi button): five performance modes, charge limit,
+"travel charge" (a one-off charge to 100%), touchpad and touchscreen on/off,
+auto refresh rate and "owl mode" (stay awake).*
 
 <p align="center">
-  <img src="docs/img/monitor.png" width="440" alt="Окно «Монитор»">
+  <img src="docs/img/monitor.png" width="440" alt="Monitor window">
 </p>
 
-*Окно «Монитор»: живые графики потребления (Вт), загрузки CPU и RAM.*
+*Monitor window: live graphs of power draw (W), CPU and RAM usage.*
 
 <p align="center">
-  <img src="docs/img/monitor-mini.png" width="380" alt="«Монитор» — компактный вид">
+  <img src="docs/img/monitor-mini.png" width="380" alt="Monitor — compact view">
   &nbsp;&nbsp;
-  <img src="docs/img/monitor-watts.png" width="120" alt="«Монитор» — только ватты">
+  <img src="docs/img/monitor-watts.png" width="120" alt="Monitor — watts only">
 </p>
 
-*В полном виде — живые графики: потребление (Вт), CPU, RAM, **температура** «горячей точки»
-(горячая зона — вишнёвым) и мощность подключённого адаптера. Сворачивается в компактную строку
-(Power / CPU / RAM) или в один показатель ватт — кнопкой «вид» или двойным кликом; направление
-тока — цветом (заряд зелёный / разряд оранжевый).*
+*In full view — live graphs: power draw (W), CPU, RAM, **hotspot temperature**
+(hot zone in cherry red) and the connected adapter's wattage. Collapses into a compact line
+(Power / CPU / RAM) or a single watts readout — via the "view" button or a double-click;
+current direction is shown by color (charging green / discharging orange).*
 
-*Значок в трее меняется по активному режиму:*
+*The tray icon changes with the active mode:*
 
 <p align="center">
-  <img src="docs/img/tray.png" width="440" alt="Значок в трее">
+  <img src="docs/img/tray.png" width="440" alt="Tray icon">
 </p>
 
-## Возможности
+## Features
 
-- 🔋 **Защита заряда** — «беречь батарею» (зарядка до ~80%) / полный заряд 100%.
-  - **ChargeGuard**: прошивка сбрасывает лимит после сна и переключения питания —
-    утилита автоматически переустанавливает его.
-  - 🧳 **Режим «В дорогу»** — разово зарядить до 100% поверх «беречь 80%»: кнопка-чемоданчик
-    в панели / пункт меню. По достижении 100% — OSD и звуковой сигнал; при отключении зарядника
-    режим сам сбрасывается (следующее подключение снова 80%).
-- 🔌 **Мощность зарядника** — при подключении зарядки показываем мощность подключённого
-  PD-адаптера (ватты) в OSD и в «Мониторе». Поверх иконки заряда — **бейдж качества блока**:
-  🔴 «!» если адаптер слабее заданного порога (медленный заряд), ⚪ «?» если блок не-PD (например
-  обычный 5 В — мощность не согласуется). При этом иконка по-прежнему показывает лимит 80/100.
-  Порог настраивается (Настройки → Батарея). Driver-free (только чтение).
-- 🩺 **Здоровье батареи** — Настройки → Батарея: реальный износ (текущая ёмкость к проектной),
-  число циклов заряда, ёмкость в Вт·ч. Штатные данные ACPI/Windows, только чтение.
-- ⚡ **Режимы производительности**: Эко (скрытый режим прошивки) / Тихий / Авто /
-  Турбо / Полная мощность. Эко и Полную мощность можно убрать из UI через конфиг.
-- 🖥️ **OSD-оверлей** (тёмная карточка, авторские иконки):
-  - подключение/отключение зарядки («Зарядка до 80%» / «Работа от батареи» + уровень);
-  - смена режима производительности и лимита заряда;
-  - микрофон вкл/выкл, подсветка клавиатуры (выкл / 50% / 100% / авто).
-- 🅼 **Mi-кнопка**:
-  - короткое нажатие — циклическое переключение режимов с OSD (настраивается);
-  - двойной клик — заряд 80/100 (настраивается);
-  - удержание — панель быстрых настроек (режимы + заряд 80/100, закрытие по Esc/X/клику вне).
-- ⌨️ **Оживление «мёртвых» клавиш** с переназначением: на клики Mi и клавиши
-  «настройки» / AI / «проекция» вешается любая функция — от цикла режимов до запуска
-  своей программы (см. «Переназначение клавиш»); клавиша микрофона мьютит системный
-  микрофон, клавиша подсветки показывает OSD с уровнем.
-- 🖱️ **Тачпад вкл/выкл** — действие для любой клавиши + ячейка в панели. Отключение
-  штатное (как в Диспетчере устройств, без драйверов) и не переживает перезагрузку —
-  залипнуть выключенным тачпад не может.
-- 👆 **Сенсорный экран вкл/выкл** — то же самое для тачскрина ноутбука: действие для
-  клавиши, ячейка в панели, штатное отключение без драйверов и авто-включение после
-  перезагрузки. Ячейка появляется только если сенсорный экран в системе есть.
-- ⚙️ **Окно «Настройки»** в стиле Windows 11 — все опции по вкладкам (Общие / Функции /
-  Батарея / Экран / Производительность / Клавиши / О программе), тёмная и светлая темы.
-  Вкладка **«Функции»** — что показывать: «Режим совы», тачпад, сенсорный экран и
-  управление частотой; выключенная функция исчезает из меню и панели целиком.
-- 🎨 Значок в трее меняется по режиму, монохром под светлую/тёмную панель задач;
-  тёмное меню в тон системной теме (переключается на лету).
-- 🦉 **«Режим совы»** — не гасить экран и не засыпать; закрытая крышка на питании
-  от сети лишь выключает экран (на батарее — штатный сон). Сова в панели / галочка
-  в меню; тайминги электропитания не изменяются, действие крышки восстанавливается.
-  Можно скрыть фичу целиком (`"OwlMode": false` в конфиге).
-- 🖥️ **Авто-герцовка** — подключил зарядку → экран 120 Гц, отключил → 60 Гц
-  (частоты настраиваются в конфиге: `AcRefreshRate`/`BatteryRefreshRate`; если такой
-  частоты у панели нет — берётся ближайшая). Переключатель в меню и ячейка в панели;
-  держится после сна и смены питания. Можно скрыть управление частотой целиком
-  (Настройки → Функции или `"RefreshRateFeature": false`) — уйдут пункт меню, ячейка и вкладка «Экран».
-- 🔌 **Профили питания** — свой режим производительности при зарядке и от батареи
-  («Не менять» — не трогать). Применяется на старте и при смене питания; driver-free (WMI прошивки).
-- 💡 **Запоминание яркости** — отдельная опция (без профилей): яркость экрана
-  запоминается и восстанавливается отдельно для сети и батареи (WMI ACPI, тот же канал,
-  что у Windows).
-- 🌐 Язык интерфейса: русский / английский / китайский (中文).
-- 🚀 Автозапуск через Планировщик заданий (без UAC-запроса при входе, работает на батарее).
-- 🛰️ **HTTP API для локальной сети** (опционально, по умолчанию **выключен**) — управляй с
-  телефона или из автоматизаций Home Assistant: чтение статуса и заряда (`GET /status`),
-  переключение режима, защиты заряда, «В дорогу» и совы. Белый список команд, авторизация по
-  токену (хранится только SHA-256), bind на `127.0.0.1` по умолчанию — доступ из сети включается
-  отдельным тумблером. См. «HTTP API» ниже.
+- 🔋 **Charge protection** — "battery care" (charge to ~80%) / full charge to 100%.
+  - **ChargeGuard**: the firmware drops the limit after sleep and power-source changes —
+    the utility re-applies it automatically.
+  - 🧳 **"Travel" mode** — a one-off charge to 100% on top of "care 80%": the suitcase button
+    in the panel / a menu item. On reaching 100% — an OSD and a sound; unplugging the charger
+    resets the mode by itself (the next plug-in is back to 80%).
+- 🔌 **Charger wattage** — when the charger is plugged in, show the connected PD adapter's
+  wattage (watts) in the OSD and in the Monitor. Over the charge icon — a **PSU quality badge**:
+  🔴 "!" if the adapter is weaker than the configured threshold (slow charging), ⚪ "?" if the
+  PSU is non-PD (e.g. plain 5 V — wattage can't be negotiated). The icon still shows the 80/100
+  limit. The threshold is configurable (Settings → Battery). Driver-free (read-only).
+- 🩺 **Battery health** — Settings → Battery: actual wear (current vs. design capacity),
+  charge cycle count, capacity in Wh. Stock ACPI/Windows data, read-only.
+- ⚡ **Performance modes**: Eco (hidden firmware mode) / Quiet / Auto /
+  Turbo / Full speed. Eco and Full speed can be removed from the UI via config.
+- 🖥️ **OSD overlay** (dark card, custom icons):
+  - charger plug/unplug ("Charging to 80%" / "On battery" + level);
+  - performance mode and charge limit changes;
+  - microphone on/off, keyboard backlight (off / 50% / 100% / auto).
+- 🅼 **Mi button**:
+  - short press — cycle through modes with an OSD (configurable);
+  - double click — charge 80/100 (configurable);
+  - hold — quick settings panel (modes + charge 80/100, closes on Esc/X/click-outside).
+- ⌨️ **Reviving "dead" keys** with remapping: the Mi clicks and the "settings" / AI /
+  "projection" keys can be bound to any function — from cycling modes to launching your
+  own program (see "Key remapping"); the microphone key mutes the system mic, the backlight
+  key shows an OSD with the level.
+- 🖱️ **Touchpad on/off** — an action for any key + a cell in the panel. Disabling is done the
+  stock way (like in Device Manager, no drivers) and does not survive a reboot — the touchpad
+  can't get stuck disabled.
+- 👆 **Touchscreen on/off** — same for the laptop's touchscreen: an action for a key,
+  a cell in the panel, stock driver-free disabling and auto re-enable after a reboot.
+  The cell appears only if a touchscreen is present in the system.
+- ⚙️ **Settings window** in Windows 11 style — all options across tabs (General / Features /
+  Battery / Display / Performance / Keys / About), dark and light themes.
+  The **Features** tab controls what to show: "Owl mode", touchpad, touchscreen and refresh-rate
+  control; a disabled feature disappears from the menu and panel entirely.
+- 🎨 The tray icon changes with the mode, monochrome to match a light/dark taskbar;
+  a dark menu matching the system theme (switches on the fly).
+- 🦉 **"Owl mode"** — don't turn off the display or sleep; a closed lid on AC power only turns
+  off the display (on battery — regular sleep). Owl in the panel / a checkbox in the menu;
+  power timings aren't changed, the lid action is restored afterwards.
+  The feature can be hidden entirely (`"OwlMode": false` in config).
+- 🖥️ **Auto refresh rate** — plug in the charger → 120 Hz, unplug → 60 Hz
+  (rates configurable in config: `AcRefreshRate`/`BatteryRefreshRate`; if the panel lacks
+  such a rate, the nearest one is used). A menu toggle and a panel cell;
+  holds after sleep and power-source changes. Refresh-rate control can be hidden entirely
+  (Settings → Features or `"RefreshRateFeature": false`) — the menu item, cell and Display tab go away.
+- 🔌 **Power profiles** — your own performance mode on AC and on battery
+  ("Don't change" — leave alone). Applied at startup and on power-source changes; driver-free (firmware WMI).
+- 💡 **Brightness memory** — a separate option (no profiles): screen brightness is remembered
+  and restored separately for AC and battery (WMI ACPI, the same channel Windows uses).
+- 🌐 UI language: Russian / English / Chinese (中文).
+- 🚀 Autostart via Task Scheduler (no UAC prompt at logon, works on battery).
+- 🛰️ **HTTP API for the local network** (optional, **off by default**) — control it from a
+  phone or from Home Assistant automations: read status and charge (`GET /status`),
+  switch mode, charge protection, "travel" and owl. A command allowlist, token authorization
+  (only the SHA-256 is stored), binds to `127.0.0.1` by default — network access is enabled by
+  a separate toggle. See "HTTP API" below.
 
-## Совместимость
+## Compatibility
 
-Проверено на **Xiaomi Book Pro 14** (TM2424). Должно работать на ноутбуках Xiaomi/Redmi
-производства ODM Bitland с WMI-классом `MiCommonInterface` (большинство Redmibook / Xiaomi Book
-последних поколений).
+Tested on the **Xiaomi Book Pro 14** (TM2424). Should work on Xiaomi/Redmi laptops made by
+ODM Bitland with the `MiCommonInterface` WMI class (most recent-generation Redmibook / Xiaomi
+Book models).
 
-Проверить свою машину (PowerShell):
+Check your machine (PowerShell):
 
 ```powershell
 Get-CimClass -Namespace root/wmi -ClassName MiCommonInterface
 ```
 
-Если класс нашёлся — интерфейс есть. Набор поддерживаемых функций зависит от модели
-(утилита определяет их в рантайме и не падает на неподдерживаемых).
+If the class is found — the interface is there. The set of supported functions depends on the
+model (the utility detects them at runtime and won't crash on unsupported ones).
 
-## Установка
+## Installation
 
-Готовый exe — на [странице релизов](../../releases):
+A prebuilt exe is on the [releases page](../../releases):
 
-- `XiControl-vX.X.X-win-x64.exe` — самодостаточный, ничего ставить не нужно (~70 МБ);
-- `XiControl-vX.X.X-win-x64-net8.exe` — лёгкий (~2 МБ), требует
+- `XiControl-vX.X.X-win-x64.exe` — self-contained, nothing to install (~70 MB);
+- `XiControl-vX.X.X-win-x64-net8.exe` — lightweight (~2 MB), requires the
   [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
 
-Запуск — от администратора (это требование WMI-интерфейса прошивки — даже чтение
-без elevation не работает).
+Run as administrator (a firmware WMI-interface requirement — even reading doesn't work
+without elevation).
 
-### Антивирусы и ложные срабатывания
+### Antivirus false positives
 
-Xi Control не подписан сертификатом, работает от администратора и правит системные вещи
-(лимит заряда в прошивке, частоту экрана, правило брандмауэра для опционального HTTP API,
-задачу автозапуска) — некоторым «слишком умным» эвристикам этого набора хватает, чтобы
-занервничать. Проверить легко: залейте exe на [VirusTotal](https://www.virustotal.com/) —
-как правило, из ~70 движков срабатывает разве что **Bkav Pro** (generic-сигнатура вида
-`W32.Malware.*`), а **Microsoft Defender и все остальные молчат**. Движок Bkav построен
-на AI/ML-эвристике — это позиционирование самого вендора, и их generic-детект так и
-называется, `W32.AIDetectMalware`. Такой анализ ищет «подозрительные» паттерны кода,
-общие и для легитимных, и для вредоносных программ, — отсюда его печальная слава по
-ложным срабатываниям. Это ложный сигнал, и это не наш баг.
+Xi Control is unsigned, runs as administrator and touches system things (the firmware charge
+limit, refresh rate, a firewall rule for the optional HTTP API, an autostart task) — enough for
+some over-eager heuristics to twitch. Easy to check: upload the exe to
+[VirusTotal](https://www.virustotal.com/) — typically, out of ~70 engines only **Bkav Pro**
+flags it (a generic signature like `W32.Malware.*`), while **Microsoft Defender and everyone
+else stay silent**. Bkav's engine is AI/ML-based — that's the vendor's own positioning, and their
+generic detection is literally named `W32.AIDetectMalware`. That kind of analysis looks for
+"suspicious" code patterns common to both legitimate and malicious software — hence its notorious
+reputation for false positives. It's a false positive, and it's not a bug on our side.
 
-Почему сборке можно доверять:
+Why you can trust the build:
 
-- **исходный код открыт** — читайте и компилируйте сами;
-- **релизы собираются в GitHub Actions** из этого репозитория (видно в логах Actions),
-  а не «с чьего-то ноутбука»;
-- exe воспроизводится командой `dotnet publish` (ниже) — сверьте сами.
+- **the source code is open** — read it and compile it yourself;
+- **releases are built in GitHub Actions** from this repository (visible in the Actions logs),
+  not "from someone's laptop";
+- the exe is reproducible with `dotnet publish` (below) — verify it yourself.
 
-Так что если антивирус заругался — это повод извиниться ему, а не паниковать вам. При
-желании отправьте файл вендору как false positive: такие generic-сигнатуры обычно
-отваливаются со следующим обновлением баз.
+So if your antivirus complains, it's a reason for it to apologize, not for you to panic. If you
+like, report the file to the vendor as a false positive: such generic signatures usually fall off
+with the next database update.
 
-Сборка из исходников:
+Build from source:
 
 ```powershell
 dotnet build XiControl.sln -c Release
 # → src/bin/x64/Release/net8.0-windows/XiControl.exe
-dotnet test XiControl.sln -c Release --no-build   # юнит-тесты (железо не требуется)
+dotnet test XiControl.sln -c Release --no-build   # unit tests (no hardware required)
 ```
 
-Один переносимый .exe (без установленного .NET):
+A single portable .exe (without .NET installed):
 
 ```powershell
 dotnet publish src/XiControl.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
 ```
 
-## Использование
+## Usage
 
-Запусти `XiControl.exe` (подтверди UAC) — появится значок в трее.
+Launch `XiControl.exe` (confirm the UAC prompt) — a tray icon appears.
 
-| Действие | Результат |
+| Action | Result |
 |----------|-----------|
-| Клик по значку в трее | Панель быстрых настроек |
-| Правый клик по значку | Меню: заряд, «В дорогу», сова, авто-герцовка, «Монитор», режим, «Настройки…», выход |
-| Mi-кнопка, одинарный клик | Следующий режим производительности + OSD *(настраивается)* |
-| Mi-кнопка, двойной клик | Переключение лимита заряда 80% ↔ 100% + OSD *(настраивается)* |
-| Mi-кнопка, удержание ~0.5 с | Панель быстрых настроек |
-| Клавиша микрофона | Мьют/анмьют системного микрофона + OSD |
-| Клавиша «настройки» | Переключение лимита заряда 80% ↔ 100% + OSD *(настраивается)* |
-| Клавиша подсветки клавиатуры | OSD с уровнем (выкл / 50% / 100% / авто) |
+| Click the tray icon | Quick settings panel |
+| Right-click the icon | Menu: charge, "travel", owl, auto refresh rate, Monitor, mode, Settings…, exit |
+| Mi button, single click | Next performance mode + OSD *(configurable)* |
+| Mi button, double click | Toggle charge limit 80% ↔ 100% + OSD *(configurable)* |
+| Mi button, hold ~0.5 s | Quick settings panel |
+| Microphone key | Mute/unmute the system microphone + OSD |
+| "Settings" key | Toggle charge limit 80% ↔ 100% + OSD *(configurable)* |
+| Keyboard backlight key | OSD with the level (off / 50% / 100% / auto) |
 
-Все опции собраны в окне **«Настройки…»** (пункт меню трея): вкладки Общие (язык,
-автозапуск, тема панелей, запоминание яркости), Функции (сова, тачпад, сенсорный экран,
-управление частотой), Батарея (звук «В дорогу»), Экран (авто-герцовка и частоты; вкладка
-скрыта, если управление частотой выключено), Производительность (видимость режимов, режим
-при старте, профили питания), Клавиши (переназначение) и О программе. Быстрые переключатели
-(заряд, «В дорогу», сова, герцовка, «Монитор», режим) остаются в меню трея и панели.
+All options live in the **Settings…** window (tray menu item): tabs General (language,
+autostart, panel theme, brightness memory), Features (owl, touchpad, touchscreen, refresh-rate
+control), Battery ("travel" sound), Display (auto refresh rate and rates; the tab is hidden if
+refresh-rate control is off), Performance (mode visibility, startup mode, power profiles),
+Keys (remapping) and About. The quick toggles (charge, "travel", owl, refresh rate, Monitor,
+mode) stay in the tray menu and the panel.
 
-Тонкие тайминги правятся только в `%APPDATA%\XiControl\config.json` (применяются при
-следующем запуске): `MiHoldMs` — порог удержания Mi-кнопки (400), `MiDoubleClickMs` — окно
-двойного клика (300), `OsdDurationMs` — сколько висит OSD (2800).
+Fine timings are edited only in `%APPDATA%\XiControl\config.json` (applied on the next
+launch): `MiHoldMs` — the Mi-button hold threshold (400), `MiDoubleClickMs` — the double-click
+window (300), `OsdDurationMs` — how long the OSD stays up (2800).
 
-Для автозапуска включи «Запускать при входе в Windows» (Настройки → Общие) — задача
-планировщика создаётся с повышенными правами, поэтому при входе UAC-запрос не показывается;
-если задача указывает на пропавший exe (обновил/перенёс файл), она чинится сама при запуске.
+For autostart, enable "Start with Windows" (Settings → General) — the scheduler task is created
+elevated, so there's no UAC prompt at logon; if the task points to a missing exe (you updated or
+moved the file), it repairs itself on launch.
 
-### Режим «В дорогу» (разовый заряд до 100%)
+### Travel mode (a one-off charge to 100%)
 
-Обычно держишь «беречь 80%», но перед поездкой хочется полный заряд. Нажми
-**кнопку-чемоданчик** в панели (слева от пилюль 80/100) или пункт **«Зарядить „в дорогу"»**
-в меню — утилита разово снимет ограничение и дозарядит до 100%.
+You usually keep "care 80%", but before a trip you want a full charge. Press the
+**suitcase button** in the panel (left of the 80/100 pills) or the **"Charge for the road"**
+menu item — the utility lifts the limit once and tops up to 100%.
 
-- По достижении **100%** — OSD «можно в дорогу» и звуковой сигнал (переключатель
-  **Настройки → Батарея → «Звук готовности»**, по умолчанию вкл).
-- **Отключил зарядник → режим сам выключается**; следующее подключение снова бережёт 80%.
-- Ручной выбор пилюли 80/100 тоже отменяет режим. При постоянном «100%» кнопка неактивна
-  (дозаряжать некуда).
+- On reaching **100%** — a "ready for the road" OSD and a sound (toggle
+  **Settings → Battery → "Ready sound"**, on by default).
+- **Unplug the charger → the mode turns off by itself**; the next plug-in is back to caring at 80%.
+- Manually picking the 80/100 pill also cancels the mode. With a permanent "100%" the button is
+  inactive (nothing to top up).
 
-Пилюли 80/100 показывают **базовую** настройку — «В дорогу» это временный оверрайд поверх неё
-(driver-free, тот же WMI-канал заряда). В `config.json`: `"TravelMode"`, `"TravelSound"`.
+The 80/100 pills show the **base** setting — "travel" is a temporary override on top of it
+(driver-free, the same charge WMI channel). In `config.json`: `"TravelMode"`, `"TravelSound"`.
 
-Свой звук готовности — поле «Свой звуковой файл» там же в настройках (или `config.json`;
-пусто или файл не найден → встроенный джингл; поддерживаются `%ПЕРЕМЕННЫЕ%`; только WAV/PCM):
+A custom ready sound — the "Custom sound file" field in the same settings (or `config.json`;
+empty or a missing file → the built-in jingle; `%VARIABLES%` are supported; WAV/PCM only):
 
 ```json
 "TravelSoundFile": "C:\\Users\\Me\\Sounds\\ready.wav"
 ```
 
-### Скрыть ненужные режимы
+### Hide unused modes
 
-Тумблеры **Настройки → Производительность → «Показывать режим „Эко“» / «Показывать
-„Полную мощность“»** (применяется сразу; панель при этом не сжимается — ячейки оставшихся
-режимов растягиваются). То же самое в `%APPDATA%\XiControl\config.json`
-(скрытый режим включить из приложения станет нельзя):
+The toggles **Settings → Performance → "Show the Eco mode" / "Show Full speed"**
+(applied immediately; the panel doesn't shrink — the cells of the remaining modes stretch).
+Same in `%APPDATA%\XiControl\config.json` (you then won't be able to enable a hidden mode from
+the app):
 
 ```json
 "EcoMode": false,
 "FullSpeedMode": false
 ```
 
-- **Эко** — скрытый режим прошивки, которого нет в официальном софте (на проверенной
-  модели гасит подсветку клавиатуры и снижает яркость экрана — самый экономный профиль);
-- **Полная мощность** — если не пользуешься или хочешь исключить случайное включение
-  (режим шумный и работает только от сети).
+- **Eco** — a hidden firmware mode absent from the official software (on the tested model it turns
+  off the keyboard backlight and lowers screen brightness — the most economical profile);
+- **Full speed** — if you don't use it or want to prevent accidental activation
+  (the mode is loud and only works on AC).
 
-По умолчанию оба показываются. После правки конфига вручную перезапусти приложение.
+Both are shown by default. After editing the config by hand, restart the app.
 
-### Режим производительности при старте
+### Startup performance mode
 
-Прошивка сбрасывает режим при перезагрузке. Что включать на старте — радио-выбор
-**Настройки → Производительность → «Режим при старте»** (взаимоисключающие; четвёртый,
-«Профили питания», — ниже):
+The firmware resets the mode on reboot. What to enable at startup is a radio choice
+**Settings → Performance → "Mode at startup"** (mutually exclusive; the fourth,
+"Power profiles", is below):
 
-- **Не трогать** — оставлять то, что выставила прошивка.
-- **Восстанавливать последний** — приложение запоминает выбранный режим и возвращает его после
-  перезагрузки (следует за твоими переключениями). При включении сразу запоминает текущий.
-- **Закрепить текущий** — фиксирует **один** режим: он будет включаться каждый старт,
-  с какого бы ни выключились. Выбираешь, находясь в нужном режиме, — он закрепляется.
+- **Don't touch** — leave whatever the firmware set.
+- **Restore last** — the app remembers the selected mode and brings it back after a reboot
+  (follows your switches). On enabling it records the current one right away.
+- **Pin current** — fixes **one** mode: it will be enabled every startup, whatever you shut down
+  from. You pick it while in the desired mode — that one gets pinned.
 
-Если нужный режим на старте недоступен (например, «Полная мощность» на батарее) — включится «Авто».
+If the desired mode is unavailable at startup (e.g. "Full speed" on battery), "Auto" is enabled.
 
-Закреплённый режим можно задать и правкой `config.json`: `"ForceStartMode": "Eco"` (допустимо
-`"Quiet"` / `"Turbo"` / `"FullSpeed"` / `"Auto"` / `"Eco"`; `null` или удалить строку — снять).
+The pinned mode can also be set by editing `config.json`: `"ForceStartMode": "Eco"` (allowed:
+`"Quiet"` / `"Turbo"` / `"FullSpeed"` / `"Auto"` / `"Eco"`; `null` or removing the line clears it).
 
-### Профили питания (режим по питанию)
+### Power profiles (mode by power source)
 
-Четвёртый вариант «Режима при старте»: **свой режим производительности при зарядке и от
-батареи**. Выбирается там же — **Настройки → Производительность → «Профили питания»**;
-под радио-выбором появляются «Режим при зарядке» и «Режим от батареи» (или «Не менять»).
+The fourth "Mode at startup" option: **your own performance mode on AC and on battery**.
+Selected in the same place — **Settings → Performance → "Power profiles"**;
+below the radio choice appear "Mode on AC" and "Mode on battery" (or "Don't change").
 
 ```json
 "PowerProfiles": true,
-"AcPerfMode": "Turbo",       // режим от сети; null или "Не менять" — не трогать
-"BatteryPerfMode": "Quiet"   // режим от батареи
+"AcPerfMode": "Turbo",       // mode on AC; null or "Don't change" — leave alone
+"BatteryPerfMode": "Quiet"   // mode on battery
 ```
 
-- **Профиль применяется на старте и при каждой смене питания** сеть↔батарея (и после сна),
-  через гард с дебаунсом — как у защиты заряда и авто-герцовки. Driver-free: WMI прошивки `0x08`.
-- Если прошивка не приняла режим (например, «Полная мощность» на батарее) — мягкий откат на «Авто».
+- **The profile is applied at startup and on every power-source change** AC↔battery (and after
+  sleep), through a debounced guard — like charge protection and auto refresh rate. Driver-free:
+  firmware WMI `0x08`.
+- If the firmware rejected the mode (e.g. "Full speed" on battery) — a soft fallback to "Auto".
 
-### Запоминание яркости экрана
+### Screen brightness memory
 
-Отдельная опция **Настройки → Общие → «Запоминать яркость экрана»** (по умолчанию **выкл**),
-работает независимо от «Профилей питания». Утилита следит за твоей яркостью отдельно для сети
-и батареи и восстанавливает её при каждом переходе: выставил 80 % на зарядке → при следующем
-подключении вернётся 80 %. Driver-free: WMI `WmiMonitorBrightness*` (ACPI-подсветка, тот же
-канал, что у Windows).
+A separate option **Settings → General → "Remember screen brightness"** (**off** by default),
+independent of "Power profiles". The utility tracks your brightness separately for AC and battery
+and restores it on each transition: you set 80% on AC → the next plug-in returns 80%. Driver-free:
+WMI `WmiMonitorBrightness*` (ACPI backlight, the same channel Windows uses).
 
-- XiControl при этом **перебивает яркость Windows** своим значением — поэтому опция и
-  включается явно; на переходе возможна кратковременная двойная подстройка (Windows → через
-  ~1.5 с наше). `AcBrightness`/`BatteryBrightness` в конфиге заполняются сами.
-- Смена режима и яркости — **в фоне** (UI не блокируется); на панели без WMI-яркости фича молча
-  деградирует (пишет в `log.txt`, не падает). Запись конфига дебаунсится (бережём SSD).
+- Xi Control **overrides Windows' brightness** with its value — which is why the option is enabled
+  explicitly; a transition may briefly do a double adjustment (Windows → ours ~1.5 s later).
+  `AcBrightness`/`BatteryBrightness` in config fill themselves in.
+- Mode and brightness changes run **in the background** (the UI isn't blocked); on a panel without
+  WMI brightness the feature degrades silently (logs to `log.txt`, doesn't crash). Config writes are
+  debounced (sparing the SSD).
 
-### Авто-герцовка (частота экрана по питанию)
+### Auto refresh rate (screen rate by power source)
 
-Экран переключается на разную частоту в зависимости от источника питания: от сети — повыше
-(плавность), от батареи — пониже (экономия). Включается пунктом меню трея, ячейкой в панели
-или в **Настройки → Экран**; там же выбираются частоты (применяются сразу). В `config.json`:
+The screen switches to a different rate depending on the power source: on AC — higher (smoothness),
+on battery — lower (savings). Enabled from the tray menu item, a panel cell, or in
+**Settings → Display**; the rates are picked there too (applied immediately). In `config.json`:
 
 ```json
 "AutoRefreshRate": true,
@@ -302,48 +302,48 @@ dotnet publish src/XiControl.csproj -c Release -r win-x64 --self-contained -p:Pu
 "BatteryRefreshRate": 60
 ```
 
-Как это ведёт себя на самом деле (чистый Win32 `ChangeDisplaySettings`, драйвер не нужен):
+How it actually behaves (plain Win32 `ChangeDisplaySettings`, no driver needed):
 
-- **Только основной экран**, разрешение и глубина цвета не трогаются — меняется лишь частота.
-- **Берётся ближайшая поддерживаемая частота** при текущем разрешении: попросили 120, а панель
-  умеет только 90/60 → выберет 90 (при равном расстоянии — большую). Поэтому вписать «144» на
-  60-герцовой матрице безопасно — просто останется 60. Значение ≤ 0 в конфиге игнорируется.
-- **Срабатывает** на старте приложения, при смене питания сеть↔батарея и при выходе из сна
-  (эти два — через дебаунс ~1.5 с, события приходят пачкой), а также сразу при включении опции.
-- Если нужная частота **уже стоит — экран не мигает** (лишний вызов не делается).
-- Частота пишется в реестр дисплея (`CDS_UPDATEREGISTRY`), т.е. **переживает перезагрузку**;
-  но при выключенной опции приложение частоту **не трогает вообще** (в т.ч. в момент снятия галки —
-  что стояло, то и останется, вернуть вручную).
-- Сама смена видеорежима идёт **в фоновом потоке** (не блокирует UI), а неудача просто пишется
-  в `log.txt`, приложение не падает. OSD смены питания дописывает фактическую частоту («… • 120 Гц»).
+- **Primary display only**, resolution and color depth are untouched — only the rate changes.
+- **The nearest supported rate** at the current resolution is taken: you asked for 120, the panel
+  can only do 90/60 → it picks 90 (ties go to the higher). So entering "144" on a 60 Hz matrix is
+  safe — it just stays 60. A value ≤ 0 in config is ignored.
+- **Triggers** at app startup, on AC↔battery changes and on wake from sleep (the latter two are
+  debounced ~1.5 s, events arrive in bursts), and immediately when you enable the option.
+- If the desired rate **is already set — the screen doesn't blink** (no redundant call is made).
+- The rate is written to the display registry (`CDS_UPDATEREGISTRY`), i.e. it **survives a reboot**;
+  but with the option off the app **doesn't touch the rate at all** (including at the moment you
+  uncheck it — whatever was set stays, restore it manually).
+- The actual mode switch runs **on a background thread** (doesn't block the UI), and a failure is
+  merely logged to `log.txt`, the app doesn't crash. The power-change OSD appends the actual rate ("… • 120 Hz").
 
-При правке `AcRefreshRate`/`BatteryRefreshRate` прямо в конфиге перезапусти приложение
-(выбор в окне настроек применяется сразу; нестандартное значение из конфига окно тоже покажет).
+When editing `AcRefreshRate`/`BatteryRefreshRate` directly in the config, restart the app
+(a choice in the settings window applies immediately; a non-standard value from the config is shown too).
 
-### Переназначение клавиш
+### Key remapping
 
-Каждой клавише — своё действие: **Настройки → Клавиши**. Слоты — одиночный и двойной
-клик Mi-кнопки, клавиши «Настройки» (шестерёнка), AI и «Проекция». На любой слот можно
-навесить: цикл режимов, заряд 80/100, быструю панель, режим совы, «Монитор»,
-«В дорогу», тачпад и сенсорный экран вкл/выкл, системные «Проекция (Win+P)» /
-«Параметры Windows» / «Copilot (Win+C)», запуск своей программы или «Ничего».
+Each key gets its own action: **Settings → Keys**. The slots are the single and double Mi-button
+click, the "Settings" (gear), AI and "Projection" keys. Any slot can be bound to: cycle modes,
+charge 80/100, quick panel, owl mode, Monitor, "travel", touchpad and touchscreen on/off, the
+system "Projection (Win+P)" / "Windows Settings" / "Copilot (Win+C)", launching your own program,
+or "Nothing".
 
-Тачпад и сенсорный экран отключаются штатным механизмом Windows (как «Отключить
-устройство» в Диспетчере, без драйверов) и **всегда включаются сами после перезагрузки** —
-залипнуть выключенными не могут. Их ячейки есть и в быстрой панели, рядом с авто-герцовкой
-(ячейка сенсорного экрана — только если тачскрин в системе присутствует).
+The touchpad and touchscreen are disabled with Windows' stock mechanism (like "Disable device" in
+Device Manager, no drivers) and **always re-enable on their own after a reboot** — they can't get
+stuck disabled. Their cells are also in the quick panel, next to auto refresh rate (the touchscreen
+cell only if a touchscreen is present).
 
-- Удержание Mi-кнопки всегда открывает быструю панель (не настраивается).
-- Двойной клик Mi = «Ничего» → жест отключён, одиночный клик срабатывает мгновенно
-  (без окна ожидания ~300 мс).
-- При открытой панели клавиша «Настройки» всегда переключает заряд (пилюля в панели).
-- Для «Запустить программу…» подойдёт exe, документ или URL; переменные окружения
-  (`%USERPROFILE%` и т.п.) раскрываются, путь с пробелами — в кавычках, после пути
-  можно дописать аргументы: `"C:\\Program Files\\App\\app.exe" --flag`. Учти:
-  XiControl работает с правами администратора — запущенная программа их унаследует.
+- Holding the Mi button always opens the quick panel (not configurable).
+- Double-click Mi = "Nothing" → the gesture is off, a single click fires instantly
+  (no ~300 ms wait window).
+- With the panel open, the "Settings" key always toggles charge (the pill in the panel).
+- For "Launch a program…" an exe, a document or a URL will do; environment variables
+  (`%USERPROFILE%` etc.) are expanded, a path with spaces goes in quotes, arguments can follow the
+  path: `"C:\\Program Files\\App\\app.exe" --flag`. Note: Xi Control runs with administrator rights —
+  the launched program inherits them.
 
-В `config.json` это пары `*Action`/`*Command` (`MiClick`, `MiDouble`, `SettingsKey`,
-`AiKey`, `ProjKey`), значения действий: `modes`, `charge`, `panel`, `owl`, `monitor`,
+In `config.json` these are `*Action`/`*Command` pairs (`MiClick`, `MiDouble`, `SettingsKey`,
+`AiKey`, `ProjKey`); action values: `modes`, `charge`, `panel`, `owl`, `monitor`,
 `travel`, `projection`, `settings`, `copilot`, `launch`, `none`:
 
 ```json
@@ -353,127 +353,96 @@ dotnet publish src/XiControl.csproj -c Release -r win-x64 --self-contained -p:Pu
 "AiKeyCommand": "\"C:\\Program Files\\App\\app.exe\" --flag"
 ```
 
-Старые опции (`MiShortPress`, `MiDoubleClick`, `SettingsKey`, `AiKeyProgram`/`AiKeyArgs`)
-переносятся автоматически при первом запуске новой версии.
+The old options (`MiShortPress`, `MiDoubleClick`, `SettingsKey`, `AiKeyProgram`/`AiKeyArgs`)
+are migrated automatically on the first launch of the new version.
 
-### HTTP API (управление из локальной сети)
+### HTTP API (control from the local network)
 
-Опциональный веб-API, чтобы дёргать XiControl с телефона или из автоматизаций Home Assistant.
-**По умолчанию выключен** — включается в **Настройки → HTTP API**. Там же задаётся порт,
-генерируется токен (показывается **один раз** — скопируй сразу; хранится только SHA-256) и
-поштучно разрешаются команды. По умолчанию доступно только чтение состояния.
+An optional web API to poke Xi Control from a phone or Home Assistant automations.
+**Off by default** — enabled in **Settings → HTTP API**. There you set the port, generate a token
+(shown **once** — copy it right away; only the SHA-256 is stored) and allow commands one by one. By
+default only reading state is available.
 
-Маршруты (все — с заголовком `Authorization: Bearer <токен>`, тело — JSON):
+Routes (all with an `Authorization: Bearer <token>` header, body — JSON):
 
-| Метод / путь | Что делает |
+| Method / path | What it does |
 |---|---|
-| `GET /status` | Режим, защита заряда, «В дорогу», сова, % заряда, факт зарядки, ватты, здоровье батареи |
-| `POST /mode` `{"value":"turbo"}` | Режим производительности (`eco`/`quiet`/`auto`/`turbo`/`fullspeed`) |
-| `POST /care` `{"on":true}` | «Беречь ~80%» вкл/выкл |
-| `POST /travel` `{"on":true}` | Режим «В дорогу» (разовый заряд до 100%) |
-| `POST /owl` `{"on":true}` | «Режим совы» (не спать) вкл/выкл |
+| `GET /status` | Mode, charge protection, "travel", owl, charge %, charging fact, watts, battery health |
+| `POST /mode` `{"value":"turbo"}` | Performance mode (`eco`/`quiet`/`auto`/`turbo`/`fullspeed`) |
+| `POST /care` `{"on":true}` | "Care ~80%" on/off |
+| `POST /travel` `{"on":true}` | "Travel" mode (a one-off charge to 100%) |
+| `POST /owl` `{"on":true}` | "Owl mode" (stay awake) on/off |
 
 ```bash
 curl -X POST http://192.168.1.50:58125/travel \
-  -H "Authorization: Bearer <токен>" -d '{"on":true}'
+  -H "Authorization: Bearer <token>" -d '{"on":true}'
 ```
 
-Безопасность (утилита работает от администратора, поэтому — осознанно и с оговорками):
+Security (the utility runs as administrator, so — deliberately and with caveats):
 
-- **По умолчанию только `127.0.0.1`** — из сети не достучаться даже с токеном. Доступ из
-  локалки — отдельный тумблер «Доступ из локальной сети» с предупреждением; тогда создаётся
-  правило брандмауэра со скоупом **LocalSubnet** (только твоя подсеть) и удаляется при выключении.
-- **Белый список команд зашит в код** — настройки, автозапуск и запуск программ через API
-  невозможны; выключенная команда отвечает `403`, неизвестный путь — `404`, без токена — `401`.
-- **Настройки API — в `%ProgramData%\XiControl\api.json` под ACL «запись только администраторам»**:
-  сторонний процесс без прав администратора не может ни включить сервер, ни подменить токен.
-- Плейнтекст-HTTP (без TLS) — сознательный компромисс: радиус поражения белого списка мал.
+- **`127.0.0.1` only by default** — unreachable from the network even with a token. LAN access is a
+  separate "Access from local network" toggle with a warning; it then creates a firewall rule scoped
+  to **LocalSubnet** (your subnet only), removed when turned off.
+- **The command allowlist is baked into the code** — settings, autostart and launching programs via
+  the API are impossible; a disabled command answers `403`, an unknown path — `404`, no token — `401`.
+- **The API settings live in `%ProgramData%\XiControl\api.json` under a "write only for
+  administrators" ACL**: a non-elevated third-party process can neither enable the server nor swap
+  the token.
+- Plaintext HTTP (no TLS) is a deliberate trade-off: the allowlist's blast radius is small.
 
-Ничего из этого не работает и не тратит ресурсы, пока API выключен (сервер попросту не запускается).
+None of this runs or spends resources while the API is off (the server simply isn't started).
 
-## Ограничения
+## Limitations
 
-- Порог «беречь батарею» зашит в прошивку — произвольный процент через WMI невозможен.
-  На проверенной модели (TM2424) это ≈80%; на других моделях порог может отличаться
-  (например, 70% на моделях, которые обслуживал MI Control).
-- Комбинация Fn+Mi не отличима от одиночной Mi (прошивка шлёт одинаковые события),
-  поэтому используется короткое/длинное нажатие.
-- Набор функций зависит от модели: прошивочная телеметрия (обороты вентиляторов) на проверенной
-  машине не поддерживается. **Температуру** при этом показываем — не из прошивки, а через Intel DPTF
-  (WMI `EsifDeviceInformation`), строкой-графиком в «Мониторе».
+- The "battery care" threshold is baked into the firmware — an arbitrary percentage via WMI is
+  impossible. On the tested model (TM2424) it's ≈80%; on other models the threshold may differ
+  (e.g. 70% on models serviced by MI Control).
+- The Fn+Mi combo is indistinguishable from a single Mi (the firmware sends identical events),
+  which is why short/long presses are used.
+- The feature set depends on the model: firmware telemetry (fan RPM) is unsupported on the tested
+  machine. **Temperature** is shown anyway — not from the firmware, but via Intel DPTF
+  (WMI `EsifDeviceInformation`), as a line graph in the Monitor.
 
-## Как это работает
+## How it works
 
-Протокол MIFS разобран и задокументирован в [docs/](docs/):
+The MIFS protocol is reverse-engineered and documented in [docs/](docs/):
 
-- [01-wmi-protocol.md](docs/01-wmi-protocol.md) — транспорт, формат буфера, коды команд, события клавиш (**главный документ**);
-- [02-feature-catalog.md](docs/02-feature-catalog.md) — каталог функций;
-- [03-architecture.md](docs/03-architecture.md) — архитектура приложения;
-- [07-keymap.md](docs/07-keymap.md) — карта кодов клавиш.
+- [01-wmi-protocol.md](docs/01-wmi-protocol.md) — transport, buffer format, command codes, key events (**the main document**);
+- [02-feature-catalog.md](docs/02-feature-catalog.md) — the feature catalog;
+- [03-architecture.md](docs/03-architecture.md) — the app architecture;
+- [07-keymap.md](docs/07-keymap.md) — the key-code map.
 
-Коротко: метод `MiInterface` принимает 32-байтовый буфер
-(`[1]` — GET `0xFA` / SET `0xFB`, `[3]` — команда, `[4]/[6]` — аргументы) и возвращает
-статус в `OUT[1]` (`0x80` — ок). Заряд — команда `0x10`, режимы — `0x08`,
-события клавиш приходят WMI-событием `HID_EVENT20`.
+In short: the `MiInterface` method takes a 32-byte buffer
+(`[1]` — GET `0xFA` / SET `0xFB`, `[3]` — command, `[4]/[6]` — arguments) and returns a
+status in `OUT[1]` (`0x80` — ok). Charge is command `0x10`, modes are `0x08`,
+key events arrive as the WMI event `HID_EVENT20`.
 
-Протокол восстановлен по открытым источникам (включая драйвер ядра Linux) **без копирования чужого кода** —
-переносились только факты об интерфейсе. Подробности и лицензии источников: [docs/04-references.md](docs/04-references.md).
+The protocol was reconstructed from open sources (including the Linux kernel driver) **without
+copying anyone's code** — only facts about the interface were carried over. Details and source
+licenses: [docs/04-references.md](docs/04-references.md).
 
-## Разработка
+## Development
 
 ```
-src/            приложение (C# / .NET 8 / WinForms): Wmi/ — протокол MIFS, Input/ — клавиши
-                и жесты, Ui/ — трей, панель, OSD, монитор, настройки (Ui/Settings/ — вкладки),
-                SystemIntegration/ — guard-ы, питание, тачпад/экран, Config/, Localization/
-tests/          юнит-тесты (xUnit) чистой логики на фейках — гоняются без железа Xiaomi
-assets/svg/     иконки: osd/ — цветные 128×128, tray/ — монохром 24×24 (currentColor)
-tools/IconPreview/  рендер иконок в PNG для проверки + генерация app.ico
-docs/           документация протокола и архитектуры
-reference/      PowerShell-пробы, журналы исследования прошивки
+src/            the app (C# / .NET 8 / WinForms): Wmi/ — the MIFS protocol, Input/ — keys
+                and gestures, Ui/ — tray, panel, OSD, monitor, settings (Ui/Settings/ — tabs),
+                SystemIntegration/ — guards, power, touchpad/screen, Config/, Localization/
+tests/          unit tests (xUnit) of pure logic on fakes — run without Xiaomi hardware
+assets/svg/     icons: osd/ — color 128×128, tray/ — monochrome 24×24 (currentColor)
+tools/IconPreview/  renders icons to PNG for review + generates app.ico
+docs/           protocol and architecture documentation
+reference/      PowerShell probes, firmware research logs
 ```
 
-Как устроен код (командный слой, швы для тестов, guard-паттерн) — [CLAUDE.md](CLAUDE.md),
-как контрибьютить — [CONTRIBUTING.md](CONTRIBUTING.md).
+How the code is structured (the command layer, seams for tests, the guard pattern) — [CLAUDE.md](CLAUDE.md),
+how to contribute — [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Диагностика: ошибки пишутся в `%APPDATA%\XiControl\log.txt`.
+Diagnostics: errors are written to `%APPDATA%\XiControl\log.txt`.
 
-История изменений: [CHANGELOG.md](CHANGELOG.md) · Планы: [ROADMAP.md](ROADMAP.md)
+Changelog: [CHANGELOG.md](CHANGELOG.md) · Plans: [ROADMAP.md](ROADMAP.md)
 
-## Лицензия
+## License
 
 [GPL-3.0](LICENSE).
 
-Утилита пригодилась? Можно [угостить кофе ☕](https://buymeacoffee.com/3CLiAI1).
-
----
-
-## English
-
-**Xi Control** — a lightweight tray utility for Xiaomi / Redmi (Redmibook) laptops,
-built and tested primarily on the **Xiaomi Book Pro 14 (2026)** but not limited to it:
-battery charge limit (~80% / 100%) with automatic re-arm after sleep, a one-off
-"travel charge" to 100%, performance modes (Eco / Quiet / Auto / Turbo / Full speed),
-OSD overlays, auto refresh rate and brightness memory per power source, touchpad
-and touchscreen on/off, a Windows 11-style settings window, remappable Mi button and special keys
-(any function on any key, including launching your own program), fixes for
-otherwise dead keys, and an optional local-network HTTP API (off by default) for control
-from a phone or Home Assistant.
-
-Everything is driven through the firmware's stock WMI interface (`MiCommonInterface`,
-Bitland "MIFS") — **no WinRing0, no third-party drivers**. Requires Windows 10/11 x64
-and administrator rights (a firmware WMI requirement). UI is available in English.
-
-Check compatibility: `Get-CimClass -Namespace root/wmi -ClassName MiCommonInterface`.
-Build: `dotnet build XiControl.sln -c Release`. License: GPL-3.0.
-
-**Antivirus false positives.** Xi Control is unsigned, runs as administrator and touches
-system settings (firmware charge limit, refresh rate, a firewall rule for the optional
-HTTP API, an autostart task) — enough for some over-eager heuristics to twitch. On
-VirusTotal typically only **Bkav Pro** flags it (a generic `W32.Malware.*` signature);
-Microsoft Defender and the rest stay clean. Bkav's engine is AI/ML-based (the vendor's own
-positioning — their generic detection is literally named `W32.AIDetectMalware`), and that
-kind of analysis flags code patterns common to both legitimate and malicious software,
-which is exactly why it is notorious for false positives. It's a false positive, not a bug
-in Xi Control: the source is open and release binaries are
-built in public GitHub Actions from this repo, so you can read, rebuild and verify them
-yourself. Don't panic — feel free to report the file to the vendor as a false positive.
+Did the utility come in handy? You can [buy me a coffee ☕](https://buymeacoffee.com/3CLiAI1).
