@@ -13,6 +13,9 @@ public sealed class KeysTab : SettingsPane
         "projection", "settings", "copilot", "launch", "none",
     ];
 
+    // Единственное действие с полем ввода команды — по нему решаем, пересобирать ли слот.
+    private const string Launch = "launch";
+
     private readonly AppConfig _cfg;
     private readonly Action _rebuild;
 
@@ -62,11 +65,11 @@ public sealed class KeysTab : SettingsPane
                 _cfg.Save();
                 // пересборка — только чтобы показать/убрать поле команды: на каждом шаге
                 // выбора (колёсико, стрелки) она закрывала дропдаун и «сбрасывала» выбор
-                bool rebuild = prev == "launch" || val == "launch";
+                bool rebuild = prev == Launch || val == Launch;
                 prev = val;
                 if (rebuild) _rebuild();
             }, Ui.Sc(210)));
-        if (cur == "launch")
+        if (cur == Launch)
         {
             var tf = Ui.TextField(getCommand() ?? "", Ui.Sc(300), s =>
             { setCommand(string.IsNullOrWhiteSpace(s) ? null : s.Trim()); _cfg.Save(); });

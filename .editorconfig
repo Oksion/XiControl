@@ -57,3 +57,23 @@ dotnet_diagnostic.CA1805.severity = none
 #          VB-потребителей нет и не будет.
 dotnet_diagnostic.CA1716.severity = none
 # =====================================================================================
+
+# === SonarCloud / Roslynator: заглушённый шум (не роняет сборку — INFO/стиль) =========
+# Правила ниже конфликтуют с осознанным стилем проекта либо ложны на interop —
+# см. обоснования. Гасим в .editorconfig, чтобы не тянуть их и в SonarCloud.
+#
+# S1104 — публичные поля намеренно (та же причина, что CA1051 выше): идиома «сумка
+#         колбэков» (SettingsActions, ApiRouter) + DTO. Свойства дали бы только шум.
+dotnet_diagnostic.S1104.severity = none
+# S101  — единственные нарушители PascalCase — P/Invoke-структуры (SP_DEVINFO_DATA,
+#         MSLLHOOKSTRUCT, BATTERY_STATUS…). Их имена намеренно повторяют Win32 API.
+dotnet_diagnostic.S101.severity = none
+# RCS1123 — «лишние» скобки по приоритету операторов: против плотного стиля проекта.
+dotnet_diagnostic.RCS1123.severity = none
+# RCS1001/RCS1003 — «добавь фигурные скобки»: в проекте намеренны однострочные гарды
+#                   без скобок (if (x) return; …), см. csharp_prefer_braces = silent.
+dotnet_diagnostic.RCS1001.severity = none
+dotnet_diagnostic.RCS1003.severity = none
+# IDE0028 — стиль collection-инициализаторов, чистая косметика.
+dotnet_diagnostic.IDE0028.severity = none
+# =====================================================================================

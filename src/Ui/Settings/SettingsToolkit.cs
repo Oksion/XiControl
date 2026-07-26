@@ -31,13 +31,16 @@ public sealed class SettingsToolkit
     // ---- Шрифты — из кэша ScaledFonts под текущий DPI (Label шрифтом не владеет, в OnPaint
     // не создаём): пропорции с геометрией Sc держатся и после смены разрешения/масштаба ----
 
-    public Font HeadFont => ScaledFonts.Get(_owner.DeviceDpi, "Segoe UI Semibold", 15f);
-    public Font NameFont => ScaledFonts.Get(_owner.DeviceDpi, "Segoe UI Semibold", 14f);
-    public Font GroupFont => ScaledFonts.Get(_owner.DeviceDpi, "Segoe UI Semibold", 9.5f);
-    public Font TitleFont => ScaledFonts.Get(_owner.DeviceDpi, "Segoe UI", 10f);
-    public Font DescFont => ScaledFonts.Get(_owner.DeviceDpi, "Segoe UI", 8.5f);
-    public Font NoteFont => ScaledFonts.Get(_owner.DeviceDpi, "Segoe UI", 9f);
-    public Font CtlFont => ScaledFonts.Get(_owner.DeviceDpi, "Segoe UI", 9.5f);
+    private const string Ui = "Segoe UI";
+    private const string UiSemibold = "Segoe UI Semibold";
+
+    public Font HeadFont => ScaledFonts.Get(_owner.DeviceDpi, UiSemibold, 15f);
+    public Font NameFont => ScaledFonts.Get(_owner.DeviceDpi, UiSemibold, 14f);
+    public Font GroupFont => ScaledFonts.Get(_owner.DeviceDpi, UiSemibold, 9.5f);
+    public Font TitleFont => ScaledFonts.Get(_owner.DeviceDpi, Ui, 10f);
+    public Font DescFont => ScaledFonts.Get(_owner.DeviceDpi, Ui, 8.5f);
+    public Font NoteFont => ScaledFonts.Get(_owner.DeviceDpi, Ui, 9f);
+    public Font CtlFont => ScaledFonts.Get(_owner.DeviceDpi, Ui, 9.5f);
 
     // ---- Строки ----
 

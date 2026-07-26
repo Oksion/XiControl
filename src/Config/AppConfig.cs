@@ -266,15 +266,16 @@ public sealed class AppConfig
     /// </summary>
     public void MigrateKeyActions()
     {
+        const string Charge = "charge";
         if (MiClickAction is null)
         {
-            bool chargeFirst = string.Equals(MiShortPress, "charge", StringComparison.OrdinalIgnoreCase);
-            MiClickAction = chargeFirst ? "charge" : "modes";
-            MiDoubleAction ??= !MiDoubleClick ? "none" : (chargeFirst ? "modes" : "charge");
+            bool chargeFirst = string.Equals(MiShortPress, Charge, StringComparison.OrdinalIgnoreCase);
+            MiClickAction = chargeFirst ? Charge : "modes";
+            MiDoubleAction ??= !MiDoubleClick ? "none" : (chargeFirst ? "modes" : Charge);
         }
-        MiDoubleAction ??= "charge";
+        MiDoubleAction ??= Charge;
         SettingsKeyAction ??= string.Equals(SettingsKey, "settings", StringComparison.OrdinalIgnoreCase)
-            ? "settings" : "charge";
+            ? "settings" : Charge;
         if (AiKeyAction is null)
         {
             if (!string.IsNullOrWhiteSpace(AiKeyProgram))
