@@ -28,7 +28,7 @@ public static class Mifs
 
     // под-функции команды 0x10 (offset 4). Помимо защиты заряда, эта группа отдаёт
     // сенсоры — подтверждено на TM2424 (см. reference/probe-sensors.ps1):
-    public const byte ChargeSubEnable = 0x02;  // val 1=беречь(~80%), 0=до 100%
+    public const byte ChargeSubEnable = 0x02;  // val = КОД уровня порога (не бинарно!) — см. таблицу ниже
     public const byte ChargeSubFlag = 0x03;    // индикатор зоны заряда
     public const byte SensorAdapterWatts = 0x06; // ватты подключённого PD-адаптера (0 = нет/не PD)
     public const byte SensorBatteryHealth = 0x01; // SOH1: здоровье батареи, % от исходной ёмкости
@@ -47,8 +47,30 @@ public static class Mifs
     public const byte KeyAiUp = 0x24;         // нейропомощник (отпускание)
     public const byte KeyFnLock = 0x07;       // Fn-Lock (Fn+Esc): value = новое состояние 0/1
 
-    /// <summary>Фиксированный порог прошивки для «беречь батарею» на этой модели.</summary>
+    /// <summary>Порог «беречь батарею» по умолчанию (не «фиксирован» — уровень выбирается, см. ниже).</summary>
     public const int ChargeThresholdPercent = 80;
+
+    // ---- Уровни порога заряда (cmd 0x10 sub 0x02) ----
+    // ПЕРЕОТКРЫТО 2026-07-29: sub 0x02 — не бинарный флаг, а КОД уровня. Прошивка держит
+    // набор {0,1,4,5,6,7,8} и сама его валидирует (невалидные отвергает: SET → OUT[1]!=0x80,
+    // и зажимает к ближайшему). granular-шкала: % = 120 − код·10 (коды 4–8). Разбор —
+    // docs/12-charge-levels.md. Код 4 = 80% (granular-дубль) — наружу не пишем, используем legacy 1.
+
+    /// <summary>Пресеты «беречь» для UI, по убыванию (без 100% — это «выкл защиты»).</summary>
+    public static readonly int[] ChargeCarePresets = { 80, 70, 60, 50, 40 };
+
+    /// <summary>Процент порога → код для записи в <see cref="ChargeSubEnable"/>; null — % не поддержан.</summary>
+    public static byte? ChargeCodeForPercent(int percent) => percent switch
+    {
+        100 => 0, 80 => 1, 70 => 5, 60 => 6, 50 => 7, 40 => 8, _ => null,
+    };
+
+    /// <summary>Код из <see cref="ChargeSubEnable"/> → процент порога; null — код неизвестен.
+    /// Код 4 трактуем как 80% (granular-дубль legacy 1).</summary>
+    public static int? ChargePercentForCode(byte code) => code switch
+    {
+        0 => 100, 1 => 80, 4 => 80, 5 => 70, 6 => 60, 7 => 50, 8 => 40, _ => null,
+    };
 }
 
 /// <summary>
