@@ -7,12 +7,14 @@ namespace XiControl.Tests;
 /// <summary>Фейк прошивки: пишет вызовы, отвечает настроенными значениями.</summary>
 internal sealed class FakeMifsClient : IMifsClient
 {
-    public readonly List<bool> ChargeCareCalls = [];
+    public readonly List<int> ChargeLimitCalls = [];   // проценты, отправленные в SetChargeLimit
     public readonly List<PerfMode> PerfModeCalls = [];
     public bool SetPerfModeResult = true;
+    public bool SetChargeLimitResult = true;   // валидирует ли прошивка (для проверки фолбэка)
+    public int? ChargeLimit { get; set; }   // что вернёт GetChargeLimit (null — «не прочиталось»)
     public PerfMode? Mode;               // что вернёт GetPerfMode
     public bool ThrowOnGetPerfMode;      // симуляция недоступного железа
-    public bool ThrowOnSetChargeCare;    // симуляция отказа прошивки на запись
+    public bool ThrowOnSetChargeLimit;   // симуляция отказа прошивки на запись
 
     /// <summary>Сигнал «SetPerfMode вызван» — для ожидания асинхронных Apply (Task.Run в guard-ах).</summary>
     public readonly SemaphoreSlim PerfModeHit = new(0);
@@ -27,12 +29,13 @@ internal sealed class FakeMifsClient : IMifsClient
         return SetPerfModeResult;
     }
 
-    public bool GetChargeCare() => false;
+    public int? GetChargeLimit() => ChargeLimit;
 
-    public void SetChargeCare(bool care)
+    public bool SetChargeLimit(int percent)
     {
-        if (ThrowOnSetChargeCare) throw new InvalidOperationException("прошивка не ответила");
-        ChargeCareCalls.Add(care);
+        if (ThrowOnSetChargeLimit) throw new InvalidOperationException("прошивка не ответила");
+        ChargeLimitCalls.Add(percent);
+        return SetChargeLimitResult;
     }
 
     public int GetAdapterWatts() => 0;

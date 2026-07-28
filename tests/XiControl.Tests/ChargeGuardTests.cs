@@ -16,7 +16,7 @@ public sealed class ChargeGuardTests
     private readonly FakeTimer _timer = new();
 
     private ChargeGuard Create(bool careWanted = true) =>
-        new(_mifs, _power, () => careWanted, _timer);
+        new(_mifs, _power, () => careWanted ? 80 : 100, _timer);   // порог 80% (беречь) / 100% (выкл)
 
     [Fact]
     public void Reapply_WhenCareWanted_ArmsEc()
@@ -25,7 +25,7 @@ public sealed class ChargeGuardTests
 
         guard.Reapply();
 
-        _mifs.ChargeCareCalls.Should().Equal(true);
+        _mifs.ChargeLimitCalls.Should().Equal(80);
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class ChargeGuardTests
 
         guard.Reapply();
 
-        _mifs.ChargeCareCalls.Should().BeEmpty();
+        _mifs.ChargeLimitCalls.Should().BeEmpty();
     }
 
     [Theory]
@@ -48,12 +48,12 @@ public sealed class ChargeGuardTests
         _power.RaisePower(mode);
 
         // событие пришло — но EC трогаем только после тика дебаунса (события сыплются пачкой)
-        _mifs.ChargeCareCalls.Should().BeEmpty();
+        _mifs.ChargeLimitCalls.Should().BeEmpty();
         _timer.Running.Should().BeTrue();
 
         _timer.Fire();
 
-        _mifs.ChargeCareCalls.Should().Equal(true);
+        _mifs.ChargeLimitCalls.Should().Equal(80);
         _timer.Running.Should().BeFalse(); // одноразовый: тик сам себя останавливает
     }
 
@@ -65,7 +65,7 @@ public sealed class ChargeGuardTests
         _power.RaisePower(PowerModes.Suspend);
 
         // после Suspend наш код уже не выполнится — ре-арм строго до засыпания
-        _mifs.ChargeCareCalls.Should().Equal(true);
+        _mifs.ChargeLimitCalls.Should().Equal(80);
         _timer.Running.Should().BeFalse();
     }
 
@@ -76,7 +76,7 @@ public sealed class ChargeGuardTests
 
         _power.RaiseSession();
 
-        _mifs.ChargeCareCalls.Should().Equal(true);
+        _mifs.ChargeLimitCalls.Should().Equal(80);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public sealed class ChargeGuardTests
         _power.RaisePower(PowerModes.StatusChange); // взводим дебаунс
         _power.RaisePower(PowerModes.Suspend);      // сон пришёл раньше тика
 
-        _mifs.ChargeCareCalls.Should().Equal(true); // ре-арм от Suspend
+        _mifs.ChargeLimitCalls.Should().Equal(80); // ре-арм от Suspend
         _timer.Running.Should().BeFalse();          // дебаунс снят — второго ре-арма не будет
     }
 
@@ -100,6 +100,6 @@ public sealed class ChargeGuardTests
         _power.RaisePower(PowerModes.Suspend);
         _power.RaiseSession();
 
-        _mifs.ChargeCareCalls.Should().BeEmpty();
+        _mifs.ChargeLimitCalls.Should().BeEmpty();
     }
 }

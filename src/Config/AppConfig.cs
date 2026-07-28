@@ -19,6 +19,15 @@ public sealed class AppConfig
     public string? FlyoutTheme { get; set; }
 
     public bool ChargeCare { get; set; } = false;
+
+    /// <summary>
+    /// Порог «беречь батарею», % — значение X, когда ChargeCare=true. Пресеты 40/50/60/70/80
+    /// (см. <see cref="Mifs.ChargeCarePresets"/>); панель/меню переключают ChargeCare между этим X
+    /// и 100%. Дефолт 80 = прежнее поведение, поэтому старые config.json мигрируются автоматически
+    /// (поля нет → дефолт 80). Невалидное (руками правленное) значение гасится фолбэком к 80 на месте.
+    /// </summary>
+    public int CareLimitPercent { get; set; } = Mifs.ChargeThresholdPercent;
+
     public bool AutoStart { get; set; } = false;
 
     /// <summary>Логировать ошибки и проблемы в %APPDATA%\XiControl\log.txt.
@@ -294,6 +303,11 @@ public sealed class AppConfig
 
     /// <summary>Сохранить через привязанный store. Без store (голый POCO в тестах) — no-op.</summary>
     public void Save() => Store?.Save(this);
+
+    /// <summary>Валидный порог «беречь», % — клэмп руками-правленного <see cref="CareLimitPercent"/>
+    /// к поддержанному пресету (неизвестное значение → дефолт 80).</summary>
+    public int CarePercent() =>
+        Mifs.ChargeCodeForPercent(CareLimitPercent) is null ? Mifs.ChargeThresholdPercent : CareLimitPercent;
 
     /// <summary>Запомнить режим для восстановления — только если опция включена и значение изменилось (бережём SSD).</summary>
     public void RememberMode(PerfMode mode)

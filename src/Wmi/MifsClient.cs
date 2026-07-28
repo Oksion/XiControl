@@ -67,26 +67,28 @@ public sealed class MifsClient : IMifsClient
         return GetPerfMode() == mode;
     }
 
-    // ---- Защита заряда (беречь ~80% / полный 100%) ----
+    // ---- Порог заряда (уровни 40/50/60/70/80 / полный 100%) ----
 
-    public bool GetChargeCare()
+    /// <summary>Текущий порог заряда, %; null — прошивка не ответила или код неизвестен.</summary>
+    public int? GetChargeLimit()
     {
         var r = Get(Mifs.CmdCharge, Mifs.ChargeSubEnable);
-        return r.Ok && r.Val6 != 0;
+        return r.Ok ? Mifs.ChargePercentForCode(r.Val6) : null;
     }
 
     /// <summary>
-    /// Включает/выключает «беречь батарею». При включении делает ре-арм (off→on),
-    /// чтобы сбросить стейт-машину EC (как в референсе).
+    /// Ставит порог заряда процентом. Пишет код по таблице <see cref="Mifs.ChargeCodeForPercent"/>
+    /// с ре-армом off→on (сброс стейт-машины EC, как в референсе). Неподдержанный % — не пишем
+    /// вслепую (false); прошивка сама валидирует набор — отвергла код → false (сигнал для фолбэка).
     /// </summary>
-    public void SetChargeCare(bool care)
+    public bool SetChargeLimit(int percent)
     {
-        Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, 0);
-        if (care)
-        {
-            Thread.Sleep(80);
-            Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, 1);
-        }
+        var code = Mifs.ChargeCodeForPercent(percent);
+        if (code is null) return false;
+        Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, 0);   // «выкл» = 100%
+        if (code.Value == 0) return true;               // сам 100% — второй записи не нужно
+        Thread.Sleep(80);
+        return Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, code.Value).Ok;
     }
 
     // ---- Сенсоры (та же группа команд 0x10, driver-free) ----

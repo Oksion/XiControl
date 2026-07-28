@@ -16,14 +16,14 @@ public sealed class ChargeGuard : IDisposable
 {
     private readonly IMifsClient _mifs;
     private readonly IPowerEvents _power;
-    private readonly Func<bool> _careWanted;   // желаемое состояние (из настроек/UI)
+    private readonly Func<int> _limitWanted;   // желаемый порог %, 100 = «беречь» выкл (из настроек/UI)
     private readonly IAppTimer _debounce;
 
-    public ChargeGuard(IMifsClient mifs, IPowerEvents power, Func<bool> careWanted, IAppTimer? debounce = null)
+    public ChargeGuard(IMifsClient mifs, IPowerEvents power, Func<int> limitWanted, IAppTimer? debounce = null)
     {
         _mifs = mifs;
         _power = power;
-        _careWanted = careWanted;
+        _limitWanted = limitWanted;
 
         // события StatusChange могут сыпаться пачкой — гасим дребезг
         _debounce = debounce ?? new UiTimer();
@@ -55,13 +55,14 @@ public sealed class ChargeGuard : IDisposable
     // перед периодом «выключено»; заодно закрывает окно, когда дебаунс (1.5 с) не успел
     private void OnSessionEnding() => Reapply();
 
-    /// <summary>Применить желаемое состояние заряда прямо сейчас (напр. при старте).</summary>
+    /// <summary>Применить желаемый порог заряда прямо сейчас (напр. при старте).</summary>
     public void Reapply()
     {
         try
         {
-            if (_careWanted())
-                _mifs.SetChargeCare(true);   // ре-арм off→on внутри
+            int pct = _limitWanted();
+            if (pct < 100)
+                _mifs.SetChargeLimit(pct);   // ре-арм только когда «беречь» включено (порог < 100)
         }
         catch (Exception ex) { Log.Ex("ChargeGuard.Reapply", ex); /* железо могло быть недоступно */ }
     }
