@@ -53,7 +53,8 @@ Get-Event -SourceIdentifier mifs | ForEach-Object { $_.SourceEventArgs.NewEvent.
 - Телеметрия: отсутствует на TM2424.
 - Архитектура: **одно трей-приложение** (C#/.NET 8/WinForms, admin, автозапуск).
 - Остаточное — всё закрыто позже: ярлыки клавиш → [07-keymap.md](07-keymap.md);
-  ChargeGuard реализован (v0.1); `0x0C` — рудиментный слот TPLock, см. [01-wmi-protocol.md](01-wmi-protocol.md).
+  ChargeGuard реализован (v0.1); `0x0C` — **статус-канал IoT-модуля удалённого включения** (не TPLock,
+  переопределено 2026-07-28), см. [11-iot-remote-wake.md](11-iot-remote-wake.md).
 
 ## Вопрос 4. Режимы производительности на этой модели
 
