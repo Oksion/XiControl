@@ -71,6 +71,10 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
         with:
+          # PAT (а не GITHUB_TOKEN) — чтобы событие `release` триггерило winget.yml:
+          # релиз, созданный встроенным токеном, downstream-workflow'ы не будит.
+          # Фолбэк на GITHUB_TOKEN для форков без секрета (там winget и не нужен).
+          token: ${{ secrets.WINGET_TOKEN || secrets.GITHUB_TOKEN }}
           files: XiControl-*.exe
           generate_release_notes: true
           # тег с суффиксом через дефис (v0.7.0-pre) → пометить как pre-release,
