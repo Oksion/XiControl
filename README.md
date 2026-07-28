@@ -125,7 +125,13 @@ model (the utility detects them at runtime and won't crash on unsupported ones).
 
 ## Installation
 
-A prebuilt exe is on the [releases page](../../releases):
+The easiest way — via [winget](https://learn.microsoft.com/windows/package-manager/winget/):
+
+```powershell
+winget install Oksion.XiControl
+```
+
+Or grab a prebuilt exe from the [releases page](../../releases):
 
 - `XiControl-vX.X.X-win-x64.exe` — self-contained, nothing to install (~70 MB);
 - `XiControl-vX.X.X-win-x64-net8.exe` — lightweight (~2 MB), requires the

@@ -127,7 +127,13 @@ Get-CimClass -Namespace root/wmi -ClassName MiCommonInterface
 
 ## Установка
 
-Готовый exe — на [странице релизов](../../releases):
+Проще всего — через [winget](https://learn.microsoft.com/ru-ru/windows/package-manager/winget/):
+
+```powershell
+winget install Oksion.XiControl
+```
+
+Или готовый exe — на [странице релизов](../../releases):
 
 - `XiControl-vX.X.X-win-x64.exe` — самодостаточный, ничего ставить не нужно (~70 МБ);
 - `XiControl-vX.X.X-win-x64-net8.exe` — лёгкий (~2 МБ), требует
