@@ -2,11 +2,33 @@ using System.Drawing.Imaging;
 using System.Drawing.Text;
 using XiControl.Ui;
 
+// Пути считаем от корня репозитория (ищем XiControl.sln вверх от каталога сборки),
+// чтобы инструмент работал из любого рабочего каталога и на любой машине.
+string RepoDir()
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "XiControl.sln")))
+        dir = dir.Parent;
+    return dir?.FullName ?? Directory.GetCurrentDirectory();
+}
+string Repo(params string[] parts)
+{
+    string p = RepoDir();
+    foreach (var part in parts) p = Path.Combine(p, part);
+    return p;
+}
+string Out(params string[] parts)                       // как Repo, но создаёт каталог назначения
+{
+    string p = Repo(parts);
+    Directory.CreateDirectory(Path.GetDirectoryName(p)!);
+    return p;
+}
+
 // Режим "svg": сгенерировать SVG-лист иконок и отрендерить его для сверки.
 if (args.Length > 0 && args[0] == "svg")
 {
-    string svgOut = @"C:\Users\Mi\Project\XiControl\xi_control\reference\icons-sheet.svg";
-    string pngOut = @"C:\Users\Mi\Project\XiControl\xi_control\reference\svg-preview.png";
+    string svgOut = Out("reference", "icons-sheet.svg");
+    string pngOut = Out("reference", "svg-preview.png");
     string svg = SvgGen.BuildSheet();
     File.WriteAllText(svgOut, svg);
     var doc = Svg.SvgDocument.FromSvg<Svg.SvgDocument>(svg);
@@ -20,7 +42,7 @@ if (args.Length > 0 && args[0] == "svg")
 // Режим "bench": стоимость операций кадра анимации (панель/OSD) в микросекундах.
 if (args.Length > 0 && args[0] == "bench")
 {
-    string root = @"C:\Users\Mi\Project\XiControl\xi_control\assets\svg\osd";
+    string root = Repo("assets", "svg", "osd");
     Bitmap Load(string name, int size)
     {
         var d = Svg.SvgDocument.FromSvg<Svg.SvgDocument>(File.ReadAllText(Path.Combine(root, name + ".svg")));
@@ -116,7 +138,7 @@ if (args.Length > 1 && args[0] == "one")
         g1.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         d1.Draw(g1);
     }
-    string onePath = @"C:\Users\Mi\Project\XiControl\xi_control\reference\one-icon.png";
+    string onePath = Out("reference", "one-icon.png");
     b1.Save(onePath, ImageFormat.Png);
     Console.WriteLine("saved: " + onePath);
     return;
@@ -125,8 +147,8 @@ if (args.Length > 1 && args[0] == "one")
 // Режим "ico": собрать app.ico из settings.svg (PNG-вложения 16..256, формат Vista+).
 if (args.Length > 0 && args[0] == "ico")
 {
-    string svgPath = @"C:\Users\Mi\Project\XiControl\xi_control\assets\svg\osd\settings.svg";
-    string icoPath = @"C:\Users\Mi\Project\XiControl\xi_control\src\app.ico";
+    string svgPath = Repo("assets", "svg", "osd", "settings.svg");
+    string icoPath = Out("src", "app.ico");
     int[] sizes = { 16, 24, 32, 48, 64, 128, 256 };
 
     var doc0 = Svg.SvgDocument.FromSvg<Svg.SvgDocument>(File.ReadAllText(svgPath));
@@ -166,7 +188,7 @@ if (args.Length > 0 && args[0] == "ico")
 // Режим "user": отрендерить пользовательские SVG-ассеты (assets/svg) в сетку для проверки Svg.NET.
 if (args.Length > 0 && args[0] == "user")
 {
-    string root = @"C:\Users\Mi\Project\XiControl\xi_control\assets\svg";
+    string root = Repo("assets", "svg");
     var osdFiles = Directory.GetFiles(Path.Combine(root, "osd"), "*.svg").OrderBy(f => f).ToArray();
     var trayFiles = Directory.GetFiles(Path.Combine(root, "tray"), "*.svg").OrderBy(f => f).ToArray();
 
@@ -216,7 +238,7 @@ if (args.Length > 0 && args[0] == "user")
             g.DrawString(Path.GetFileNameWithoutExtension(trayFiles[i]), f, br, cx + 10, ty + uTileH - 24);
         }
     }
-    string userOut = @"C:\Users\Mi\Project\XiControl\xi_control\reference\user-icons-preview.png";
+    string userOut = Out("reference", "user-icons-preview.png");
     sheet.Save(userOut, ImageFormat.Png);
     Console.WriteLine("saved: " + userOut);
     return;
@@ -279,6 +301,6 @@ using (var g = Graphics.FromImage(bmp))
     }
 }
 
-string outPath = @"C:\Users\Mi\Project\XiControl\xi_control\reference\icon-preview.png";
+string outPath = Out("reference", "icon-preview.png");
 bmp.Save(outPath, ImageFormat.Png);
 Console.WriteLine("saved: " + outPath);
