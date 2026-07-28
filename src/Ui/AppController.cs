@@ -166,6 +166,19 @@ public sealed class AppController
         CareChanged?.Invoke(on);
     }
 
+    /// <summary>Сменить порог «беречь батарею» (%). На железе применяем сразу, только если защита
+    /// сейчас активна и не перебита «В дорогу»; иначе порог просто запоминается до включения.
+    /// Прошивка отвергла уровень (модель его не держит) → откатываем выбор и честно сообщаем.</summary>
+    public void SetCareLimit(int percent)
+    {
+        if (Mifs.ChargeCodeForPercent(percent) is null) return;   // не пишем вслепую неизвестный уровень
+        if (_cfg.ChargeCare && !_cfg.TravelMode
+            && !Safe(() => _mifs.SetChargeLimit(percent), false)) { FirmwareFailed?.Invoke(); return; }
+        _cfg.CareLimitPercent = percent;
+        _cfg.Save();
+        CareChanged?.Invoke(_cfg.ChargeCare);   // обновить подписи (панель/меню/значок)
+    }
+
     /// <summary>«В дорогу»: временный заряд до 100% поверх «беречь X%».
     /// Доступно только при базовом ChargeCare=true (при постоянном 100% смысла нет).</summary>
     public void SetTravel(bool on)

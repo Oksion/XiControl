@@ -488,7 +488,8 @@ public sealed class QuickPanelForm : FlyoutForm
         else
             SvgIcons.Draw(g, SvgIcons.TravelOff, trRect, trOp, trSat);
 
-        DrawPill(g, _care80, "80%", _cfg.ChargeCare, _hover == 10, FlyoutPalette.Green, PillFont);
+        // левая пилюля — выбранный порог «беречь» (X% из настроек), не хардкод 80
+        DrawPill(g, _care80, _cfg.CarePercent() + "%", _cfg.ChargeCare, _hover == 10, FlyoutPalette.Green, PillFont);
         DrawPill(g, _care100, "100%", !_cfg.ChargeCare, _hover == 11, Color.FromArgb(120, 120, 125), PillFont);
 
         // тачпад: подсвечиваем ячейку, когда он ВЫКЛЮЧЕН — нестандартное состояние заметнее
