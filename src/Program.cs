@@ -36,7 +36,7 @@ internal static class Program
         {
             var c = sp.GetRequiredService<AppConfig>();
             return new ChargeGuard(sp.GetRequiredService<IMifsClient>(), sp.GetRequiredService<IPowerEvents>(),
-                () => c.ChargeCare && !c.TravelMode);
+                () => c.ChargeCare && !c.TravelMode ? c.CarePercent() : 100);
         });
         services.AddSingleton<RefreshRateGuard>();
         services.AddSingleton<PowerProfileGuard>();

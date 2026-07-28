@@ -13,11 +13,12 @@ public interface IMifsClient : IDisposable
     /// <returns>true, если прошивка приняла режим.</returns>
     bool SetPerfMode(PerfMode mode);
 
-    /// <summary>Включена ли защита заряда («беречь ~80%»).</summary>
-    bool GetChargeCare();
+    /// <summary>Текущий порог заряда, %; null — прошивка не ответила. 100 = «беречь» выключено.</summary>
+    int? GetChargeLimit();
 
-    /// <summary>Включает/выключает «беречь батарею» (с ре-армом off→on при включении).</summary>
-    void SetChargeCare(bool care);
+    /// <summary>Ставит порог заряда (%): пишет код по таблице уровней (с ре-армом off→on для «беречь»).
+    /// true — прошивка приняла; неподдержанный/отвергнутый прошивкой % → false (не применено).</summary>
+    bool SetChargeLimit(int percent);
 
     /// <summary>Мощность адаптера в ваттах; 0 — не подключён или не-PD.</summary>
     int GetAdapterWatts();

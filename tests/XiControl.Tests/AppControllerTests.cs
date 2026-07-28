@@ -25,7 +25,7 @@ public sealed class AppControllerTests
     {
         Log.Enabled = false;
         _c = new AppController(_mifs, _cfg, _power, new Localizer(),
-            new ChargeGuard(_mifs, _power, () => _cfg.ChargeCare, new FakeTimer()),
+            new ChargeGuard(_mifs, _power, () => _cfg.ChargeCare ? _cfg.CarePercent() : 100, new FakeTimer()),
             new RefreshRateGuard(_cfg, _power, new FakeTimer()),
             new PowerProfileGuard(_mifs, _cfg, _power, new FakeTimer()),
             new TravelChargeMonitor(_cfg, _power, new FakeTimer()),
@@ -48,7 +48,7 @@ public sealed class AppControllerTests
     {
         _c.ToggleCare(true);
 
-        _mifs.ChargeCareCalls.Should().Equal(true);
+        _mifs.ChargeLimitCalls.Should().Equal(80);
         _cfg.ChargeCare.Should().BeTrue();
         _events.Should().Equal("care:True");
     }
@@ -81,7 +81,7 @@ public sealed class AppControllerTests
 
         _c.SetTravel(true);
 
-        _mifs.ChargeCareCalls.Should().Equal(false); // снять защиту — заряд до 100%
+        _mifs.ChargeLimitCalls.Should().Equal(100); // снять защиту — заряд до 100%
         _cfg.TravelMode.Should().BeTrue();
         _events.Should().Equal("travel:True");
     }
@@ -94,7 +94,7 @@ public sealed class AppControllerTests
 
         _c.SetTravel(false);
 
-        _mifs.ChargeCareCalls.Should().Equal(true); // вернуть «беречь 80%»
+        _mifs.ChargeLimitCalls.Should().Equal(80); // вернуть «беречь 80%»
         _events.Should().Equal("travel:False");
     }
 
@@ -106,7 +106,7 @@ public sealed class AppControllerTests
         _c.DisableTravel();
 
         _cfg.TravelMode.Should().BeFalse();
-        _mifs.ChargeCareCalls.Should().BeEmpty("защиту вернёт ChargeGuard по событию питания");
+        _mifs.ChargeLimitCalls.Should().BeEmpty("защиту вернёт ChargeGuard по событию питания");
         _events.Should().Equal("travel-cancelled");
     }
 
@@ -185,7 +185,7 @@ public sealed class AppControllerTests
     {
         bool failed = false;
         _c.FirmwareFailed = () => failed = true;
-        _mifs.ThrowOnSetChargeCare = true;
+        _mifs.ThrowOnSetChargeLimit = true;
         _cfg.TravelMode = true;
 
         _c.ToggleCare(true);
@@ -202,7 +202,7 @@ public sealed class AppControllerTests
         bool failed = false;
         _c.FirmwareFailed = () => failed = true;
         _cfg.ChargeCare = true;
-        _mifs.ThrowOnSetChargeCare = true;
+        _mifs.ThrowOnSetChargeLimit = true;
 
         _c.SetTravel(true);
 

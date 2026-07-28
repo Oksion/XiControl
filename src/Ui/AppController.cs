@@ -146,30 +146,34 @@ public sealed class AppController
 
     // ---- Заряд и «в дорогу» ----
 
-    /// <summary>Переключить лимит заряда на противоположный (текущий читается из прошивки).</summary>
+    /// <summary>Переключить лимит заряда «беречь X% ↔ 100%» (текущий читается из прошивки).</summary>
     public void ToggleCharge()
-        => ToggleCare(!Safe(() => _mifs.GetChargeCare(), _cfg.ChargeCare));
+    {
+        int cur = Safe(() => _mifs.GetChargeLimit(), _cfg.ChargeCare ? _cfg.CarePercent() : 100) ?? 100;
+        ToggleCare(cur >= 100);   // сейчас 100 → включить «беречь X%»; иначе → 100
+    }
 
-    /// <summary>Установить «беречь батарею». Ручная смена отменяет временный режим «В дорогу».
-    /// Прошивка не приняла → конфиг не трогаем (реальное состояние не изменилось) и честно
+    /// <summary>Установить «беречь батарею» (порог X% из настроек) либо 100%. Ручная смена отменяет
+    /// «В дорогу». Прошивка не приняла → конфиг не трогаем (реальное состояние не изменилось) и честно
     /// сообщаем об ошибке вместо оптимистичного «успеха» (Фаза 6.2).</summary>
     public void ToggleCare(bool on)
     {
-        if (!Safe(() => { _mifs.SetChargeCare(on); return true; }, false)) { FirmwareFailed?.Invoke(); return; }
+        int percent = on ? _cfg.CarePercent() : 100;
+        if (!Safe(() => _mifs.SetChargeLimit(percent), false)) { FirmwareFailed?.Invoke(); return; }
         if (_cfg.TravelMode) { _cfg.TravelMode = false; _travel.Rearm(); }
         _cfg.ChargeCare = on;
         _cfg.Save();
         CareChanged?.Invoke(on);
     }
 
-    /// <summary>«В дорогу»: временный заряд до 100% поверх «беречь 80%».
+    /// <summary>«В дорогу»: временный заряд до 100% поверх «беречь X%».
     /// Доступно только при базовом ChargeCare=true (при постоянном 100% смысла нет).</summary>
     public void SetTravel(bool on)
     {
         if (on && !_cfg.ChargeCare) return;
-        // on → снять защиту (заряд до 100); off → вернуть базовый режим заряда.
+        // on → снять защиту (заряд до 100); off → вернуть базовый порог X%.
         // Сначала прошивка: не приняла → состояние не изменилось, конфиг не трогаем (6.2)
-        if (!Safe(() => { _mifs.SetChargeCare(on ? false : _cfg.ChargeCare); return true; }, false))
+        if (!Safe(() => _mifs.SetChargeLimit(on ? 100 : _cfg.CarePercent()), false))
         { FirmwareFailed?.Invoke(); return; }
         _cfg.TravelMode = on;
         _cfg.Save();
