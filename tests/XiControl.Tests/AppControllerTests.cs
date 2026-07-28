@@ -99,6 +99,64 @@ public sealed class AppControllerTests
     }
 
     [Fact]
+    public void SetCareLimit_WhenCareActive_AppliesToFirmware()
+    {
+        _cfg.ChargeCare = true;
+
+        _c.SetCareLimit(60);
+
+        _mifs.ChargeLimitCalls.Should().Equal(60);
+        _cfg.CareLimitPercent.Should().Be(60);
+        _events.Should().Equal("care:True");
+    }
+
+    [Fact]
+    public void SetCareLimit_WhenCareOff_OnlyRemembers()
+    {
+        _cfg.ChargeCare = false;
+
+        _c.SetCareLimit(50);
+
+        _mifs.ChargeLimitCalls.Should().BeEmpty("защита выключена — железо не трогаем, порог ждёт включения");
+        _cfg.CareLimitPercent.Should().Be(50);
+    }
+
+    [Fact]
+    public void SetCareLimit_DuringTravel_OnlyRemembers()
+    {
+        _cfg.ChargeCare = true;
+        _cfg.TravelMode = true;   // «в дорогу» временно держит 100% — не перебиваем его
+
+        _c.SetCareLimit(40);
+
+        _mifs.ChargeLimitCalls.Should().BeEmpty();
+        _cfg.CareLimitPercent.Should().Be(40);
+    }
+
+    [Fact]
+    public void SetCareLimit_UnsupportedPercent_IsIgnored()
+    {
+        _c.SetCareLimit(90);   // прошивка такого уровня не держит (docs/12)
+
+        _mifs.ChargeLimitCalls.Should().BeEmpty("неизвестный уровень не пишем вслепую");
+        _cfg.CareLimitPercent.Should().Be(80, "выбор не изменился");
+    }
+
+    [Fact]
+    public void SetCareLimit_FirmwareRejects_KeepsPreviousChoice()
+    {
+        bool failed = false;
+        _c.FirmwareFailed = () => failed = true;
+        _cfg.ChargeCare = true;
+        _mifs.SetChargeLimitResult = false;   // модель без granular — прошивка отвергла уровень
+
+        _c.SetCareLimit(40);
+
+        _cfg.CareLimitPercent.Should().Be(80, "откатываем выбор — на железе он не применился");
+        failed.Should().BeTrue();
+    }
+
+    [Fact]
     public void DisableTravel_IsSilentReset()
     {
         _cfg.TravelMode = true;

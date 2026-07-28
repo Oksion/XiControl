@@ -82,7 +82,7 @@ public sealed class TrayMenuBuilder : IDisposable
         // --- Заряд ---
         int lim = Safe(() => _mifs.GetChargeLimit(), _cfg.ChargeCare ? _cfg.CarePercent() : 100) ?? 100;
         bool care = lim < 100;   // «беречь» включено, когда порог не 100%
-        var charge = new ToolStripMenuItem(Loc.T("menu.charge")) { Checked = care };
+        var charge = new ToolStripMenuItem(Loc.T("menu.charge", _cfg.CarePercent())) { Checked = care };
         // состояние читаем в момент клика: пока меню висело, его мог сменить ChargeGuard
         charge.Click += (_, _) => _controller.ToggleCharge();
         Menu.Items.Add(charge);

@@ -9,7 +9,18 @@ public sealed class BatteryTab : SettingsPane
     public BatteryTab(SettingsToolkit ui, AppConfig cfg, SettingsActions act) : base(ui)
     {
         ui.AddHeader(this, "settings.tab.battery", "settings.battery.sub");
+
+        // Порог «беречь батарею»: панель/меню переключают между этим X и 100%, поэтому сам выбор
+        // живёт здесь (редкая настройка), а не в быстрой панели. Набор — уровни, которые держит
+        // прошивка (docs/12-charge-levels.md); модель без granular отвергнет — AppController откатит.
+        ui.AddGroup(this, "settings.battery.care");
+        int[] presets = Wmi.Mifs.ChargeCarePresets;
+        ui.AddRow(this, "settings.battery.care.limit", "settings.battery.care.limit.desc",
+            ui.Combo([.. presets.Select(p => $"{p}%")],
+                Math.Max(0, Array.IndexOf(presets, cfg.CarePercent())),
+                i => act.SetCareLimit(presets[i]), ui.Sc(120)));
         ui.AddNote(this, "settings.battery.note");
+
         ui.AddGroup(this, "settings.battery.travel");
         ui.AddRow(this, "settings.travel.sound", "settings.travel.sound.desc",
             ui.Toggle(cfg.TravelSound, on => { cfg.TravelSound = on; cfg.Save(); }));

@@ -386,7 +386,7 @@ public sealed class TrayApp : IDisposable
             if (_cfg.TravelMode)
                 _osd.Flash(OsdKind.Travel, Loc.T("osd.travel"), Append(Loc.T("osd.travel.sub"), note), badge);
             else if (_cfg.ChargeCare)
-                _osd.Flash(OsdKind.ChargingLimited, Loc.T("osd.charging.limited", Mifs.ChargeThresholdPercent), Append(sub, note), badge);
+                _osd.Flash(OsdKind.ChargingLimited, Loc.T("osd.charging.limited", _cfg.CarePercent()), Append(sub, note), badge);
             else
                 _osd.Flash(OsdKind.Charging, Loc.T("osd.charging"), Append(sub, note), badge);
         }
@@ -493,6 +493,7 @@ public sealed class TrayApp : IDisposable
                 SetRefreshRateFeature = _controller.ToggleRefreshRateFeature,
                 SetRefreshRates = _controller.SetRefreshRates,
                 SetOwlFeature = _controller.ToggleOwlFeature,
+                SetCareLimit = _controller.SetCareLimit,
                 GetBatteryReport = BatteryReportCached,
                 GetApiSettings = () => _api,
                 ApiApplied = ApiApplied,
