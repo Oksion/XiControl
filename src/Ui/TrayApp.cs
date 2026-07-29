@@ -114,6 +114,7 @@ public sealed class TrayApp : IDisposable
         _panel.SetAutoHz = _controller.ToggleAutoHz;
         _panel.ToggleTouchpad = _controller.ToggleTouchpad;
         _panel.ToggleTouchscreen = _controller.ToggleTouchscreen;
+        _panel.SyncCare = () => _controller.SyncCareFromFirmware();
 
         // Уведомления контроллера → обратная связь UI: панель открыта — обновляется она,
         // иначе OSD; значок обновляем после смены режима. Сама логика — в AppController.
