@@ -85,8 +85,8 @@ public sealed class MifsClient : IMifsClient
     {
         var code = Mifs.ChargeCodeForPercent(percent);
         if (code is null) return false;
-        Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, 0);   // «выкл» = 100%
-        if (code.Value == 0) return true;               // сам 100% — второй записи не нужно
+        var off = Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, 0);   // «выкл» = 100%
+        if (code.Value == 0) return off.Ok;             // сам 100% — второй записи не нужно
         Thread.Sleep(80);
         return Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, code.Value).Ok;
     }

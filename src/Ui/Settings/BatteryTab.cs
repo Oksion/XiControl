@@ -15,10 +15,22 @@ public sealed class BatteryTab : SettingsPane
         // прошивка (docs/12-charge-levels.md); модель без granular отвергнет — AppController откатит.
         ui.AddGroup(this, "settings.battery.care");
         int[] presets = Wmi.Mifs.ChargeCarePresets;
-        ui.AddRow(this, "settings.battery.care.limit", "settings.battery.care.limit.desc",
-            ui.Combo([.. presets.Select(p => $"{p}%")],
-                Math.Max(0, Array.IndexOf(presets, cfg.CarePercent())),
-                i => act.SetCareLimit(presets[i]), ui.Sc(120)));
+        int PresetIndex() => Math.Max(0, Array.IndexOf(presets, cfg.CarePercent()));
+        bool reverting = false;   // откат ниже сам дёргает SelectedIndexChanged — не пишем повторно
+        ComboBox limit = null!;
+        limit = ui.Combo([.. presets.Select(p => $"{p}%")], PresetIndex(), i =>
+        {
+            if (reverting) return;
+            act.SetCareLimit(presets[i]);
+            // прошивка отвергла уровень → конфиг не изменился — вернуть комбо фактический выбор
+            if (limit.SelectedIndex != PresetIndex())
+            {
+                reverting = true;
+                limit.SelectedIndex = PresetIndex();
+                reverting = false;
+            }
+        }, ui.Sc(120));
+        ui.AddRow(this, "settings.battery.care.limit", "settings.battery.care.limit.desc", limit);
         ui.AddNote(this, "settings.battery.note");
 
         ui.AddGroup(this, "settings.battery.travel");

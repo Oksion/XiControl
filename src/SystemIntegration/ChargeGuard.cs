@@ -60,9 +60,11 @@ public sealed class ChargeGuard : IDisposable
     {
         try
         {
+            // ре-арм только когда «беречь» включено (порог < 100); отказ прошивки — в лог:
+            // молча оставить батарею на 100% хуже, чем след в log.txt
             int pct = _limitWanted();
-            if (pct < 100)
-                _mifs.SetChargeLimit(pct);   // ре-арм только когда «беречь» включено (порог < 100)
+            if (pct < 100 && !_mifs.SetChargeLimit(pct))
+                Log.Write($"ChargeGuard.Reapply: прошивка отвергла порог {pct}%");
         }
         catch (Exception ex) { Log.Ex("ChargeGuard.Reapply", ex); /* железо могло быть недоступно */ }
     }

@@ -400,9 +400,9 @@ None of this runs or spends resources while the API is off (the server simply is
 
 ## Limitations
 
-- The "battery care" threshold is baked into the firmware — an arbitrary percentage via WMI is
-  impossible. On the tested model (TM2424) it's ≈80%; on other models the threshold may differ
-  (e.g. 70% on models serviced by MI Control).
+- The "battery care" threshold is picked from a discrete set the firmware supports — an arbitrary
+  percentage via WMI is impossible. On the tested model (TM2424) that's 40/50/60/70/80/100%;
+  on other models the set may differ (the firmware validates it itself and rejects unsupported levels).
 - The Fn+Mi combo is indistinguishable from a single Mi (the firmware sends identical events),
   which is why short/long presses are used.
 - The feature set depends on the model: firmware telemetry (fan RPM) is unsupported on the tested
