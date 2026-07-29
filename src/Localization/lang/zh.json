@@ -106,7 +106,7 @@
   "settings.key.proj.desc": "屏幕切换键。",
   "settings.key.command": "程序 / 文件 / URL",
   "settings.act.modes": "循环性能模式",
-  "settings.act.charge": "充电 80 / 100 %",
+  "settings.act.charge": "充电限制开关",
   "settings.act.panel": "快速面板",
   "settings.act.owl": "猫头鹰模式",
   "settings.act.monitor": "监视器",

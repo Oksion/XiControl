@@ -106,7 +106,7 @@
   "settings.key.proj.desc": "The display-switch key.",
   "settings.key.command": "Program / file / URL",
   "settings.act.modes": "Cycle modes",
-  "settings.act.charge": "Charge 80 / 100 %",
+  "settings.act.charge": "Charge limit on/off",
   "settings.act.panel": "Quick panel",
   "settings.act.owl": "Owl mode",
   "settings.act.monitor": "Monitor",
