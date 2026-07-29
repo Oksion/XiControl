@@ -187,10 +187,10 @@ public sealed class OsdForm : Form
         switch (kind)
         {
             case OsdKind.Auto:     SvgIcons.DrawGauge(g, r, NeedleAngle()); return;
-            case OsdKind.Quiet:    SvgIcons.DrawLeafSway(g, r, _gaugeT, 1f); return;
+            case OsdKind.Quiet:    SvgIcons.DrawMoonTwinkle(g, r, _gaugeT, 1f); return;
             case OsdKind.Turbo:    SvgIcons.DrawBoltPulse(g, r, _gaugeT, 1f); return;
             case OsdKind.Full:     SvgIcons.DrawRocket(g, r, _gaugeT, 1f); return;
-            case OsdKind.Eco:      SvgIcons.DrawMoonTwinkle(g, r, _gaugeT, 1f); return;
+            case OsdKind.Eco:      SvgIcons.DrawLeafSway(g, r, _gaugeT, 1f); return;
             case OsdKind.Charging: SvgIcons.DrawChargingPulse(g, r, _gaugeT); return;
             case OsdKind.Travel:   SvgIcons.DrawTravelPulse(g, r, _gaugeT); return;
         }

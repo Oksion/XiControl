@@ -35,14 +35,14 @@ public static class SvgIcons
     public const string PerfAuto = "perf-auto";
     public const string PerfAutoDial = "perf-auto-dial";     // спидометр без стрелки
     public const string PerfAutoNeedle = "perf-auto-needle"; // стрелка, пивот в центре
-    public const string PerfEco = "perf-eco";
+    public const string PerfEco = "perf-eco";                // лист (экономия)
     public const string PerfFull = "perf-full";
     public const string PerfFullBody = "perf-full-body";     // ракета без пламени
     public const string PerfFullFlame = "perf-full-flame";   // пламя отдельно
-    public const string PerfEcoMoon = "perf-eco-moon";       // луна без звёзд
-    public const string PerfEcoStar1 = "perf-eco-star1";     // звёзды по одной —
-    public const string PerfEcoStar2 = "perf-eco-star2";     //   мерцают в противофазе
-    public const string PerfQuiet = "perf-quiet";
+    public const string PerfQuietMoon = "perf-quiet-moon";   // луна без звёзд
+    public const string PerfQuietStar1 = "perf-quiet-star1"; // звёзды по одной —
+    public const string PerfQuietStar2 = "perf-quiet-star2"; //   мерцают в противофазе
+    public const string PerfQuiet = "perf-quiet";            // луна со звёздами (тишина)
     public const string PerfTurbo = "perf-turbo";
     public const string RefreshRate = "refresh-rate";        // монитор со стрелками — авто-герцовка вкл
     public const string RefreshRateOff = "refresh-rate-off"; // то же серым — авто-герцовка выкл
@@ -151,7 +151,7 @@ public static class SvgIcons
         g.DrawImage(bmp, pts, src, GraphicsUnit.Pixel, attrs);
     }
 
-    /// <summary>Лист (Тихий): покачивание вокруг основания черешка, как от ветерка.</summary>
+    /// <summary>Лист (Эко): покачивание вокруг основания черешка, как от ветерка.</summary>
     public static void DrawLeafSway(Graphics g, RectangleF r, float t, float k, float opacity = 1f, float saturation = 1f)
     {
         int size = (int)Math.Round(Math.Min(r.Width, r.Height));
@@ -160,7 +160,7 @@ public static class SvgIcons
         float px = dest.X + dest.Width * 0.25f, py = dest.Y + dest.Height * 0.84f; // основание черешка
         var st = g.Save();
         g.TranslateTransform(px, py); g.RotateTransform(ang); g.TranslateTransform(-px, -py);
-        DrawBitmap(g, Render(PerfQuiet, size), dest, opacity, 1f, saturation);
+        DrawBitmap(g, Render(PerfEco, size), dest, opacity, 1f, saturation);
         g.Restore(st);
     }
 
@@ -194,16 +194,16 @@ public static class SvgIcons
         DrawBitmap(g, Render(PerfFullBody, size), body, opacity, 1f, saturation);
     }
 
-    /// <summary>Луна (Эко): звёзды мерцают в противофазе.</summary>
+    /// <summary>Луна (Тихий): звёзды мерцают в противофазе.</summary>
     public static void DrawMoonTwinkle(Graphics g, RectangleF r, float t, float k, float opacity = 1f, float saturation = 1f)
     {
         int size = (int)Math.Round(Math.Min(r.Width, r.Height));
         var dest = CenteredDest(r, size);
-        DrawBitmap(g, Render(PerfEcoMoon, size), dest, opacity, 1f, saturation);
+        DrawBitmap(g, Render(PerfQuietMoon, size), dest, opacity, 1f, saturation);
         float a1 = 1f - 0.7f * k * (0.5f + 0.5f * MathF.Sin(t * 2.1f));
         float a2 = 1f - 0.7f * k * (0.5f + 0.5f * MathF.Sin(t * 2.1f + 2.2f));
-        DrawBitmap(g, Render(PerfEcoStar1, size), dest, opacity * a1, 1f, saturation);
-        DrawBitmap(g, Render(PerfEcoStar2, size), dest, opacity * a2, 1f, saturation);
+        DrawBitmap(g, Render(PerfQuietStar1, size), dest, opacity * a1, 1f, saturation);
+        DrawBitmap(g, Render(PerfQuietStar2, size), dest, opacity * a2, 1f, saturation);
     }
 
     /// <summary>Батарея на зарядке: молния внутри мягко пульсирует.</summary>
