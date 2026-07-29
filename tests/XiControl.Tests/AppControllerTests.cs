@@ -172,15 +172,30 @@ public sealed class AppControllerTests
     }
 
     [Fact]
-    public void SyncCare_ProtectionOffOutside_KeepsChosenPercent()
+    public void SyncCare_Reads100_DoesNotDisarm()
     {
+        // EC читается как 100 и когда защиту выключили снаружи, и — транзиентно — после сна/смены
+        // питания, пока ChargeGuard не переармил (дебаунс). Принять 100 = сбросить ChargeCare и
+        // разоружить гард навсегда: панель, открытая сразу после resume, молча убивала бы защиту.
         _cfg.ChargeCare = true;
-        _mifs.ChargeLimit = 100;   // снаружи защиту выключили
+        _mifs.ChargeLimit = 100;
+
+        _c.SyncCareFromFirmware().Should().BeFalse();
+
+        _cfg.ChargeCare.Should().BeTrue("«100» неотличим от транзиента до ре-арма — не принимаем");
+        _cfg.CareLimitPercent.Should().Be(80);
+    }
+
+    [Fact]
+    public void SyncCare_ExternalArming_IsAdopted()
+    {
+        _cfg.ChargeCare = false;
+        _mifs.ChargeLimit = 60;   // защиту включили снаружи: EC сам уровень не породит — это чей-то SET
 
         _c.SyncCareFromFirmware().Should().BeTrue();
 
-        _cfg.ChargeCare.Should().BeFalse();
-        _cfg.CareLimitPercent.Should().Be(80, "100% — это «выключено», а не порог: выбранный X храним");
+        _cfg.ChargeCare.Should().BeTrue();
+        _cfg.CareLimitPercent.Should().Be(60);
     }
 
     [Fact]
