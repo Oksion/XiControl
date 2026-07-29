@@ -48,12 +48,13 @@ current direction is shown by color (charging green / discharging orange).*
 
 ## Features
 
-- 🔋 **Charge protection** — "battery care" (charge to ~80%) / full charge to 100%.
+- 🔋 **Charge protection** — "battery care" with a selectable threshold (40/50/60/70/80%,
+  picked in Settings → Battery) / full charge to 100%.
   - **ChargeGuard**: the firmware drops the limit after sleep and power-source changes —
     the utility re-applies it automatically.
-  - 🧳 **"Travel" mode** — a one-off charge to 100% on top of "care 80%": the suitcase button
+  - 🧳 **"Travel" mode** — a one-off charge to 100% on top of battery care: the suitcase button
     in the panel / a menu item. On reaching 100% — an OSD and a sound; unplugging the charger
-    resets the mode by itself (the next plug-in is back to 80%).
+    resets the mode by itself (the next plug-in is back to the threshold).
 - 🔌 **Charger wattage** — when the charger is plugged in, show the connected PD adapter's
   wattage (watts) in the OSD and in the Monitor. Over the charge icon — a **PSU quality badge**:
   🔴 "!" if the adapter is weaker than the configured threshold (slow charging), ⚪ "?" if the
@@ -64,7 +65,7 @@ current direction is shown by color (charging green / discharging orange).*
 - ⚡ **Performance modes**: Eco (hidden firmware mode) / Quiet / Auto /
   Turbo / Full speed. Eco and Full speed can be removed from the UI via config.
 - 🖥️ **OSD overlay** (dark card, custom icons):
-  - charger plug/unplug ("Charging to 80%" / "On battery" + level);
+  - charger plug/unplug ("Charging to X%" with the actual threshold / "On battery" + level);
   - performance mode and charge limit changes;
   - microphone on/off, keyboard backlight (off / 50% / 100% / auto).
 - 🅼 **Mi button**:
@@ -186,10 +187,10 @@ Launch `XiControl.exe` (confirm the UAC prompt) — a tray icon appears.
 | Click the tray icon | Quick settings panel |
 | Right-click the icon | Menu: charge, "travel", owl, auto refresh rate, Monitor, mode, Settings…, exit |
 | Mi button, single click | Next performance mode + OSD *(configurable)* |
-| Mi button, double click | Toggle charge limit 80% ↔ 100% + OSD *(configurable)* |
+| Mi button, double click | Toggle charge limit threshold ↔ 100% + OSD *(configurable)* |
 | Mi button, hold ~0.5 s | Quick settings panel |
 | Microphone key | Mute/unmute the system microphone + OSD |
-| "Settings" key | Toggle charge limit 80% ↔ 100% + OSD *(configurable)* |
+| "Settings" key | Toggle charge limit threshold ↔ 100% + OSD *(configurable)* |
 | Keyboard backlight key | OSD with the level (off / 50% / 100% / auto) |
 
 All options live in the **Settings…** window (tray menu item): tabs General (language,
@@ -209,14 +210,14 @@ moved the file), it repairs itself on launch.
 
 ### Travel mode (a one-off charge to 100%)
 
-You usually keep "care 80%", but before a trip you want a full charge. Press the
-**suitcase button** in the panel (left of the 80/100 pills) or the **"Charge for the road"**
+You usually keep battery care on (say, 80%), but before a trip you want a full charge. Press the
+**suitcase button** in the panel (left of the threshold/100 pills) or the **"Charge for the road"**
 menu item — the utility lifts the limit once and tops up to 100%.
 
 - On reaching **100%** — a "ready for the road" OSD and a sound (toggle
   **Settings → Battery → "Ready sound"**, on by default).
-- **Unplug the charger → the mode turns off by itself**; the next plug-in is back to caring at 80%.
-- Manually picking the 80/100 pill also cancels the mode. With a permanent "100%" the button is
+- **Unplug the charger → the mode turns off by itself**; the next plug-in is back to the care threshold.
+- Manually picking the threshold/100 pill also cancels the mode. With a permanent "100%" the button is
   inactive (nothing to top up).
 
 The 80/100 pills show the **base** setting — "travel" is a temporary override on top of it
@@ -375,7 +376,7 @@ Routes (all with an `Authorization: Bearer <token>` header, body — JSON):
 |---|---|
 | `GET /status` | Mode, charge protection, "travel", owl, charge %, charging fact, watts, battery health |
 | `POST /mode` `{"value":"turbo"}` | Performance mode (`eco`/`quiet`/`auto`/`turbo`/`fullspeed`) |
-| `POST /care` `{"on":true}` | "Care ~80%" on/off |
+| `POST /care` `{"on":true}` | Battery care on/off (the configured threshold) |
 | `POST /travel` `{"on":true}` | "Travel" mode (a one-off charge to 100%) |
 | `POST /owl` `{"on":true}` | "Owl mode" (stay awake) on/off |
 
