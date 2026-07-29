@@ -184,6 +184,7 @@
   "monitor.ram.of": "{0:0.0} / {1:0.0} GB",
   "monitor.adapter": "适配器 {0} 瓦",
   "monitor.watts.scale": "{0:0} 瓦",
+  "monitor.gpu.sub": "{0:0} MHz · {1:0.0} 瓦",
   "monitor.temp": "温度",
   "monitor.temp.c": "{0} °C",
   "osd.charging": "充电中",

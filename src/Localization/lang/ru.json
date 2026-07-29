@@ -184,6 +184,7 @@
   "monitor.ram.of": "{0:0.0} / {1:0.0} ГБ",
   "monitor.adapter": "Адаптер {0} Вт",
   "monitor.watts.scale": "{0:0} Вт",
+  "monitor.gpu.sub": "{0:0} МГц · {1:0.0} Вт",
   "monitor.temp": "Температура",
   "monitor.temp.c": "{0} °C",
   "osd.charging": "Зарядка",
