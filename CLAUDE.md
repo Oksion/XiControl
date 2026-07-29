@@ -141,7 +141,7 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   `TravelChargeMonitor` (SystemIntegration).
 - `src/Ui/` остальное: `QuickPanelForm` (панель по удержанию Mi / клику по трею — чистый view
   над контроллером, навигация с клавиатуры; ширина фиксированная — при скрытых режимах
-  растягиваются ячейки), `OsdForm` (всплывашки), `MonitorForm` (виджет Вт/CPU/RAM/°C),
+  растягиваются ячейки), `OsdForm` (всплывашки), `MonitorForm` (виджет Вт/CPU/GPU/RAM/°C),
   `FlyoutForm` + `FlyoutPalette` (общая база флайаутов: borderless tool-window, Region, Esc;
   палитра — единственный источник тёмных цветов флайаутов), `FormChrome` (DWM-тёмный
   заголовок + WM_SETREDRAW), `ModeUi` (режим → ключ локализации / вид OSD / акцент),
@@ -170,7 +170,10 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   `AutoStart` (задача планировщика + самопочинка пути), `AwakeMode` («режим совы»: всегда
   `ES_SYSTEM_REQUIRED` + крышка на AC, экран держится `ES_DISPLAY_REQUIRED` — кроме
   `OwlIgnoreDisplay: true` в config.json, тогда только «не спать»),
-  `MicControl`, `KeyActions`, `Sound` (WAV-джинглы), `BatteryInfo`, `PowerDraw`;
+  `MicControl`, `KeyActions`, `Sound` (WAV-джинглы), `BatteryInfo`, `PowerDraw`,
+  `GpuTelemetry` (загрузка/ватты/частота iGPU через **Intel IGCL** — user-mode API драйвера Intel,
+  `ControlLib.dll` из System32; driver-free, без админа, ленивая инициализация; не Intel → ряд GPU
+  в «Мониторе» просто не появляется, см. `docs/09`);
   **HTTP API (XIC-13, opt-in)** — `HttpApi` (хост на `HttpListener`/http.sys, без ASP.NET Core;
   создаётся только при включённой фиче → выключено = 0 CPU), `ApiRouter` (авторизация Bearer+SHA-256
   constant-time и белый список маршрутов — тестируется на фейках), `ApiSettings`/`ApiSettingsStore`
