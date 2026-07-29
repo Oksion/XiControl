@@ -17,7 +17,7 @@
 **Никакого WinRing0**, никаких сторонних драйверов и прямого доступа к EC.
 
 <p align="center">
-  <img src="docs/img/quick-panel.png" width="560" alt="Панель быстрых настроек">
+  <img src="docs/img/quick-panel.ru.png" width="560" alt="Панель быстрых настроек">
 </p>
 
 *Панель быстрых настроек (удержание кнопки Mi): пять режимов производительности,
@@ -25,15 +25,15 @@
 авто-герцовка и «режим совы» (не спать).*
 
 <p align="center">
-  <img src="docs/img/monitor.png" width="440" alt="Окно «Монитор»">
+  <img src="docs/img/monitor.ru.png" width="440" alt="Окно «Монитор»">
 </p>
 
 *Окно «Монитор»: живые графики потребления (Вт), загрузки CPU, GPU и RAM.*
 
 <p align="center">
-  <img src="docs/img/monitor-mini.png" width="380" alt="«Монитор» — компактный вид">
+  <img src="docs/img/monitor-mini.ru.png" width="380" alt="«Монитор» — компактный вид">
   &nbsp;&nbsp;
-  <img src="docs/img/monitor-watts.png" width="120" alt="«Монитор» — только ватты">
+  <img src="docs/img/monitor-watts.ru.png" width="120" alt="«Монитор» — только ватты">
 </p>
 
 *В полном виде — живые графики: потребление (Вт), CPU, **GPU** (под процентом — частота и ватты),
