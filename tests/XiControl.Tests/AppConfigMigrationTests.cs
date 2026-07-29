@@ -25,6 +25,11 @@ public sealed class AppConfigMigrationTests
     }
 
     [Fact]
+    public void OwlIgnoreDisplay_DefaultsToOff_SoOwlKeepsHoldingTheScreen()
+        => new AppConfig().OwlIgnoreDisplay.Should().BeFalse(
+            "поле только для тех, кто добавит его руками; без него сова ведёт себя как раньше");
+
+    [Fact]
     public void LegacyChargeFirst_MapsClickToChargeAndDoubleToModes()
     {
         var cfg = new AppConfig { MiShortPress = "charge" };

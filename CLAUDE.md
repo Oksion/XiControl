@@ -167,7 +167,9 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   `Brightness` (WMI ACPI-подсветка), `TouchpadControl`/`TouchscreenControl` (вкл/выкл через
   SetupAPI/CfgMgr32 — отключается родительский узел I2C HID, без PERSIST; общая механика в
   базовом `HidNodeToggle`, разница лишь в HID-коллекции: тачпад U:0005, экран U:0004),
-  `AutoStart` (задача планировщика + самопочинка пути), `AwakeMode` («режим совы»),
+  `AutoStart` (задача планировщика + самопочинка пути), `AwakeMode` («режим совы»: всегда
+  `ES_SYSTEM_REQUIRED` + крышка на AC, экран держится `ES_DISPLAY_REQUIRED` — кроме
+  `OwlIgnoreDisplay: true` в config.json, тогда только «не спать»),
   `MicControl`, `KeyActions`, `Sound` (WAV-джинглы), `BatteryInfo`, `PowerDraw`;
   **HTTP API (XIC-13, opt-in)** — `HttpApi` (хост на `HttpListener`/http.sys, без ASP.NET Core;
   создаётся только при включённой фиче → выключено = 0 CPU), `ApiRouter` (авторизация Bearer+SHA-256
