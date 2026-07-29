@@ -58,8 +58,8 @@ double-click; current direction is shown by color (charging green / discharging 
 - 🔌 **Charger wattage** — when the charger is plugged in, show the connected PD adapter's
   wattage (watts) in the OSD and in the Monitor. Over the charge icon — a **PSU quality badge**:
   🔴 "!" if the adapter is weaker than the configured threshold (slow charging), ⚪ "?" if the
-  PSU is non-PD (e.g. plain 5 V — wattage can't be negotiated). The icon still shows the 80/100
-  limit. The threshold is configurable (Settings → Battery). Driver-free (read-only).
+  PSU is non-PD (e.g. plain 5 V — wattage can't be negotiated). The icon still shows the current
+  charge limit. The threshold is configurable (Settings → Battery). Driver-free (read-only).
 - 🩺 **Battery health** — Settings → Battery: actual wear (current vs. design capacity),
   charge cycle count, capacity in Wh. Stock ACPI/Windows data, read-only.
 - ⚡ **Performance modes**: Eco (hidden firmware mode) / Quiet / Auto /
@@ -70,8 +70,8 @@ double-click; current direction is shown by color (charging green / discharging 
   - microphone on/off, keyboard backlight (off / 50% / 100% / auto).
 - 🅼 **Mi button**:
   - short press — cycle through modes with an OSD (configurable);
-  - double click — charge 80/100 (configurable);
-  - hold — quick settings panel (modes + charge 80/100, closes on Esc/X/click-outside).
+  - double click — toggle the charge limit (configurable);
+  - hold — quick settings panel (modes + charge limit, closes on Esc/X/click-outside).
 - ⌨️ **Reviving "dead" keys** with remapping: the Mi clicks and the "settings" / AI /
   "projection" keys can be bound to any function — from cycling modes to launching your
   own program (see "Key remapping"); the microphone key mutes the system mic, the backlight
@@ -222,7 +222,7 @@ menu item — the utility lifts the limit once and tops up to 100%.
 - Manually picking the threshold/100 pill also cancels the mode. With a permanent "100%" the button is
   inactive (nothing to top up).
 
-The 80/100 pills show the **base** setting — "travel" is a temporary override on top of it
+The "threshold/100" pills show the **base** setting — "travel" is a temporary override on top of it
 (driver-free, the same charge WMI channel). In `config.json`: `"TravelMode"`, `"TravelSound"`.
 
 A custom ready sound — the "Custom sound file" field in the same settings (or `config.json`;
@@ -333,7 +333,7 @@ When editing `AcRefreshRate`/`BatteryRefreshRate` directly in the config, restar
 
 Each key gets its own action: **Settings → Keys**. The slots are the single and double Mi-button
 click, the "Settings" (gear), AI and "Projection" keys. Any slot can be bound to: cycle modes,
-charge 80/100, quick panel, owl mode, Monitor, "travel", touchpad and touchscreen on/off, the
+charge limit on/off, quick panel, owl mode, Monitor, "travel", touchpad and touchscreen on/off, the
 system "Projection (Win+P)" / "Windows Settings" / "Copilot (Win+C)", launching your own program,
 or "Nothing".
 
