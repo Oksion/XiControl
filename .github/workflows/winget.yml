@@ -23,6 +23,8 @@ jobs:
     env:
       HAS_TOKEN: ${{ secrets.WINGET_TOKEN != '' }}
     steps:
+      - uses: actions/checkout@v7 # ради .github/scripts (winget-releaser чекаут не нужен)
+        if: env.HAS_TOKEN == 'true'
       - name: Publish to winget
         if: env.HAS_TOKEN == 'true'
         uses: vedantmgoyal9/winget-releaser@v2
@@ -32,6 +34,15 @@ jobs:
           # тег: из ввода при ручном запуске, иначе из события release
           release-tag: ${{ inputs.tag || github.event.release.tag_name }}
           token: ${{ secrets.WINGET_TOKEN }}
+      # Komac пересобирает installer-манифест из exe и теряет рукописные поля —
+      # MinimumOSVersion уезжал в 0.7.0 и 0.8.0, валидатор winget без него режет PR.
+      # Возвращаем поля прямо в ветку форка (PR обновится сам); скрипт идемпотентен.
+      - name: Restore hand-written manifest fields
+        if: env.HAS_TOKEN == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: ./.github/scripts/winget-restore-fields.ps1 -Tag '${{ inputs.tag || github.event.release.tag_name }}'
       - name: No token — skip
         if: env.HAS_TOKEN != 'true'
         run: echo "Секрет WINGET_TOKEN не задан — публикация в winget пропущена."
