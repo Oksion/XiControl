@@ -22,7 +22,7 @@ public sealed class AboutTab : SettingsPane
         ico.Region = new Region(Draw.Rounded(new RectangleF(0, 0, ui.Sc(60), ui.Sc(60)), ui.Sc(12)));
         hero.Controls.Add(ico);
         var name = new Label { Text = "XiControl", Font = ui.NameFont, AutoSize = true, ForeColor = ui.T.Text, BackColor = Color.Transparent, Location = new Point(ui.Sc(74), ui.Sc(10)) };
-        var ver = new Label { Text = $"{Loc.T("settings.version")} {AppVersion()}  ·  GPLv3", Tag = "dim", AutoSize = true, ForeColor = ui.T.Text2, BackColor = Color.Transparent, Location = new Point(ui.Sc(74), ui.Sc(40)) };
+        var ver = new Label { Text = $"{Loc.T("settings.version")} {AppVersion()}  ·  GPLv3", Tag = "dim", AutoSize = true, ForeColor = ui.T.Text2, BackColor = Color.Transparent, Font = ui.NoteFont, Location = new Point(ui.Sc(74), ui.Sc(40)) };
         hero.Controls.Add(name); hero.Controls.Add(ver);
         Controls.Add(hero);
 
