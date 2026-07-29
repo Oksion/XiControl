@@ -2,6 +2,16 @@
 # для .NET (Automatic Analysis язык не поддерживает) — begin → build → test → end.
 # Результат уезжает на sonarcloud.io. Секрет SONAR_TOKEN секретам форков не виден,
 # поэтому анализ гоняем на push в main и вручную, а не на PR из форков.
+#
+# sonar.coverage.exclusions — из ИЗМЕРЕНИЯ покрытия исключены края, которые мы намеренно
+# не покрываем юнитами (политика из CLAUDE.md: чистую логику тестируем, UI и железо — глазами):
+# UI/WinForms, системная интеграция, точка входа, tools и два файла живого WMI —
+# MifsClient/MifsEventWatcher (они дёргают ManagementObject, без ноутбука не выполняются;
+# логика над ними тестируется через шов IMifsClient на фейках). Mifs.cs НЕ исключён:
+# это чистые таблицы и маппинги, они покрыты тестами и должны такими оставаться.
+# На статический анализ (баги, smells, уязвимости) исключение не влияет — только на coverage.
+# Важно: Quality Gate «Sonar way» требует ≥80% покрытия нового кода, а свой гейт на бесплатном
+# тарифе не завести (Team/Enterprise) — поэтому измеряем только то, что реально тестируем.
 name: sonarcloud
 
 on:
@@ -43,7 +53,7 @@ jobs:
           /d:sonar.token="$env:SONAR_TOKEN"
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
           /d:sonar.scanner.scanAll=false
-          /d:sonar.coverage.exclusions="src/Ui/**,src/SystemIntegration/**,src/Program.cs,tools/**"
+          /d:sonar.coverage.exclusions="src/Ui/**,src/SystemIntegration/**,src/Wmi/MifsClient.cs,src/Wmi/MifsEventWatcher.cs,src/Program.cs,tools/**"
 
       - name: Build
         run: dotnet build XiControl.sln -c Release

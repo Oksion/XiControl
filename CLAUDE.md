@@ -216,6 +216,13 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
 - Тег с суффиксом через дефис (`v0.7.0-pre`) помечается pre-release и winget **не** трогает.
 - Каждый push в `main` собирает скользящий pre-release под тегом `pre` — всегда свежий билд из main;
   winget его не видит (слушает только `release: [released]`).
+- **SonarCloud** (`.github/workflows/sonar.yml`, только push в `main`): бесплатный тариф даёт лишь
+  встроенный Quality Gate «Sonar way» — свой не завести (Team/Enterprise), а он требует **≥80%
+  покрытия нового кода**. Поэтому из ИЗМЕРЕНИЯ покрытия (`sonar.coverage.exclusions`) исключены
+  края, которые мы намеренно не покрываем юнитами: `src/Ui/**`, `src/SystemIntegration/**`,
+  `Program.cs`, `tools/**` и живой WMI — `MifsClient.cs`/`MifsEventWatcher.cs`. Чистая логика
+  (`Mifs.cs`, конфиг, guard-ы, роутер) измеряется и должна оставаться покрытой. Добавляешь новый
+  файл с живым железом — впиши его в исключения, иначе гейт покраснеет на ровном месте.
 - Локальная сборка помечается версией `0.0.0-dev` (дев-дефолт в `XiControl.csproj`, суффикс виден
   в AboutTab); реальную версию подставляет CI из тега: `publish -p:Version=X.Y.Z`.
 
