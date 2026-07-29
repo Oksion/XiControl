@@ -8,8 +8,8 @@ internal static class ModeUi
     /// <summary>Акцент ячейки режима в панели (палитра docs/10-colors.md).</summary>
     public static Color Accent(PerfMode m) => m switch
     {
-        PerfMode.Eco => Color.FromArgb(125, 160, 185), // сизый
-        PerfMode.Quiet => FlyoutPalette.Green,
+        PerfMode.Eco => FlyoutPalette.Green,            // лист
+        PerfMode.Quiet => Color.FromArgb(125, 160, 185), // сизый — под луну
         PerfMode.Auto => FlyoutPalette.Blue,
         PerfMode.Turbo => FlyoutPalette.Orange,
         PerfMode.FullSpeed => FlyoutPalette.Red,

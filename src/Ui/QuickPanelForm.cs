@@ -582,8 +582,8 @@ public sealed class QuickPanelForm : FlyoutForm
     {
         switch (m)
         {
-            case PerfMode.Eco: SvgIcons.DrawMoonTwinkle(g, r, _gaugeT, k, opacity, saturation); break;
-            case PerfMode.Quiet: SvgIcons.DrawLeafSway(g, r, _gaugeT, k, opacity, saturation); break;
+            case PerfMode.Eco: SvgIcons.DrawLeafSway(g, r, _gaugeT, k, opacity, saturation); break;
+            case PerfMode.Quiet: SvgIcons.DrawMoonTwinkle(g, r, _gaugeT, k, opacity, saturation); break;
             case PerfMode.Auto: SvgIcons.DrawGauge(g, r, k * OsdForm.SweepAngle(_gaugeT), opacity, saturation); break;
             case PerfMode.Turbo: SvgIcons.DrawBoltPulse(g, r, _gaugeT, k, opacity, saturation); break;
             case PerfMode.FullSpeed: SvgIcons.DrawRocket(g, r, _gaugeT, k, opacity, saturation); break;
