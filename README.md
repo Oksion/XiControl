@@ -88,9 +88,11 @@ current direction is shown by color (charging green / discharging orange).*
   control; a disabled feature disappears from the menu and panel entirely.
 - 🎨 The tray icon changes with the mode, monochrome to match a light/dark taskbar;
   a dark menu matching the system theme (switches on the fly).
-- 🦉 **"Owl mode"** — don't turn off the display or sleep; a closed lid on AC power only turns
-  off the display (on battery — regular sleep). Owl in the panel / a checkbox in the menu;
-  power timings aren't changed, the lid action is restored afterwards.
+- 🦉 **"Owl mode"** — don't sleep, and don't turn off the display *(optional)*; a closed lid on
+  AC power only turns off the display (on battery — regular sleep). Owl in the panel / a checkbox
+  in the menu; power timings aren't changed, the lid action is restored afterwards.
+  If you only need the machine to stay awake (for a remote session, say), set
+  `"OwlIgnoreDisplay": true` in config — the screen then blanks as usual instead of burning idle.
   The feature can be hidden entirely (`"OwlMode": false` in config).
 - 🖥️ **Auto refresh rate** — plug in the charger → 120 Hz, unplug → 60 Hz
   (rates configurable in config: `AcRefreshRate`/`BatteryRefreshRate`; if the panel lacks

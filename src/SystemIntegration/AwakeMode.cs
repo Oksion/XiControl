@@ -4,10 +4,12 @@ using XiControl.Config;
 namespace XiControl.SystemIntegration;
 
 /// <summary>
-/// Режим «Не спать»: пока включён — экран не гаснет и система не засыпает
-/// (SetThreadExecutionState), а закрытие крышки НА ПИТАНИИ ОТ СЕТИ не уводит
-/// в сон (действие крышки AC → «ничего не делать» через Power Management API).
-/// На батарее крышка не трогается — там штатный сон.
+/// Режим «Не спать»: пока включён — система не засыпает (SetThreadExecutionState),
+/// а закрытие крышки НА ПИТАНИИ ОТ СЕТИ не уводит в сон (действие крышки AC →
+/// «ничего не делать» через Power Management API). На батарее крышка не трогается —
+/// там штатный сон. Экран дополнительно удерживается негаснущим — кроме случая, когда в
+/// config.json задан <see cref="AppConfig.OwlIgnoreDisplay"/> (дефолт false = прежнее
+/// поведение); с ним сова держит бодрой только систему, для удалённого доступа.
 /// Исходное действие крышки хранится в config.json (восстановление после сбоя).
 /// </summary>
 public static class AwakeMode
@@ -50,8 +52,12 @@ public static class AwakeMode
             }
             finally { LocalFree(pScheme); }
 
+            // ES_SYSTEM_REQUIRED — всегда, это и есть суть режима; экран отпускаем только по опции
+            uint flags = ES_CONTINUOUS | ES_SYSTEM_REQUIRED;
+            if (!cfg.OwlIgnoreDisplay) flags |= ES_DISPLAY_REQUIRED;
+
             // возвращает прежние флаги; 0 — вызов не принят (сон/экран не удержим)
-            if (SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED) == 0)
+            if (SetThreadExecutionState(flags) == 0)
             {
                 Log.Write("AwakeMode: SetThreadExecutionState не принял флаги");
                 return false;
