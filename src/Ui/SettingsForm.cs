@@ -1,5 +1,7 @@
-﻿using XiControl.Config;
+﻿using Microsoft.Win32;
+using XiControl.Config;
 using XiControl.Localization;
+using XiControl.SystemIntegration;
 using XiControl.Ui.Settings;
 
 namespace XiControl.Ui;
@@ -26,6 +28,10 @@ public sealed class SettingsForm : Form
     private readonly List<Panel?> _panes = [];
     private int _tab;
 
+    // смена разрешения/масштаба сыплется пачкой событий — гасим дребезг и пересобираем один раз
+    // (шов IAppTimer тут не нужен: окно юнит-тестами не покрывается)
+    private readonly UiTimer _rescale = new() { Interval = 250 };
+
     // MifsClient сюда сознательно не передаётся: окно железо не трогает — все «умные»
     // операции идут через колбэки SettingsActions в TrayApp/AppController.
     public SettingsForm(AppConfig cfg, SettingsActions act)
@@ -40,14 +46,31 @@ public sealed class SettingsForm : Form
         StartPosition = FormStartPosition.Manual; // позицию считаем сами в Popup (всегда центр)
         KeyPreview = true;
         DoubleBuffered = true;
-        Font = new Font("Segoe UI", 9f);
+        // масштабируем себя сами (Sc + ScaledFonts от DeviceDpi) — иначе WinForms домасштабирует
+        // поверх наших размеров, и геометрия разъедется вдвойне
+        AutoScaleMode = AutoScaleMode.None;
         try { Icon = Icon.ExtractAssociatedIcon(Environment.ProcessPath!); } catch { /* иконки нет — не критично */ }
 
         _ = Handle; // форсируем хэндл (нужен DeviceDpi)
         _ui = new SettingsToolkit(this, SettingsTheme.Load());
         ClientSize = new Size(_ui.Sc(824), _ui.Sc(700));
 
+        // разрешение могло смениться и без смены DPI (удалённый рабочий стол подгоняет его
+        // под клиента) — WM_DPICHANGED тогда не приходит, а пересобраться всё равно надо
+        _rescale.Tick += () => { _rescale.Stop(); if (Visible) Rescale(); };
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+
         BuildAll();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+            _rescale.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     /// <summary>
@@ -58,16 +81,48 @@ public sealed class SettingsForm : Form
     public void Popup()
     {
         BuildAll();
-        // высота — чтобы вкладки влезали без прокрутки, но не выше рабочей области экрана;
-        // окно каждый раз открывается по центру экрана с курсором
-        var wa = Screen.FromPoint(Cursor.Position).WorkingArea;
-        int h = Math.Min(_ui.Sc(700), wa.Height - _ui.Sc(80));
-        if (ClientSize.Height != h) ClientSize = new Size(_ui.Sc(824), h);
-        Location = new Point(wa.Left + (wa.Width - Width) / 2, wa.Top + (wa.Height - Height) / 2);
+        FitToScreen(Screen.FromPoint(Cursor.Position)); // открываемся по центру экрана с курсором
         Show();
         if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
         Activate();
         BringToFront();
+    }
+
+    /// <summary>Разместить окно по центру экрана: высота — чтобы вкладки влезали без прокрутки,
+    /// но не выше рабочей области (она меняется вместе с разрешением).</summary>
+    private void FitToScreen(Screen screen)
+    {
+        var wa = screen.WorkingArea;
+        var size = new Size(_ui.Sc(824), Math.Min(_ui.Sc(700), wa.Height - _ui.Sc(80)));
+        if (ClientSize != size) ClientSize = size;
+        Location = new Point(wa.Left + (wa.Width - Width) / 2, wa.Top + (wa.Height - Height) / 2);
+    }
+
+    /// <summary>Пересобрать окно под текущий DPI/разрешение. Sc() и шрифты у нас пиксельные и
+    /// снимаются в момент постройки: без пересборки текст остаётся в старом масштабе и расходится
+    /// с разметкой — заметнее всего на пояснениях, высота карточки под них считается один раз
+    /// по DescFont (SettingsToolkit.AddRow). Механика та же, что у смены темы: пересборка дешёвая.</summary>
+    private void Rescale()
+    {
+        BuildAll();
+        FitToScreen(Screen.FromControl(this));
+    }
+
+    /// <summary>Масштаб сменился или окно переехало на монитор с другим DPI — пересобрать
+    /// (для флайаутов это же делает FlyoutForm.OnDpiRescaled).</summary>
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        Rescale();
+    }
+
+    // Сменилось разрешение/раскладка мониторов. Событие приходит из системного потока и пачкой —
+    // маршалим в UI и гасим дребезг. Спрятанное окно не трогаем: его пересоберёт следующий Popup.
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        if (!IsHandleCreated || IsDisposed || !Visible) return;
+        try { BeginInvoke(new Action(() => { _rescale.Stop(); _rescale.Start(); })); }
+        catch (ObjectDisposedException) { /* окно закрылось, пока событие шло к нам */ }
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -138,6 +193,10 @@ public sealed class SettingsForm : Form
         foreach (var c in stale) c.Dispose();
         _panes.Clear();
         _factories.Clear();
+
+        // ambient-шрифт формы — тоже из ScaledFonts: контролы без явного Font наследуют его,
+        // а пунктовый шрифт при смене DPI разъезжается с нашими пиксельными
+        Font = _ui.NoteFont;
 
         _host = new Panel { Dock = DockStyle.Fill, BackColor = _ui.T.WinBg, Tag = "host" };
         Controls.Add(_host);
