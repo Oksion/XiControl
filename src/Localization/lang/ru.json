@@ -143,7 +143,7 @@
   "settings.api.cmd.mode": "Режимы производительности",
   "settings.api.cmd.mode.desc": "POST /mode — переключение режима.",
   "settings.api.cmd.care": "Защита заряда",
-  "settings.api.cmd.care.desc": "POST /care — «беречь ~80%» вкл/выкл.",
+  "settings.api.cmd.care.desc": "POST /care — лимит заряда вкл/выкл.",
   "settings.api.cmd.travel": "Режим «В дорогу»",
   "settings.api.cmd.travel.desc": "POST /travel — разовый заряд до 100%.",
   "settings.api.cmd.owl": "Режим совы",

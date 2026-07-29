@@ -143,7 +143,7 @@
   "settings.api.cmd.mode": "性能模式",
   "settings.api.cmd.mode.desc": "POST /mode — 切换性能模式。",
   "settings.api.cmd.care": "电池保护",
-  "settings.api.cmd.care.desc": "POST /care — 开关“保持约 80%”。",
+  "settings.api.cmd.care.desc": "POST /care — 开关充电限制。",
   "settings.api.cmd.travel": "出行模式",
   "settings.api.cmd.travel.desc": "POST /travel — 一次性充电至 100%。",
   "settings.api.cmd.owl": "猫头鹰模式",

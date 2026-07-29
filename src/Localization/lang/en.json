@@ -143,7 +143,7 @@
   "settings.api.cmd.mode": "Performance modes",
   "settings.api.cmd.mode.desc": "POST /mode — switch the mode.",
   "settings.api.cmd.care": "Battery protection",
-  "settings.api.cmd.care.desc": "POST /care — toggle “protect ~80%”.",
+  "settings.api.cmd.care.desc": "POST /care — toggle the charge limit.",
   "settings.api.cmd.travel": "Travel mode",
   "settings.api.cmd.travel.desc": "POST /travel — one-off charge to 100%.",
   "settings.api.cmd.owl": "Owl mode",
