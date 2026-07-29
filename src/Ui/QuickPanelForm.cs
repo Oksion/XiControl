@@ -61,6 +61,10 @@ public sealed class QuickPanelForm : FlyoutForm
     public Action? ToggleTouchpad;
     public Action? ToggleTouchscreen;
 
+    /// <summary>Перед показом: подтянуть порог заряда из прошивки в конфиг (его мог сменить кто-то
+    /// снаружи). Запись в конфиг — дело контроллера, панель только просит (XIC-17).</summary>
+    public Action? SyncCare;
+
     /// <summary>Кнопка-график слева от крестика: открыть окно «Монитор» (владелец — трей).</summary>
     public Action? MonitorRequested;
 
@@ -110,6 +114,10 @@ public sealed class QuickPanelForm : FlyoutForm
         // деградация с логом: панель откроется и без ответивших подсистем
         try { _mode = _mifs.GetPerfMode(); }
         catch (Exception ex) { Log.Ex("QuickPanel.Mode", ex); _mode = null; }
+        // порог заряда рисуем из конфига, но сперва приводим его к прошивке: иначе внешняя смена
+        // до панели не доходила вовсе, и подпись расходилась с поведением клика (XIC-17)
+        try { SyncCare?.Invoke(); }
+        catch (Exception ex) { Log.Ex("QuickPanel.SyncCare", ex); }
         try { _tpAvail = _cfg.TouchpadFeature && _tp.Available; _tpOn = _tp.IsEnabled() ?? false; }
         catch (Exception ex) { Log.Ex("QuickPanel.Touchpad", ex); _tpAvail = false; }
         try { _tsAvail = _cfg.TouchscreenFeature && _ts.Available; _tsOn = _ts.IsEnabled() ?? false; }

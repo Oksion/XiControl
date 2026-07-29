@@ -156,6 +156,78 @@ public sealed class AppControllerTests
         failed.Should().BeTrue();
     }
 
+    // ---- Примирение порога с прошивкой (XIC-17) ----
+
+    [Fact]
+    public void SyncCare_AdoptsExternalLimit_Silently()
+    {
+        _cfg.ChargeCare = true;
+        _mifs.ChargeLimit = 50;   // порог сменили снаружи (Xiaomi PC Manager)
+
+        _c.SyncCareFromFirmware().Should().BeTrue();
+
+        _cfg.CareLimitPercent.Should().Be(50, "источник истины — прошивка (docs/12)");
+        _cfg.ChargeCare.Should().BeTrue();
+        _events.Should().BeEmpty("подхват чужого значения — не действие пользователя: OSD не показываем");
+    }
+
+    [Fact]
+    public void SyncCare_ProtectionOffOutside_KeepsChosenPercent()
+    {
+        _cfg.ChargeCare = true;
+        _mifs.ChargeLimit = 100;   // снаружи защиту выключили
+
+        _c.SyncCareFromFirmware().Should().BeTrue();
+
+        _cfg.ChargeCare.Should().BeFalse();
+        _cfg.CareLimitPercent.Should().Be(80, "100% — это «выключено», а не порог: выбранный X храним");
+    }
+
+    [Fact]
+    public void SyncCare_FirmwareSilent_KeepsConfig()
+    {
+        _cfg.ChargeCare = true;
+        _mifs.ChargeLimit = null;   // прошивка не ответила
+
+        _c.SyncCareFromFirmware().Should().BeFalse();
+
+        _cfg.ChargeCare.Should().BeTrue("лучше показать своё значение, чем затереть его нулём");
+        _cfg.CareLimitPercent.Should().Be(80);
+    }
+
+    [Fact]
+    public void SyncCare_DuringTravel_DoesNothing()
+    {
+        _cfg.ChargeCare = true;
+        _cfg.TravelMode = true;
+        _mifs.ChargeLimit = 100;   // «в дорогу» и держит 100% — это наше состояние, не внешнее
+
+        _c.SyncCareFromFirmware().Should().BeFalse();
+
+        _cfg.ChargeCare.Should().BeTrue("иначе примирение сломало бы «в дорогу»");
+        _cfg.TravelMode.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SyncCare_UnknownPercent_KeepsChoice()
+    {
+        _cfg.ChargeCare = true;
+        _mifs.ChargeLimit = 90;   // такого уровня в наборе нет (docs/12)
+
+        _c.SyncCareFromFirmware().Should().BeFalse();
+
+        _cfg.CareLimitPercent.Should().Be(80, "неизвестный уровень в конфиг не принимаем");
+    }
+
+    [Fact]
+    public void SyncCare_AlreadyInSync_ReportsNoChange()
+    {
+        _cfg.ChargeCare = true;
+        _mifs.ChargeLimit = 80;   // ровно то, что в конфиге
+
+        _c.SyncCareFromFirmware().Should().BeFalse("без отличий не пишем конфиг на каждое открытие панели");
+    }
+
     [Fact]
     public void DisableTravel_IsSilentReset()
     {

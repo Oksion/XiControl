@@ -80,9 +80,11 @@ public sealed class TrayMenuBuilder : IDisposable
         Menu.ImageScalingSize = new Size(imgSz, imgSz);
 
         // --- Заряд ---
-        int lim = Safe(() => _mifs.GetChargeLimit(), _cfg.ChargeCare ? _cfg.CarePercent() : 100) ?? 100;
-        bool care = lim < 100;   // «беречь» включено, когда порог не 100%
-        var charge = new ToolStripMenuItem(Loc.T("menu.charge", _cfg.CarePercent())) { Checked = care };
+        // Порог приводим к прошивке (её мог сменить кто-то снаружи) и дальше рисуем из конфига: раньше
+        // галочка считалась от живого значения, а процент в подписи брался из конфига — меню могло
+        // показать «беречь 60%» с галочкой, когда в железе 50% (XIC-17).
+        _controller.SyncCareFromFirmware();
+        var charge = new ToolStripMenuItem(Loc.T("menu.charge", _cfg.CarePercent())) { Checked = _cfg.ChargeCare };
         // состояние читаем в момент клика: пока меню висело, его мог сменить ChargeGuard
         charge.Click += (_, _) => _controller.ToggleCharge();
         Menu.Items.Add(charge);
