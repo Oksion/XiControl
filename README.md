@@ -27,7 +27,7 @@ auto refresh rate and "owl mode" (stay awake).*
   <img src="docs/img/monitor.png" width="440" alt="Monitor window">
 </p>
 
-*Monitor window: live graphs of power draw (W), CPU and RAM usage.*
+*Monitor window: live graphs of power draw (W), CPU, GPU and RAM usage.*
 
 <p align="center">
   <img src="docs/img/monitor-mini.png" width="380" alt="Monitor — compact view">
@@ -35,10 +35,10 @@ auto refresh rate and "owl mode" (stay awake).*
   <img src="docs/img/monitor-watts.png" width="120" alt="Monitor — watts only">
 </p>
 
-*In full view — live graphs: power draw (W), CPU, RAM, **hotspot temperature**
-(hot zone in cherry red) and the connected adapter's wattage. Collapses into a compact line
-(Power / CPU / RAM) or a single watts readout — via the "view" button or a double-click;
-current direction is shown by color (charging green / discharging orange).*
+*In full view — live graphs: power draw (W), CPU, **GPU** (clock and watts under the percentage),
+RAM, **hotspot temperature** (hot zone in cherry red) and the connected adapter's wattage. Collapses
+into a compact line (Power / CPU / GPU / RAM) or a single watts readout — via the "view" button or a
+double-click; current direction is shown by color (charging green / discharging orange).*
 
 *The tray icon changes with the active mode:*
 
@@ -411,6 +411,10 @@ None of this runs or spends resources while the API is off (the server simply is
 - The feature set depends on the model: firmware telemetry (fan RPM) is unsupported on the tested
   machine. **Temperature** is shown anyway — not from the firmware, but via Intel DPTF
   (WMI `EsifDeviceInformation`), as a line graph in the Monitor.
+- **GPU usage** comes from Intel IGCL — the graphics driver's user-mode API (`ControlLib.dll` in
+  System32, installed with the Intel driver; no administrator rights needed). On machines without
+  Intel graphics the GPU row simply does not appear. This channel exposes no temperature or fan RPM
+  for integrated GPUs — only usage, power and clock.
 
 ## How it works
 
