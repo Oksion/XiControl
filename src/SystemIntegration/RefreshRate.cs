@@ -49,8 +49,7 @@ public static class RefreshRate
     public static void ApplyForPower(AppConfig cfg)
     {
         if (!cfg.RefreshRateFeature || !cfg.AutoRefreshRate) return; // фича убрана — экран не трогаем
-        bool online = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
-        int hz = online ? cfg.AcRefreshRate : cfg.BatteryRefreshRate;
+        int hz = PowerLine.IsOnline() ? cfg.AcRefreshRate : cfg.BatteryRefreshRate;
         Task.Run(() =>
         {
             if (!Apply(hz))

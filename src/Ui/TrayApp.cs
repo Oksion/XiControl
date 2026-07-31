@@ -16,6 +16,7 @@ public sealed class TrayApp : IDisposable
     private readonly AppConfig _cfg;
     private readonly OsdForm _osd = new();
     private readonly IKeyEventSource _events;
+    private readonly IPowerEvents _power;
     private readonly QuickPanelForm _panel;
     private bool _lastOnline;  // прошлое состояние питания (для OSD только на реальном переходе)
     private bool _locked;      // сессия заблокирована (Win+L): OSD не виден — обратная связь звуком/тостом (XIC-11)
@@ -48,13 +49,14 @@ public sealed class TrayApp : IDisposable
 
     // Конструктор только сохраняет зависимости и монтирует UI-каркас (меню, значок,
     // панель, подписки, колбэки контроллера). Стартовая бизнес-логика — в Start().
-    public TrayApp(IMifsClient mifs, AppConfig cfg, IKeyEventSource events,
+    public TrayApp(IMifsClient mifs, AppConfig cfg, IKeyEventSource events, IPowerEvents power,
         PowerProfileGuard powerGuard, TouchpadControl touchpad, TouchscreenControl touchscreen,
         TravelChargeMonitor travel, TrayIconController icon, AppController controller, ApiSettings api)
     {
         _mifs = mifs;
         _cfg = cfg;
         _events = events;
+        _power = power;
         _travel = travel;
         _icon = icon;
         _controller = controller;
@@ -96,10 +98,12 @@ public sealed class TrayApp : IDisposable
             if (_cfg.TravelSound) Sound.PlayTravelReady(_cfg.TravelSoundFile);
         };
 
-        // OSD на смену питания
+        // OSD на смену питания. Подписка через IPowerEvents (не SystemEvents напрямую):
+        // прод-реализация маршалит Resume/StatusChange в UI-поток — иначе Rearm «в дорогу»
+        // стартовал бы таймер с фонового потока SystemEvents, где тот не тикает
         _ = _osd.Handle; // форсируем создание хэндла для маршалинга событий в UI-поток
-        _lastOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
-        SystemEvents.PowerModeChanged += OnPower;
+        _lastOnline = PowerLine.IsOnline();
+        _power.PowerModeChanged += OnPower;
         SystemEvents.SessionSwitch += OnSessionSwitch; // блокировка/разблокировка — для «слепой» обратной связи
 
         // Панель по Mi-кнопке + слушатель клавиш прошивки. Панель — чистый view:
@@ -332,10 +336,12 @@ public sealed class TrayApp : IDisposable
         else if (e.Reason == SessionSwitchReason.SessionUnlock) _locked = false;
     }
 
-    private void OnPower(object? sender, PowerModeChangedEventArgs e)
+    // Resume/StatusChange приходят уже в UI-потоке (маршалит SystemPowerEvents);
+    // Suspend — синхронно с потока SystemEvents, но мы его отфильтровываем первой строкой.
+    private void OnPower(PowerModes mode)
     {
-        if (e.Mode is not (PowerModes.StatusChange or PowerModes.Resume)) return;
-        bool online = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+        if (mode is not (PowerModes.StatusChange or PowerModes.Resume)) return;
+        bool online = PowerLine.IsOnline();
         if (online == _lastOnline) return;   // только реальный переход AC↔батарея
         _lastOnline = online;
 
@@ -347,8 +353,7 @@ public sealed class TrayApp : IDisposable
             else _travel.Rearm(); // подключили при активном режиме — заново ждём 100%
         }
 
-        if (_osd.IsHandleCreated) _osd.BeginInvoke(() => ShowPowerOsd(online));
-        else ShowPowerOsd(online);
+        ShowPowerOsd(online);
     }
 
     private void ShowPowerOsd(bool online)
@@ -450,7 +455,7 @@ public sealed class TrayApp : IDisposable
         return new ApiStatus(
             mode?.ToString() ?? "unknown",
             _cfg.ChargeCare, _cfg.TravelMode, _cfg.Awake,
-            pct, ps.PowerLineStatus == PowerLineStatus.Online, watts,
+            pct, PowerLine.IsOnline(ps.PowerLineStatus), watts,
             BatteryReportCached().HealthPercent);
     }
 
@@ -533,7 +538,7 @@ public sealed class TrayApp : IDisposable
         _apiHost?.Dispose();    // остановить слушатель API (firewall-правило не трогаем — фича включена)
         _apiDraw?.Dispose();
 
-        SystemEvents.PowerModeChanged -= OnPower;
+        _power.PowerModeChanged -= OnPower;
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.UserPreferenceChanged -= OnUserPref;
         _mi.Dispose();

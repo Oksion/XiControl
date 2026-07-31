@@ -14,7 +14,10 @@ public interface IAppTimer : IDisposable
     void Stop();
 }
 
-/// <summary>Прод-реализация поверх System.Windows.Forms.Timer (тикает в UI-потоке).</summary>
+/// <summary>Прод-реализация поверх System.Windows.Forms.Timer (тикает в UI-потоке).
+/// Start — только с потока с насосом сообщений: WinForms-таймер, стартованный с фонового
+/// потока (напр. SystemEvents), не тикает никогда. Событийные источники это учитывают —
+/// SystemPowerEvents маршалит Resume/StatusChange, TrayApp — клавиши прошивки.</summary>
 public sealed class UiTimer : IAppTimer
 {
     private readonly System.Windows.Forms.Timer _t = new();
