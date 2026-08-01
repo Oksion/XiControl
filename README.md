@@ -314,7 +314,9 @@ on battery — lower (savings). Enabled from the tray menu item, a panel cell, o
 
 How it actually behaves (plain Win32 `ChangeDisplaySettings`, no driver needed):
 
-- **Primary display only**, resolution and color depth are untouched — only the rate changes.
+- **The laptop's built-in panel only**, resolution and color depth are untouched — only the rate
+  changes. External monitors are never touched, even when one of them is set as primary; if the
+  panel isn't currently active (lid closed, "second screen only") nothing changes at all.
 - **The nearest supported rate** at the current resolution is taken: you asked for 120, the panel
   can only do 90/60 → it picks 90 (ties go to the higher). So entering "144" on a 60 Hz matrix is
   safe — it just stays 60. A value ≤ 0 in config is ignored.

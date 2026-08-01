@@ -165,7 +165,9 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   (собирают себя в ctor).
 - `src/SystemIntegration/` — `ChargeGuard` (переустанавливает лимит заряда после сна/смены
   питания И перед уходом в сон/shutdown — EC теряет его на переходах), `RefreshRateGuard`/
-  `RefreshRate` (авто-герцовка, чистый `ChangeDisplaySettings`; с `HoldRefreshRate` гард слушает
+  `RefreshRate` (авто-герцовка, чистый `ChangeDisplaySettingsEx` по ВСТРОЕННОЙ панели — она ищется
+  через CCD `QueryDisplayConfig`, а не `null`, иначе правился бы основной экран (XIC-21);
+  с `HoldRefreshRate` гард слушает
   ещё и смену режима экрана — «удерживать частоту» после чужих изменений, только событие, без
   опроса), `PowerProfileGuard` (режим по питанию + независимое запоминание яркости),
   `TravelChargeMonitor` (ожидание 100%), `IPowerEvents`+`IDisplayEvents`/`SystemEventsSource`
