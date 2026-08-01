@@ -342,6 +342,26 @@ the system's display-mode-changed event only.
 > the rate via Windows settings — we restore it faster than Windows asks "Keep these settings?".
 > To change it by hand, turn the toggle off.
 
+### Bottom dead zone on the touchpad
+
+If the bottom edge of the pad keeps catching your palm or thumb, turn on **Settings → Touchpad →
+"Bottom dead zone"** and pick the strip height (8/10/12/15/20 mm, 12 by default). In `config.json`
+these are `TouchpadDeadZone` and `TouchpadDeadZoneMm`.
+
+It's important to know what the zone actually does: it suppresses the **start** of a touch. A
+finger first placed inside the strip doesn't move the cursor and doesn't tap — but a gesture
+started higher up keeps working all the way down, so scrolling and dragging aren't cut off.
+**Pressing inside the zone still clicks** — the strip doesn't become truly dead.
+
+Under the hood this is a stock Windows Precision Touchpad setting (`SuperCurtainBottom`), not
+input interception: a single machine-wide registry value, no drivers and no hooks. It applies
+right away — the app restarts the touchpad node itself, no need to sign out and back in (the pad
+disappears for a second). Turning the option off **removes** the value rather than writing a zero.
+
+> The zone lives inside Windows palm rejection. If **Settings → Bluetooth & devices → Touchpad**
+> is set to maximum sensitivity, palm rejection is off entirely — and so is our zone. XiControl
+> notices this and shows a warning right on the tab.
+
 ### Key remapping
 
 Each key gets its own action: **Settings → Keys**. The slots are the single and double Mi-button
