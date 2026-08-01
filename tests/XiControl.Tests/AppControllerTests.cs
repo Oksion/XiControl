@@ -26,7 +26,7 @@ public sealed class AppControllerTests
         Log.Enabled = false;
         _c = new AppController(_mifs, _cfg, _power, new Localizer(),
             new ChargeGuard(_mifs, _power, () => _cfg.ChargeCare ? _cfg.CarePercent() : 100, new FakeTimer()),
-            new RefreshRateGuard(_cfg, _power, new FakeTimer()),
+            new RefreshRateGuard(_cfg, _power, new FakeDisplayEvents(), new FakeTimer()),
             new PowerProfileGuard(_mifs, _cfg, _power, new FakeTimer()),
             new TravelChargeMonitor(_cfg, _power, new FakeTimer()),
             new TouchpadControl(_cfg), new TouchscreenControl(_cfg))

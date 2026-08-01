@@ -64,6 +64,8 @@
   "settings.display.sub": "根据电源自动切换刷新率。",
   "settings.hz.auto": "按电源自动刷新率",
   "settings.hz.auto.desc": "接通电源时更高，使用电池时更低，省电。",
+  "settings.hz.hold": "保持刷新率",
+  "settings.hz.hold.desc": "当 Windows 或其他程序更改刷新率时，恢复设定值。需要开启上面的选项。",
   "settings.hz.rates": "刷新率",
   "settings.hz.unit": "Hz",
   "settings.hz.ac": "接通电源",

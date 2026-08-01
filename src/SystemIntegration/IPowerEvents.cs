@@ -22,6 +22,17 @@ public interface IPowerEvents : IDisposable
 }
 
 /// <summary>
+/// Смена режима экрана: разрешение, частота, подключение/отключение монитора, пробуждение панели
+/// (семантика SystemEvents.DisplaySettingsChanged). Отдельный шов, а не поле в
+/// <see cref="IPowerEvents"/>: событие не про питание и потребитель у него свой. Реализация общая —
+/// <see cref="SystemEventsSource"/>, одно скрытое окно на оба источника.
+/// </summary>
+public interface IDisplayEvents
+{
+    event Action? DisplaySettingsChanged;
+}
+
+/// <summary>
 /// Единая трактовка «сеть или батарея». GetSystemPowerStatus законно отдаёт Unknown (255) —
 /// чаще всего сразу после resume, то есть ровно тогда, когда просыпаются guard-ы. Батареей
 /// считаем ТОЛЬКО явный Offline: принять Unknown за батарею — значит зря включить троттлинг
@@ -36,79 +47,102 @@ public static class PowerLine
 }
 
 /// <summary>
-/// Прод-реализация поверх статических событий WinForms.
-/// SystemEvents доставляет события с фонового MTA-потока без насоса сообщений — WinForms-таймер
+/// Прод-реализация поверх статических событий WinForms — один источник и для питания, и для экрана.
+/// SystemEvents доставляет события с фонового MTA-потока без насоса сообщений, а WinForms-таймер
 /// (дебаунс guard-ов), стартованный оттуда, не тикает никогда (проверено вживую: OSD питания
-/// показывался, а частота экрана не менялась). Поэтому Resume/StatusChange маршалятся скрытым
-/// окном в поток-создатель (главный: DI собирается в Program.Main) — тот же паттерн, что
-/// «все события — в UI-поток» у клавиш прошивки в TrayApp. Suspend и SessionEnding идут
-/// синхронно с потока события: после них насос может не успеть, а ре-арм EC (ChargeGuard)
+/// показывался, а частота экрана не менялась). Поэтому Resume/StatusChange и DisplaySettingsChanged
+/// маршалятся скрытым окном в поток-создатель (главный: DI собирается в Program.Main) — тот же
+/// паттерн, что «все события — в UI-поток» у клавиш прошивки в TrayApp. Suspend и SessionEnding
+/// идут синхронно с потока события: после них насос может не успеть, а ре-арм EC (ChargeGuard)
 /// должен случиться немедленно.
+///
+/// Оба шва (<see cref="IPowerEvents"/>, <see cref="IDisplayEvents"/>) — на одном экземпляре:
+/// окно-маршалер нужно ровно одно, а интерфейсы остаются узкими.
 /// </summary>
-public sealed class SystemPowerEvents : IPowerEvents
+public sealed class SystemEventsSource : IPowerEvents, IDisplayEvents
 {
     public event Action<PowerModes>? PowerModeChanged;
     public event Action? SessionEnding;
+    public event Action? DisplaySettingsChanged;
 
     private readonly MarshalWindow _window;
+    private bool _disposed;   // в DI экземпляр отдаётся под двумя интерфейсами — Dispose может прийти не раз
 
     public bool IsOnline => PowerLine.IsOnline();
 
     public float BatteryLifePercent => SystemInformation.PowerStatus.BatteryLifePercent;
 
-    public SystemPowerEvents()
+    public SystemEventsSource()
     {
-        _window = new MarshalWindow(m => PowerModeChanged?.Invoke(m));
+        _window = new MarshalWindow(m => PowerModeChanged?.Invoke(m), () => DisplaySettingsChanged?.Invoke());
         SystemEvents.PowerModeChanged += OnPower;
         SystemEvents.SessionEnding += OnSession;
+        SystemEvents.DisplaySettingsChanged += OnDisplay;
     }
 
     private void OnPower(object? s, PowerModeChangedEventArgs e)
     {
         if (e.Mode == PowerModes.Suspend) PowerModeChanged?.Invoke(e.Mode); // сейчас или никогда
-        else _window.Post(e.Mode);
+        else _window.PostPower(e.Mode);
     }
 
     private void OnSession(object? s, SessionEndingEventArgs e) => SessionEnding?.Invoke();
 
+    private void OnDisplay(object? s, EventArgs e) => _window.PostDisplay();
+
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         SystemEvents.PowerModeChanged -= OnPower;
         SystemEvents.SessionEnding -= OnSession;
+        SystemEvents.DisplaySettingsChanged -= OnDisplay;
         _window.DestroyHandle(); // диспоуз на главном потоке (провайдер) — окну это и нужно
     }
 
     // Скрытое окно-маршалер: Post с любого потока → доставка в WndProc потока-создателя.
     private sealed class MarshalWindow : NativeWindow
     {
-        private const int WmDeliver = 0x8000; // WM_APP
+        private const int WmPower = 0x8000;    // WM_APP
+        private const int WmDisplay = 0x8001;  // WM_APP + 1
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool PostMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
-        private readonly Action<PowerModes> _deliver;
+        private readonly Action<PowerModes> _power;
+        private readonly Action _display;
         private readonly System.Collections.Concurrent.ConcurrentQueue<PowerModes> _queue = new();
 
-        public MarshalWindow(Action<PowerModes> deliver)
+        public MarshalWindow(Action<PowerModes> power, Action display)
         {
-            _deliver = deliver;
+            _power = power;
+            _display = display;
             CreateHandle(new CreateParams());
         }
 
-        public void Post(PowerModes mode)
+        public void PostPower(PowerModes mode)
         {
             _queue.Enqueue(mode);
-            PostMessageW(Handle, WmDeliver, IntPtr.Zero, IntPtr.Zero);
+            PostMessageW(Handle, WmPower, IntPtr.Zero, IntPtr.Zero);
         }
+
+        // payload нет — само событие и есть сигнал «режим экрана изменился»
+        public void PostDisplay() => PostMessageW(Handle, WmDisplay, IntPtr.Zero, IntPtr.Zero);
 
         protected override void WndProc(ref Message m)
         {
-            if (m.Msg == WmDeliver)
+            switch (m.Msg)
             {
-                while (_queue.TryDequeue(out var mode)) _deliver(mode);
-                return;
+                case WmPower:
+                    while (_queue.TryDequeue(out var mode)) _power(mode);
+                    return;
+                case WmDisplay:
+                    _display();
+                    return;
+                default:
+                    base.WndProc(ref m);
+                    return;
             }
-            base.WndProc(ref m);
         }
 
         public new void DestroyHandle() => base.DestroyHandle();

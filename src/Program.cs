@@ -28,7 +28,11 @@ internal static class Program
         services.AddSingleton<ILocalizer, Localizer>();
         services.AddSingleton<IMifsClient, MifsClient>();
         services.AddSingleton<IKeyEventSource, MifsEventWatcher>();
-        services.AddSingleton<IPowerEvents, SystemPowerEvents>();
+        // один источник системных событий под двумя узкими швами (питание + экран):
+        // окно-маршалер внутри нужно ровно одно
+        services.AddSingleton<SystemEventsSource>();
+        services.AddSingleton<IPowerEvents>(sp => sp.GetRequiredService<SystemEventsSource>());
+        services.AddSingleton<IDisplayEvents>(sp => sp.GetRequiredService<SystemEventsSource>());
         services.AddSingleton<TouchpadControl>();
         services.AddSingleton<TouchscreenControl>();
         // «В дорогу» временно снимает защиту (заряд до 100%) — гард бережёт 80% только когда travel выключен

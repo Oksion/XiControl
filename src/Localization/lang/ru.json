@@ -64,6 +64,8 @@
   "settings.display.sub": "Частота обновления в зависимости от питания.",
   "settings.hz.auto": "Авто-частота по питанию",
   "settings.hz.auto.desc": "Повышенная от сети, пониженная от батареи — экономит заряд.",
+  "settings.hz.hold": "Удерживать частоту",
+  "settings.hz.hold.desc": "Возвращать заданную, если её сменила Windows или другая программа. Нужен включённый пункт выше.",
   "settings.hz.rates": "Частоты",
   "settings.hz.unit": "Гц",
   "settings.hz.ac": "От сети",

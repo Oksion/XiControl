@@ -336,7 +336,7 @@ public sealed class TrayApp : IDisposable
         else if (e.Reason == SessionSwitchReason.SessionUnlock) _locked = false;
     }
 
-    // Resume/StatusChange приходят уже в UI-потоке (маршалит SystemPowerEvents);
+    // Resume/StatusChange приходят уже в UI-потоке (маршалит SystemEventsSource);
     // Suspend — синхронно с потока SystemEvents, но мы его отфильтровываем первой строкой.
     private void OnPower(PowerModes mode)
     {
@@ -497,6 +497,7 @@ public sealed class TrayApp : IDisposable
                 SetRememberBrightness = _controller.SetRememberBrightness,
                 SetAutoHz = _controller.ToggleAutoHz,
                 SetRefreshRateFeature = _controller.ToggleRefreshRateFeature,
+                SetHoldRefreshRate = _controller.SetHoldRefreshRate,
                 SetRefreshRates = _controller.SetRefreshRates,
                 SetOwlFeature = _controller.ToggleOwlFeature,
                 SetCareLimit = _controller.SetCareLimit,
