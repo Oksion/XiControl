@@ -207,7 +207,9 @@ if (args.Length > 0 && args[0] == "user")
     }
 
     int uCols = 4, uTileW = 190, uTileH = 140;
-    int uRows = (osdFiles.Length + uCols - 1) / uCols + 1; // +1 ряд под трей
+    // трейных иконок давно больше четырёх — им нужен не один ряд, а столько же колонок, что и OSD
+    int uOsdRows = (osdFiles.Length + uCols - 1) / uCols;
+    int uRows = uOsdRows + (trayFiles.Length + uCols - 1) / uCols;
     using var sheet = new Bitmap(uCols * uTileW, uRows * uTileH);
     using (var g = Graphics.FromImage(sheet))
     {
@@ -226,10 +228,9 @@ if (args.Length > 0 && args[0] == "user")
             g.DrawString(Path.GetFileNameWithoutExtension(osdFiles[i]), f, br, cx + 10, cy + uTileH - 24);
         }
         // трей: белым на тёмном, размеры 16/24/40
-        int ty = ((osdFiles.Length + uCols - 1) / uCols) * uTileH;
         for (int i = 0; i < trayFiles.Length; i++)
         {
-            int cx = i * uTileW;
+            int cx = (i % uCols) * uTileW, ty = (uOsdRows + i / uCols) * uTileH;
             g.DrawRectangle(pen, cx, ty, uTileW, uTileH);
             var trayColor = Color.FromArgb(240, 240, 240);
             using (var i40 = RenderSvg(trayFiles[i], 40, trayColor)) g.DrawImage(i40, cx + 14, ty + 20);
