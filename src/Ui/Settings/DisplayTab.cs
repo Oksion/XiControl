@@ -6,13 +6,15 @@ namespace XiControl.Ui.Settings;
 /// <summary>Вкладка «Экран»: авто-герцовка и частоты для сети/батареи.</summary>
 public sealed class DisplayTab : SettingsPane
 {
-    public DisplayTab(SettingsToolkit ui, AppConfig cfg, SettingsActions act) : base(ui)
+    public DisplayTab(SettingsToolkit ui, AppConfig cfg, SettingsActions act, Action rebuild) : base(ui)
     {
         ui.AddHeader(this, "settings.tab.display", "settings.display.sub");
+        // мастер-тумблер: rebuild гасит/зажигает «удерживать» — без авто-частоты возвращать нечего
         ui.AddRow(this, "settings.hz.auto", "settings.hz.auto.desc",
-            ui.Toggle(cfg.AutoRefreshRate, act.SetAutoHz));
-        ui.AddRow(this, "settings.hz.hold", "settings.hz.hold.desc",
-            ui.Toggle(cfg.HoldRefreshRate, act.SetHoldRefreshRate));
+            ui.Toggle(cfg.AutoRefreshRate, on => { act.SetAutoHz(on); rebuild(); }));
+        var hold = ui.Toggle(cfg.HoldRefreshRate, act.SetHoldRefreshRate);
+        hold.Enabled = cfg.AutoRefreshRate;
+        ui.AddRow(this, "settings.hz.hold", "settings.hz.hold.desc", hold);
         ui.AddGroup(this, "settings.hz.rates");
         ui.AddRow(this, "settings.hz.ac", "settings.hz.ac.desc",
             HzCombo(cfg.AcRefreshRate, hz => act.SetRefreshRates(hz, cfg.BatteryRefreshRate)));
