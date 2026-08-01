@@ -97,6 +97,34 @@ Get-Event -SourceIdentifier mifs | ForEach-Object { $_.SourceEventArgs.NewEvent.
 
 ---
 
+## Вопрос 8. Мёртвая зона тачпада: можно ли подавить в ней НАЖАТИЕ? ✅ ЗАКРЫТ (нельзя)
+
+**Итог (2026-08-01, XIC-24): зонально подавить нажатие driver-free невозможно.** Само подавление
+касания — можно и сделано (`SuperCurtainBottom`, см. [ROADMAP](../ROADMAP.md) → Сделано), а вот кнопка:
+
+1. **В PTP нет ни одного зонального параметра для кнопки.** Полный список тюнинга —
+   `Curtain*`/`SuperCurtain*`/`SpaceBarOffset`/`HorizontalOffset`/`AAPNonCurtain*`/`AAPDisabled`/
+   `RightClickZone*`. Документация Microsoft описывает curtain-зоны как подавляющие «taps and mouse
+   moves»; состояние кнопки туда не входит. Эксперимент на TM2424 совпал: в зоне не начинается
+   касание, но продавливание проходит.
+2. **Единственная штатная ручка про клик — глобальная.** `ClickForceSensitivity` (HKCU, Win11 26027+)
+   = HID feature «Button Press Threshold» (`0x0D/0xB0`), то есть сила нажатия целиком по панели,
+   без понятия зон.
+3. **И её наше железо не поддерживает.** Опрос дескриптора (`HidP_GetValueCaps`, только чтение):
+   у PTP-коллекции `COL02` feature-репорты — `0x0D/0x59` (Pad Type), `0x0D/0x55` (Contact Count Max)
+   и вендорский `0xFF00/0xC5` (report 6). Ни `0x0D/0xB0`, ни коллекции Haptics (`0x0E`) нет вовсе:
+   пэд **не haptic** в понимании Windows, а лежащие в HKCU `FeedbackEnabled`/`FeedbackIntensity`/
+   `ClickForceSensitivity` до железа не доходят.
+
+Незакрытая ниточка на будущее: вендорский канал Bitland — feature `0xFF00/0xC5` в самой PTP-коллекции
+плюс коллекции `COL04` (`0xFF00`) / `COL05` (`0xFF01`), по 33 байта in/out. Без документации писать
+туда наугад нельзя (правило В6, как с неизвестными MIFS-командами) — только отдельной RE-задачей.
+
+Источники: [Precision touchpad tuning](https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-tuning-guidelines),
+[Input Device Haptics Implementation Guide](https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/input-haptics-implementation-guide).
+
+---
+
 ## Вопрос 7. TDP / Power Limit (PL1/PL2) — можно ли задать ватты? ✅ ЗАКРЫТ (нельзя)
 
 **Итог (2026-07-13): driver-free ползунок TDP в ваттах на TM2424 невозможен.** Три схождения:
