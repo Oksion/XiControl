@@ -499,6 +499,8 @@ public sealed class TrayApp : IDisposable
                 SetRefreshRateFeature = _controller.ToggleRefreshRateFeature,
                 SetHoldRefreshRate = _controller.SetHoldRefreshRate,
                 SetRefreshRates = _controller.SetRefreshRates,
+                SetTouchpadDeadZone = _controller.SetTouchpadDeadZone,
+                SetTouchpadDeadZoneMm = _controller.SetTouchpadDeadZoneMm,
                 SetOwlFeature = _controller.ToggleOwlFeature,
                 SetCareLimit = _controller.SetCareLimit,
                 GetBatteryReport = BatteryReportCached,

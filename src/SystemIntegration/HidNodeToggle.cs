@@ -76,6 +76,20 @@ public abstract class HidNodeToggle
     }
 
     /// <summary>
+    /// Перезапустить узел — как «Отключить/включить» в Диспетчере устройств (DICS_PROPCHANGE).
+    /// Нужно, чтобы драйвер перечитал настройки из реестра: иначе изменения подхватываются
+    /// только перезаходом в сеанс. Устройство при этом на секунду пропадает и возвращается.
+    /// true — узел снова включён.
+    /// </summary>
+    public bool Restart()
+    {
+        if (Find() is null) return false; // заодно подтянет DeviceId живым поиском
+        if (DeviceId is not string id || IsBusOrController(id)) return false;
+        if (!SetupDiChangeState(id, DICS_PROPCHANGE)) return false;
+        return WaitState(enabled: true);
+    }
+
+    /// <summary>
     /// Страховка на старте приложения: если в прошлый раз пришлось отключать персистентно,
     /// после перезагрузки включаем устройство сами (мягкое отключение возвращается без нас).
     /// </summary>
@@ -266,7 +280,7 @@ public abstract class HidNodeToggle
 
     // ---- Путь Диспетчера устройств: DIF_PROPERTYCHANGE / DICS_* (персистентный) ----
 
-    private const uint DICS_ENABLE = 1, DICS_DISABLE = 2, DICS_FLAG_GLOBAL = 1;
+    private const uint DICS_ENABLE = 1, DICS_DISABLE = 2, DICS_PROPCHANGE = 3, DICS_FLAG_GLOBAL = 1;
     private const uint DIF_PROPERTYCHANGE = 0x12;
 
     private bool SetupDiChangeState(string instanceId, uint stateChange)
