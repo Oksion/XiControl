@@ -57,6 +57,14 @@ internal sealed class FakePowerEvents : IPowerEvents
     public void Dispose() { }
 }
 
+/// <summary>Фейк событий экрана: RaiseDisplayChanged() поднимает событие вручную.</summary>
+internal sealed class FakeDisplayEvents : IDisplayEvents
+{
+    public event Action? DisplaySettingsChanged;
+
+    public void RaiseDisplayChanged() => DisplaySettingsChanged?.Invoke();
+}
+
 /// <summary>Фейк таймера: Fire() тикает вручную (только если запущен — как настоящий).</summary>
 internal sealed class FakeTimer : IAppTimer
 {

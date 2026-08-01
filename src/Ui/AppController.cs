@@ -430,6 +430,18 @@ public sealed class AppController
         RefreshRateFeatureChanged?.Invoke(); // перестроить панель/меню (ячейка герцовки уходит/появляется)
     }
 
+    /// <summary>
+    /// «Удерживать частоту»: возвращать заданную, если режим экрана сменили извне.
+    /// Включение сразу подтягивает текущее состояние — экран мог уже уехать до того,
+    /// как пользователь дошёл до тумблера.
+    /// </summary>
+    public void SetHoldRefreshRate(bool on)
+    {
+        _cfg.HoldRefreshRate = on;
+        _cfg.Save();
+        if (on) _hz.Reapply();
+    }
+
     /// <summary>Частоты из окна настроек: сохранить и, если режим включён, применить сейчас.</summary>
     public void SetRefreshRates(int ac, int batt)
     {

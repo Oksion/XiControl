@@ -148,6 +148,14 @@ public sealed class AppConfig
     /// </summary>
     public bool AutoRefreshRate { get; set; } = false;
 
+    /// <summary>
+    /// Удерживать частоту: возвращать заданную, если режим экрана сменил кто-то извне
+    /// (параметры Windows, чужая утилита, драйвер после сброса). Работает поверх
+    /// <see cref="AutoRefreshRate"/> — без него возвращать нечего. По умолчанию выключено:
+    /// это реакция на чужие действия, включать её за пользователя не станем.
+    /// </summary>
+    public bool HoldRefreshRate { get; set; } = false;
+
     /// <summary>Частота экрана (Гц) от сети. Настраивается только правкой config.json.</summary>
     public int AcRefreshRate { get; set; } = 120;
 

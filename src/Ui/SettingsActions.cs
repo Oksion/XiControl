@@ -29,6 +29,7 @@ public sealed class SettingsActions
     public required Action<bool, PerfMode?> SetProfileMode;  // ac, mode
     public required Action<bool> SetRememberBrightness;
     public required Action<bool> SetAutoHz;
+    public required Action<bool> SetHoldRefreshRate;         // возвращать частоту после чужих изменений
     public required Action<bool> SetRefreshRateFeature;      // «управление частотой» как фича вкл/выкл
     public required Action<int, int> SetRefreshRates;        // ac, batt
     public required Action<bool> SetOwlFeature;

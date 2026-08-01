@@ -64,6 +64,8 @@
   "settings.display.sub": "Refresh rate depending on the power source.",
   "settings.hz.auto": "Auto refresh rate by power",
   "settings.hz.auto.desc": "Higher on AC, lower on battery — saves power.",
+  "settings.hz.hold": "Keep refresh rate",
+  "settings.hz.hold.desc": "Restore the configured rate if Windows or another app changes it. Requires the option above.",
   "settings.hz.rates": "Rates",
   "settings.hz.unit": "Hz",
   "settings.hz.ac": "On AC",
