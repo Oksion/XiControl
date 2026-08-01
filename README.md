@@ -307,6 +307,7 @@ on battery — lower (savings). Enabled from the tray menu item, a panel cell, o
 
 ```json
 "AutoRefreshRate": true,
+"HoldRefreshRate": false,
 "AcRefreshRate": 120,
 "BatteryRefreshRate": 60
 ```
@@ -328,6 +329,18 @@ How it actually behaves (plain Win32 `ChangeDisplaySettings`, no driver needed):
 
 When editing `AcRefreshRate`/`BatteryRefreshRate` directly in the config, restart the app
 (a choice in the settings window applies immediately; a non-standard value from the config is shown too).
+
+**"Keep refresh rate"** (`HoldRefreshRate`, off by default) — a separate toggle in the same
+**Settings → Display**. With it, auto refresh rate watches the screen itself, not just the power
+source: if the mode is changed by someone else — Windows settings, another utility, the driver after
+a reset — the configured rate is restored through the same ~1.5 s debounce. Without it the setting
+quietly stops holding until the next power event. It works on top of auto refresh rate (with it off
+there is nothing to restore), so the toggle is greyed out while auto rate is disabled. No polling:
+the system's display-mode-changed event only.
+
+> An expected side effect, and the point of the feature: while the option is on, you can't change
+> the rate via Windows settings — we restore it faster than Windows asks "Keep these settings?".
+> To change it by hand, turn the toggle off.
 
 ### Key remapping
 
