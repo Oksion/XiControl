@@ -116,9 +116,12 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
 (`Microsoft.Extensions.DependencyInjection`, все синглтоны; провайдер владеет Dispose в обратном
 порядке создания — компоненты инжектированное не диспоузят) → `TrayApp.Start()` → `Application.Run()`.
 
-Швы-интерфейсы (`IMifsClient`, `IConfigStore`, `IKeyEventSource`, `IPowerEvents`, `IAppTimer`,
-`ILocalizer`) существуют ради тестов на фейках и задела под другие модели; `IAppTimer` в DI
-**не регистрируется** — каждому потребителю свой экземпляр (опциональный ctor-параметр).
+Швы-интерфейсы (`IMifsClient`, `IConfigStore`, `IKeyEventSource`, `IPowerEvents`, `IDisplayEvents`,
+`IAppTimer`, `ILocalizer`) существуют ради тестов на фейках и задела под другие модели; `IAppTimer`
+в DI **не регистрируется** — каждому потребителю свой экземпляр (опциональный ctor-параметр).
+`IPowerEvents` и `IDisplayEvents` — два узких шва на одной реализации `SystemEventsSource`: в DI
+это один синглтон под двумя интерфейсами (окно-маршалер внутри нужно ровно одно), поэтому его
+`Dispose` идемпотентен — провайдер видит экземпляр дважды.
 
 - `src/Wmi/` — протокол MIFS. `Mifs.cs` — все константы: метод `MiInterface` принимает
   32-байтовый буфер (`[1]` = GET `0xFA` / SET `0xFB`, `[3]` = команда, `[4]/[6]` = аргументы),
@@ -161,9 +164,11 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   (собирают себя в ctor).
 - `src/SystemIntegration/` — `ChargeGuard` (переустанавливает лимит заряда после сна/смены
   питания И перед уходом в сон/shutdown — EC теряет его на переходах), `RefreshRateGuard`/
-  `RefreshRate` (авто-герцовка, чистый `ChangeDisplaySettings`), `PowerProfileGuard` (режим
-  по питанию + независимое запоминание яркости), `TravelChargeMonitor` (ожидание 100%),
-  `IPowerEvents`/`SystemPowerEvents` (события питания за швом), `IAppTimer`/`UiTimer`,
+  `RefreshRate` (авто-герцовка, чистый `ChangeDisplaySettings`; с `HoldRefreshRate` гард слушает
+  ещё и смену режима экрана — «удерживать частоту» после чужих изменений, только событие, без
+  опроса), `PowerProfileGuard` (режим по питанию + независимое запоминание яркости),
+  `TravelChargeMonitor` (ожидание 100%), `IPowerEvents`+`IDisplayEvents`/`SystemEventsSource`
+  (события питания и экрана за швами, одно скрытое окно-маршалер), `IAppTimer`/`UiTimer`,
   `Brightness` (WMI ACPI-подсветка), `TouchpadControl`/`TouchscreenControl` (вкл/выкл через
   SetupAPI/CfgMgr32 — отключается родительский узел I2C HID, без PERSIST; общая механика в
   базовом `HidNodeToggle`, разница лишь в HID-коллекции: тачпад U:0005, экран U:0004),

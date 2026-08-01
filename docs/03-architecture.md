@@ -120,7 +120,7 @@ xi_control/
  │   ├─ Ui/Settings/        — SettingsToolkit (фабрика виджетов), SettingsTheme, NavStrip,
  │   │                         вкладки-контролы General/Features/Battery/Display/Perf/Keys/Api/AboutTab
  │   ├─ SystemIntegration/  — ChargeGuard, RefreshRate(+Guard), PowerProfileGuard,
- │   │                         TravelChargeMonitor, IPowerEvents/SystemPowerEvents,
+ │   │                         TravelChargeMonitor, IPowerEvents+IDisplayEvents/SystemEventsSource,
  │   │                         IAppTimer/UiTimer, Brightness, TouchpadControl/TouchscreenControl
  │   │                         (общий HidNodeToggle), AwakeMode, MicControl, KeyActions,
  │   │                         AutoStart, Sound, BatteryInfo, PowerDraw,
