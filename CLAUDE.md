@@ -159,7 +159,8 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   тумблеры, комбо; раздаёт `AccessibleName`), `SettingsTheme` (палитра под системную тему),
   `NavStrip` (левая навигация, доступна с клавиатуры), вкладки-контролы `GeneralTab` /
   `FeaturesTab` (доступность фич: сова/тачпад/тачскрин/`RefreshRateFeature`) / `BatteryTab` /
-  `DisplayTab` (скрыта, если `RefreshRateFeature=false`) / `PerfTab` / `KeysTab` /
+  `DisplayTab` (скрыта, если `RefreshRateFeature=false`) / `TouchpadTab` (поведение панели:
+  мёртвая зона снизу — в отличие от «Функций», где только видимость) / `PerfTab` / `KeysTab` /
   `ApiTab` (HTTP API: тумблеры, порт, токен, пер-командные разрешения) / `AboutTab`
   (собирают себя в ctor).
 - `src/SystemIntegration/` — `ChargeGuard` (переустанавливает лимит заряда после сна/смены
@@ -171,7 +172,11 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   (события питания и экрана за швами, одно скрытое окно-маршалер), `IAppTimer`/`UiTimer`,
   `Brightness` (WMI ACPI-подсветка), `TouchpadControl`/`TouchscreenControl` (вкл/выкл через
   SetupAPI/CfgMgr32 — отключается родительский узел I2C HID, без PERSIST; общая механика в
-  базовом `HidNodeToggle`, разница лишь в HID-коллекции: тачпад U:0005, экран U:0004),
+  базовом `HidNodeToggle`, разница лишь в HID-коллекции: тачпад U:0005, экран U:0004;
+  `HidNodeToggle.Restart` — перезапуск узла, чтобы драйвер перечитал настройки без перезахода
+  в сеанс), `TouchpadDeadZone` (мёртвая зона у нижнего края: штатная curtain-зона PTP
+  `SuperCurtainBottom` в HKLM, himetric = мм × 100; гасит НАЧАЛО касания, нажатие в зоне
+  проходит — XIC-24),
   `AutoStart` (задача планировщика + самопочинка пути), `AwakeMode` («режим совы»: всегда
   `ES_SYSTEM_REQUIRED` + крышка на AC, экран держится `ES_DISPLAY_REQUIRED` — кроме
   `OwlIgnoreDisplay: true` в config.json, тогда только «не спать»),
