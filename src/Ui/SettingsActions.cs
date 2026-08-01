@@ -32,6 +32,8 @@ public sealed class SettingsActions
     public required Action<bool> SetHoldRefreshRate;         // возвращать частоту после чужих изменений
     public required Action<bool> SetRefreshRateFeature;      // «управление частотой» как фича вкл/выкл
     public required Action<int, int> SetRefreshRates;        // ac, batt
+    public required Action<bool> SetTouchpadDeadZone;        // мёртвая зона у нижнего края тачпада
+    public required Action<int> SetTouchpadDeadZoneMm;       // её высота в мм
     public required Action<bool> SetOwlFeature;
     public required Action<int> SetCareLimit;                // порог «беречь батарею», % (применить на железе)
     public required Func<SystemIntegration.BatteryReport> GetBatteryReport; // здоровье батареи (WMI + SOH1)

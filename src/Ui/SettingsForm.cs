@@ -226,6 +226,7 @@ public sealed class SettingsForm : Form
         AddTab("settings.tab.battery", NavGlyph.Battery, () => new BatteryTab(_ui, _cfg, _act));
         if (_cfg.RefreshRateFeature)
             AddTab("settings.tab.display", NavGlyph.Display, () => new DisplayTab(_ui, _cfg, _act, rebuild));
+        AddTab("settings.tab.touchpad", NavGlyph.Touchpad, () => new TouchpadTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.perf", NavGlyph.Perf, () => new PerfTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.keys", NavGlyph.Keys, () => new KeysTab(_ui, _cfg, rebuild));
         AddTab("settings.tab.api", NavGlyph.Api, () => new ApiTab(_ui, _cfg, _act, rebuild));

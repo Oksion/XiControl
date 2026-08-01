@@ -23,6 +23,7 @@ public sealed class AppController
     private readonly TravelChargeMonitor _travel;
     private readonly TouchpadControl _touchpad;
     private readonly TouchscreenControl _touchscreen;
+    private readonly TouchpadDeadZone _deadZone;
 
     private PerfMode[] _modes = [];
     private bool _autoStart;   // кэш состояния автозапуска (не дёргаем schtasks на каждое меню)
@@ -52,7 +53,8 @@ public sealed class AppController
 
     public AppController(IMifsClient mifs, AppConfig cfg, IPowerEvents power, ILocalizer loc,
         ChargeGuard charge, RefreshRateGuard hz, PowerProfileGuard profiles,
-        TravelChargeMonitor travel, TouchpadControl touchpad, TouchscreenControl touchscreen)
+        TravelChargeMonitor travel, TouchpadControl touchpad, TouchscreenControl touchscreen,
+        TouchpadDeadZone deadZone)
     {
         _mifs = mifs;
         _cfg = cfg;
@@ -64,6 +66,7 @@ public sealed class AppController
         _travel = travel;
         _touchpad = touchpad;
         _touchscreen = touchscreen;
+        _deadZone = deadZone;
         ApplyModeVisibility();
     }
 
@@ -523,6 +526,27 @@ public sealed class AppController
         bool? on = Safe<bool?>(() => _touchscreen.Toggle(), null);
         if (on is bool b) TouchscreenToggled?.Invoke(b);
     });
+
+    /// <summary>
+    /// Мёртвая зона у нижнего края тачпада вкл/выкл. Реестр правим только отсюда — то есть
+    /// только по явному переключению пользователем; перезапуск узла тачпада (сотни мс, панель
+    /// на секунду пропадает) — в фоне, чтобы не морозить окно настроек.
+    /// </summary>
+    public void SetTouchpadDeadZone(bool on)
+    {
+        _cfg.TouchpadDeadZone = on;
+        _cfg.Save();
+        Task.Run(() => Safe(_deadZone.Apply, false));
+    }
+
+    /// <summary>Высота мёртвой зоны (мм). Применяем сразу, но только если зона включена —
+    /// иначе выбор высоты «про запас» молча включил бы её.</summary>
+    public void SetTouchpadDeadZoneMm(int mm)
+    {
+        _cfg.TouchpadDeadZoneMm = mm;
+        _cfg.Save();
+        if (_cfg.TouchpadDeadZone) Task.Run(() => Safe(_deadZone.Apply, false));
+    }
 
     private static T Safe<T>(Func<T> f, T fallback,
         [System.Runtime.CompilerServices.CallerMemberName] string caller = "")

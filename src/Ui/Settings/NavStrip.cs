@@ -4,7 +4,7 @@ using XiControl.Localization;
 namespace XiControl.Ui.Settings;
 
 /// <summary>Глифы навигации (рисуем сами — без иконочных шрифтов и ресурсов).</summary>
-public enum NavGlyph { General, Features, Battery, Display, Perf, Keys, Api, About }
+public enum NavGlyph { General, Features, Battery, Display, Touchpad, Perf, Keys, Api, About }
 
 /// <summary>
 /// Левая навигация окна настроек (кастомная отрисовка): подсветка hover/выбора,
@@ -154,6 +154,12 @@ public sealed class NavStrip : Panel
                 g.DrawRectangle(pen, x + w * 0.1f, y + h * 0.2f, w * 0.8f, h * 0.5f);
                 g.DrawLine(pen, x + w * 0.35f, y + h * 0.86f, x + w * 0.65f, y + h * 0.86f);
                 g.DrawLine(pen, x + w * 0.5f, y + h * 0.7f, x + w * 0.5f, y + h * 0.86f);
+                break;
+            case NavGlyph.Touchpad:
+                // прямоугольник панели + полоска у нижнего края — та самая мёртвая зона
+                g.DrawRectangle(pen, x + w * 0.12f, y + h * 0.22f, w * 0.76f, h * 0.56f);
+                using (var zone = new SolidBrush(Color.FromArgb(90, c)))
+                    g.FillRectangle(zone, x + w * 0.12f, y + h * 0.64f, w * 0.76f, h * 0.14f);
                 break;
             case NavGlyph.Perf:
                 g.DrawArc(pen, x + w * 0.12f, y + h * 0.2f, w * 0.76f, h * 0.76f, 180, 180);

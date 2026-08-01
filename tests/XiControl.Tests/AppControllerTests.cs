@@ -29,7 +29,8 @@ public sealed class AppControllerTests
             new RefreshRateGuard(_cfg, _power, new FakeDisplayEvents(), new FakeTimer()),
             new PowerProfileGuard(_mifs, _cfg, _power, new FakeTimer()),
             new TravelChargeMonitor(_cfg, _power, new FakeTimer()),
-            new TouchpadControl(_cfg), new TouchscreenControl(_cfg))
+            new TouchpadControl(_cfg), new TouchscreenControl(_cfg),
+            new TouchpadDeadZone(_cfg, new TouchpadControl(_cfg)))
         {
             CareChanged = on => _events.Add($"care:{on}"),
             TravelChanged = on => _events.Add($"travel:{on}"),
