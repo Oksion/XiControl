@@ -533,6 +533,10 @@ public sealed class AppController
     /// на каждый показ (и на смену темы/DPI/языка), запрос оттуда улетал бы по нескольку раз.</summary>
     public ReleaseInfo? Update { get; private set; }
 
+    /// <summary>Чем закончилась последняя проверка — «О программе» отвечает пользователю,
+    /// нажавшему «Проверить обновления», а не молчит.</summary>
+    public UpdateStatus LastUpdateCheck { get; private set; } = UpdateStatus.NotChecked;
+
     /// <summary>Новая версия найдена — TrayApp решает, показывать ли тост.</summary>
     public Action<ReleaseInfo>? UpdateFound;
 
@@ -550,9 +554,16 @@ public sealed class AppController
         _cfg.Save();
 
         var release = await UpdateCheck.FetchLatestAsync().ConfigureAwait(false);
-        if (release is null) return;
+        if (release is null)
+        {
+            LastUpdateCheck = UpdateStatus.Failed; // нет сети/таймаут/лимит — так и скажем
+            return;
+        }
 
         var current = UpdateCheck.CurrentVersion();
+        LastUpdateCheck = UpdateCheck.IsNewer(release.Version, current)
+            ? UpdateStatus.Available
+            : UpdateStatus.UpToDate;
         // отметку на «О программе» держим, только если релиз реально новее: иначе на свежей
         // установке вкладка писала бы «доступна X», когда X и так стоит
         if (UpdateCheck.IsNewer(release.Version, current)) Update = release;

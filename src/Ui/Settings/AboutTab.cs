@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using XiControl.Localization;
+using XiControl.SystemIntegration;
 
 namespace XiControl.Ui.Settings;
 
@@ -46,11 +47,29 @@ public sealed class AboutTab : SettingsPane
         }
         else
         {
-            // проверки могло и не быть (тумблер выключен) — даём явную кнопку: запрос
-            // только по нажатию, фонового трафика по-прежнему ноль
-            var check = ui.LinkButton("settings.updates.now", () => act.CheckUpdatesNow(rebuild));
-            check.Margin = new Padding(0, 0, 0, ui.Sc(8));
-            Controls.Add(check);
+            // Проверки могло и не быть (тумблер выключен) — даём явную кнопку: запрос только по
+            // нажатию, фонового трафика по-прежнему ноль. Рядом — итог прошлой проверки: без него
+            // нажатие выглядит как «ничего не произошло» (окно лишь мигает на пересборке).
+            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, 0, 0, ui.Sc(8)), BackColor = ui.T.WinBg };
+            row.Controls.Add(ui.LinkButton("settings.updates.now", () => act.CheckUpdatesNow(rebuild)));
+
+            string? status = act.GetUpdateStatus() switch
+            {
+                UpdateStatus.UpToDate => Loc.T("settings.updates.uptodate"),
+                UpdateStatus.Failed => Loc.T("settings.updates.failed"),
+                _ => null, // ещё не проверяли — говорить нечего
+            };
+            if (status is not null)
+                row.Controls.Add(new Label
+                {
+                    Text = status,
+                    AutoSize = true,
+                    ForeColor = ui.T.Text2,
+                    BackColor = Color.Transparent,
+                    Font = ui.NoteFont,
+                    Margin = new Padding(ui.Sc(8), ui.Sc(6), 0, 0),
+                });
+            Controls.Add(row);
         }
 
         var links = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, 0, 0, ui.Sc(14)), BackColor = ui.T.WinBg };
