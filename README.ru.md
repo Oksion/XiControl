@@ -475,7 +475,8 @@ src/            приложение (C# / .NET 8 / WinForms): Wmi/ — прот
                 и жесты, Ui/ — трей, панель, OSD, монитор, настройки (Ui/Settings/ — вкладки),
                 SystemIntegration/ — guard-ы, питание, тачпад/экран, Config/, Localization/
 tests/          юнит-тесты (xUnit) чистой логики на фейках — гоняются без железа Xiaomi
-assets/svg/     иконки: osd/ — цветные 128×128, tray/ — монохром 24×24 (currentColor)
+assets/svg/     иконки: osd/ — цветные 128×128, tray/ — монохром 24×24 (currentColor),
+                ui/ — неквадратные картинки интерфейса (кнопка Buy Me a Coffee)
 tools/IconPreview/  рендер иконок в PNG для проверки + генерация app.ico
 docs/           документация протокола и архитектуры
 reference/      PowerShell-пробы, журналы исследования прошивки

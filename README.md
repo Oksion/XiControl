@@ -476,7 +476,8 @@ src/            the app (C# / .NET 8 / WinForms): Wmi/ — the MIFS protocol, In
                 and gestures, Ui/ — tray, panel, OSD, monitor, settings (Ui/Settings/ — tabs),
                 SystemIntegration/ — guards, power, touchpad/screen, Config/, Localization/
 tests/          unit tests (xUnit) of pure logic on fakes — run without Xiaomi hardware
-assets/svg/     icons: osd/ — color 128×128, tray/ — monochrome 24×24 (currentColor)
+assets/svg/     icons: osd/ — color 128×128, tray/ — monochrome 24×24 (currentColor),
+                ui/ — non-square interface art (the Buy Me a Coffee button)
 tools/IconPreview/  renders icons to PNG for review + generates app.ico
 docs/           protocol and architecture documentation
 reference/      PowerShell probes, firmware research logs

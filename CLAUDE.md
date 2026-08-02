@@ -213,7 +213,9 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
 ## Иконки
 
 - SVG рисует **сам пользователь**; Claude только интегрирует и правит технически. `assets/svg/osd/` —
-  цветные 128×128, `assets/svg/tray/` — монохром 24×24 (`currentColor`, перекрашивается под тему).
+  цветные 128×128, `assets/svg/tray/` — монохром 24×24 (`currentColor`, перекрашивается под тему),
+  `assets/svg/ui/` — неквадратные картинки интерфейса (кнопка Buy Me a Coffee 545×153): рисуются
+  через `SvgIcons.RenderByHeight` — обычный `Render` строго квадратный и растянул бы их.
 - **Фирменная палитра — [docs/10-colors.md](docs/10-colors.md)** (Material-набор): бери цвета оттуда,
   не вводи произвольные оттенки. Пары вкл/выкл: «выкл» = синие → Blue Grey, ripple убрать, рука `#FFCC80`.
 - SVG встраиваются в exe как EmbeddedResource с `LogicalName svg.<имя>.svg` — **имена файлов должны
