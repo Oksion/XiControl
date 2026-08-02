@@ -27,50 +27,45 @@ public sealed class AboutTab : SettingsPane
         hero.Controls.Add(name); hero.Controls.Add(ver);
         Controls.Add(hero);
 
-        // Отметка о новой версии — из результата стартовой проверки, что уже лежит в памяти.
-        // Своего запроса вкладка НЕ делает: окно пересобирается на каждый показ (и на смену
-        // темы/DPI/языка), запрос отсюда улетал бы по нескольку раз за сессию.
-        if (act.GetUpdate() is { } upd)
+        // Итог проверки — из результата, что уже лежит в памяти. Своего запроса вкладка НЕ делает:
+        // окно пересобирается на каждый показ (и на смену темы/DPI/языка), запрос отсюда улетал бы
+        // по нескольку раз за сессию. Что показать, решает статус, а не сам факт находки: релиз
+        // найден всегда, но «доступно обновление» — только когда он реально новее.
+        var upd = act.GetUpdate();
+        var status = act.GetUpdateStatus();
+        var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, 0, 0, ui.Sc(8)), BackColor = ui.T.WinBg };
+
+        if (status == UpdateStatus.Available && upd is not null)
         {
-            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, 0, 0, ui.Sc(8)), BackColor = ui.T.WinBg };
-            row.Controls.Add(new Label
-            {
-                Text = Loc.T("settings.updates.available", upd.Tag),
-                AutoSize = true,
-                ForeColor = ui.T.Accent,
-                BackColor = Color.Transparent,
-                Font = ui.NoteFont,
-                Margin = new Padding(0, ui.Sc(6), ui.Sc(8), 0),
-            });
+            row.Controls.Add(Note(Loc.T("settings.updates.available", upd.Tag), ui.T.Accent));
             row.Controls.Add(ui.LinkButton("settings.updates.open", () => Open(upd.Url)));
-            Controls.Add(row);
         }
         else
         {
-            // Проверки могло и не быть (тумблер выключен) — даём явную кнопку: запрос только по
-            // нажатию, фонового трафика по-прежнему ноль. Рядом — итог прошлой проверки: без него
-            // нажатие выглядит как «ничего не произошло» (окно лишь мигает на пересборке).
-            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, 0, 0, ui.Sc(8)), BackColor = ui.T.WinBg };
+            // проверки могло и не быть (тумблер выключен) — даём явную кнопку: запрос только по
+            // нажатию, фонового трафика по-прежнему ноль
             row.Controls.Add(ui.LinkButton("settings.updates.now", () => act.CheckUpdatesNow(rebuild)));
-
-            string? status = act.GetUpdateStatus() switch
+            string? text = status switch
             {
+                // дев-сборку «последней версией» не называем — это было бы неправдой
+                UpdateStatus.DevBuild when upd is not null => Loc.T("settings.updates.dev", upd.Tag),
                 UpdateStatus.UpToDate => Loc.T("settings.updates.uptodate"),
                 UpdateStatus.Failed => Loc.T("settings.updates.failed"),
                 _ => null, // ещё не проверяли — говорить нечего
             };
-            if (status is not null)
-                row.Controls.Add(new Label
-                {
-                    Text = status,
-                    AutoSize = true,
-                    ForeColor = ui.T.Text2,
-                    BackColor = Color.Transparent,
-                    Font = ui.NoteFont,
-                    Margin = new Padding(ui.Sc(8), ui.Sc(6), 0, 0),
-                });
-            Controls.Add(row);
+            if (text is not null) row.Controls.Add(Note(text, ui.T.Text2, indent: true));
         }
+        Controls.Add(row);
+
+        Label Note(string text, Color color, bool indent = false) => new()
+        {
+            Text = text,
+            AutoSize = true,
+            ForeColor = color,
+            BackColor = Color.Transparent,
+            Font = ui.NoteFont,
+            Margin = new Padding(indent ? ui.Sc(8) : 0, ui.Sc(6), indent ? 0 : ui.Sc(8), 0),
+        };
 
         var links = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, 0, 0, ui.Sc(14)), BackColor = ui.T.WinBg };
         links.Controls.Add(ui.LinkButton("GitHub", () => Open("https://github.com/Oksion/XiControl")));

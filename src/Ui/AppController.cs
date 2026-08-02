@@ -529,8 +529,9 @@ public sealed class AppController
 
     // ---- Проверка обновлений (XIC-20) ----
 
-    /// <summary>Найденный релиз или null. Держим на всю сессию: окно настроек пересобирается
-    /// на каждый показ (и на смену темы/DPI/языка), запрос оттуда улетал бы по нескольку раз.</summary>
+    /// <summary>Последний найденный релиз (не обязательно новее нас — см. <see cref="LastUpdateCheck"/>).
+    /// Держим на всю сессию: окно настроек пересобирается на каждый показ (и на смену темы/DPI/языка),
+    /// запрос оттуда улетал бы по нескольку раз.</summary>
     public ReleaseInfo? Update { get; private set; }
 
     /// <summary>Чем закончилась последняя проверка — «О программе» отвечает пользователю,
@@ -561,12 +562,13 @@ public sealed class AppController
         }
 
         var current = UpdateCheck.CurrentVersion();
-        LastUpdateCheck = UpdateCheck.IsNewer(release.Version, current)
-            ? UpdateStatus.Available
+        // дев-сборку не называем «последней версией»: релиз на GitHub заведомо свежее её 0.0.0
+        LastUpdateCheck = UpdateCheck.IsDevBuild(current) ? UpdateStatus.DevBuild
+            : UpdateCheck.IsNewer(release.Version, current) ? UpdateStatus.Available
             : UpdateStatus.UpToDate;
         // отметку на «О программе» держим, только если релиз реально новее: иначе на свежей
         // установке вкладка писала бы «доступна X», когда X и так стоит
-        if (UpdateCheck.IsNewer(release.Version, current)) Update = release;
+        Update = release; // что именно показать — решает статус выше, а не сам факт находки
 
         // тост — раз на версию; отметка на «О программе» при этом остаётся
         if (UpdateCheck.ShouldNotify(release.Version, current, _cfg.SkippedVersion))
