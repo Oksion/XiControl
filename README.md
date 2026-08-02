@@ -82,8 +82,13 @@ double-click; current direction is shown by color (charging green / discharging 
 - 👆 **Touchscreen on/off** — same for the laptop's touchscreen: an action for a key,
   a cell in the panel, stock driver-free disabling and auto re-enable after a reboot.
   The cell appears only if a touchscreen is present in the system.
+- 🔔 **Update check** (on by default) — once a day the app asks GitHub whether a new version is out
+  and shows a toast linking to the release; the notice also appears on the "About" tab. Updates are
+  **never installed automatically** — this is a notification only (grab it from the release page or
+  run `winget upgrade Oksion.XiControl`). With the toggle off the app makes **no network requests at
+  all**, and a one-off check is available on a button.
 - ⚙️ **Settings window** in Windows 11 style — all options across tabs (General / Features /
-  Battery / Display / Performance / Keys / About), dark and light themes.
+  Battery / Display / Touchpad / Performance / Keys / HTTP API / About), dark and light themes.
   The **Features** tab controls what to show: "Owl mode", touchpad, touchscreen and refresh-rate
   control; a disabled feature disappears from the menu and panel entirely.
 - 🎨 The tray icon changes with the mode, monochrome to match a light/dark taskbar;
@@ -196,19 +201,30 @@ Launch `XiControl.exe` (confirm the UAC prompt) — a tray icon appears.
 | Keyboard backlight key | OSD with the level (off / 50% / 100% / auto) |
 
 All options live in the **Settings…** window (tray menu item): tabs General (language,
-autostart, panel theme, brightness memory), Features (owl, touchpad, touchscreen, refresh-rate
-control), Battery ("travel" sound), Display (auto refresh rate and rates; the tab is hidden if
-refresh-rate control is off), Performance (mode visibility, startup mode, power profiles),
-Keys (remapping) and About. The quick toggles (charge, "travel", owl, refresh rate, Monitor,
+autostart, panel theme, brightness memory, update check, logging), Features (owl, touchpad,
+touchscreen, refresh-rate control), Battery (charge threshold with a hint, "travel" sound and file,
+lock-screen sound and toast, charger-wattage OSD, "weak PSU" threshold, battery health), Display
+(auto refresh rate, "Keep refresh rate" and the rates; the tab is hidden if refresh-rate control is
+off), Touchpad (bottom dead zone), Performance (mode visibility, startup mode, power profiles),
+Keys (remapping), HTTP API (port, token, permissions) and About. The quick toggles (charge, "travel", owl, refresh rate, Monitor,
 mode) stay in the tray menu and the panel.
 
 Fine timings are edited only in `%APPDATA%\XiControl\config.json` (applied on the next
 launch): `MiHoldMs` — the Mi-button hold threshold (400), `MiDoubleClickMs` — the double-click
 window (300), `OsdDurationMs` — how long the OSD stays up (2800).
 
+Config keys behind the UI settings (no need to edit them by hand, but worth knowing):
+`CareLimitPercent` — the selected charge threshold; `TravelLockSound` / `TravelLockToast` — "travel"
+sound and toast on a locked screen; `CheckUpdates` — whether to check for updates, `SkippedVersion` —
+the version already announced, `LastUpdateCheckUtc` — timestamp of the last check (daily window).
+
 For autostart, enable "Start with Windows" (Settings → General) — the scheduler task is created
-elevated, so there's no UAC prompt at logon; if the task points to a missing exe (you updated or
-moved the file), it repairs itself on launch.
+elevated, so there's no UAC prompt at logon. The task is **per user account** (named
+`XiControl_S-1-5-21-…`), so on a shared machine people no longer overwrite each other's autostart;
+a task from older versions (plain `XiControl`) is recognised and migrated to the new name on the
+next toggle. Self-repair on launch covers not only a missing exe but also a task pointing at an
+**outdated build** — the typical case when the portable version is unpacked into a new folder.
+Besides logon, the task also fires when you return to the session via fast user switching.
 
 ### Travel mode (a one-off charge to 100%)
 
@@ -312,7 +328,8 @@ on battery — lower (savings). Enabled from the tray menu item, a panel cell, o
 "BatteryRefreshRate": 60
 ```
 
-How it actually behaves (plain Win32 `ChangeDisplaySettings`, no driver needed):
+How it actually behaves (plain Win32: the built-in panel is located via `QueryDisplayConfig`, the
+rate is set with `ChangeDisplaySettingsEx` — no driver needed):
 
 - **The laptop's built-in panel only**, resolution and color depth are untouched — only the rate
   changes. External monitors are never touched, even when one of them is set as primary; if the
@@ -387,7 +404,8 @@ cell only if a touchscreen is present).
   the launched program inherits them.
 
 In `config.json` these are `*Action`/`*Command` pairs (`MiClick`, `MiDouble`, `SettingsKey`,
-`AiKey`, `ProjKey`); action values: `modes`, `charge`, `panel`, `owl`, `monitor`,
+`AiKey`, `ProjKey`); action values: `modes`, `charge`, `panel`, `owl`, `monitor`, `touchpad`,
+`touchscreen`,
 `travel`, `projection`, `settings`, `copilot`, `launch`, `none`:
 
 ```json
@@ -478,7 +496,8 @@ src/            the app (C# / .NET 8 / WinForms): Wmi/ — the MIFS protocol, In
 tests/          unit tests (xUnit) of pure logic on fakes — run without Xiaomi hardware
 assets/svg/     icons: osd/ — color 128×128, tray/ — monochrome 24×24 (currentColor),
                 ui/ — non-square interface art (the Buy Me a Coffee button)
-tools/IconPreview/  renders icons to PNG for review + generates app.ico
+assets/sound/   embedded WAV jingles for "travel" mode
+tools/          IconPreview/ — renders icons to PNG + generates app.ico; helper scripts
 docs/           protocol and architecture documentation
 reference/      PowerShell probes, firmware research logs
 ```

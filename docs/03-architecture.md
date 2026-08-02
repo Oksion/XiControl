@@ -89,7 +89,7 @@
 | WMI события | `ManagementEventWatcher` на `SELECT * FROM HID_EVENT20` | простая подписка |
 | UI трея | WinForms `NotifyIcon` + `ContextMenuStrip` | пара строк, без фреймворков |
 | OSD | borderless `Form`, `TransparencyKey`/layered, GDI+ (`System.Drawing`) | идея из CoreCharge |
-| Питание | `SystemEvents.PowerModeChanged` + `RegisterSuspendResumeNotification` | для ChargeGuard |
+| Питание | `SystemEvents.PowerModeChanged` + `SessionEnding` (маршалятся в UI-поток `SystemEventsSource`) | для ChargeGuard; `RegisterSuspendResumeNotification` не понадобился |
 | Сборка | `dotnet publish -r win-x64 --self-contained -p:PublishSingleFile=true` | один .exe, без рантайма |
 
 > Native AOT пока **не** закладываем: `System.Management` использует COM-interop/reflection и с AOT капризен. Self-contained single-file — надёжный вариант.
@@ -116,17 +116,21 @@ xi_control/
  │   │                         TrayApp (тонкий монтажник), TrayMenuBuilder, TrayIconController,
  │   │                         QuickPanelForm, OsdForm, MonitorForm, FlyoutForm(+FlyoutPalette),
  │   │                         FormChrome, ModeUi, SettingsForm, SettingsActions, ToggleSwitch,
- │   │                         ScaledFonts, SvgIcons, Draw, TrayIcons, DarkMenu
+ │   │                         ScaledFonts, SvgIcons, FlyoutTip, Draw, TrayIcons, DarkMenu
  │   ├─ Ui/Settings/        — SettingsToolkit (фабрика виджетов), SettingsTheme, NavStrip,
- │   │                         вкладки-контролы General/Features/Battery/Display/Perf/Keys/Api/AboutTab
+ │   │                         SettingsPane (база вкладок), вкладки-контролы
+ │   │                         General/Features/Battery/Display/Touchpad/Perf/Keys/Api/AboutTab
  │   ├─ SystemIntegration/  — ChargeGuard, RefreshRate(+Guard), PowerProfileGuard,
  │   │                         TravelChargeMonitor, IPowerEvents+IDisplayEvents/SystemEventsSource,
  │   │                         IAppTimer/UiTimer, Brightness, TouchpadControl/TouchscreenControl
- │   │                         (общий HidNodeToggle), AwakeMode, MicControl, KeyActions,
- │   │                         AutoStart, Sound, BatteryInfo, PowerDraw,
+ │   │                         (общий HidNodeToggle), TouchpadDeadZone, AwakeMode, MicControl,
+ │   │                         KeyActions, AutoStart, UpdateCheck, Sound, BatteryInfo, PowerDraw,
+ │   │                         GpuTelemetry,
  │   │                         HttpApi/ApiRouter/ApiSettings/ApiFirewall (opt-in HTTP API, XIC-13)
- │   ├─ Config/             — AppConfig (POCO + миграции), IConfigStore/JsonConfigStore
- │   └─ Localization/       — Loc.cs RU/EN/ZH (+ ILocalizer)
+ │   ├─ Config/             — AppConfig (POCO + миграции), IConfigStore/JsonConfigStore,
+ │   │                         LegacyLanguageConverter
+ │   └─ Localization/       — lang/{ru,en,zh}.json (переводы, встроены в exe) + Loc.cs (загрузчик,
+ │                             Loc.T) и шов ILocalizer
  └─ tests/XiControl.Tests/  — юнит-тесты чистой логики на фейках (Fakes.cs), без железа
 ```
 
