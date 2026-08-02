@@ -179,7 +179,9 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   в сеанс), `TouchpadDeadZone` (мёртвая зона у нижнего края: штатная curtain-зона PTP
   `SuperCurtainBottom` в HKLM, himetric = мм × 100; гасит НАЧАЛО касания, нажатие в зоне
   проходит — XIC-24),
-  `AutoStart` (задача планировщика + самопочинка пути), `AwakeMode` («режим совы»: всегда
+  `AutoStart` (задача планировщика с SID в имени — своя на каждого пользователя, задача старого
+  образца `XiControl` мигрирует при следующем переключении; самопочинка на старте чинит и пропавший
+  путь, и устаревшую версию exe, дев-сборки `0.0.0` в сверке не участвуют), `AwakeMode` («режим совы»: всегда
   `ES_SYSTEM_REQUIRED` + крышка на AC, экран держится `ES_DISPLAY_REQUIRED` — кроме
   `OwlIgnoreDisplay: true` в config.json, тогда только «не спать»),
   `MicControl`, `KeyActions`, `Sound` (WAV-джинглы), `BatteryInfo`, `PowerDraw`,
