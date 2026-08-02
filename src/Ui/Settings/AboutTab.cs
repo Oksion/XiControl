@@ -74,6 +74,20 @@ public sealed class AboutTab : SettingsPane
         links.Controls.Add(ui.LinkButton("settings.about.updates", () => Open("https://github.com/Oksion/XiControl/releases")));
         Controls.Add(links);
 
+        // Официальная кнопка Buy Me a Coffee: фирменный ассет, поэтому картинкой, а не ссылкой —
+        // среди четырёх текстовых она бы потерялась. Высота от DPI, ширина из пропорций SVG.
+        var coffee = new PictureBox
+        {
+            Image = SvgIcons.RenderByHeight(SvgIcons.BuyMeACoffee, ui.Sc(34)),
+            SizeMode = PictureBoxSizeMode.AutoSize,
+            BackColor = Color.Transparent,
+            Cursor = Cursors.Hand,
+            Margin = new Padding(0, 0, 0, ui.Sc(14)),
+            AccessibleName = "Buy me a coffee", // текст на кнопке — часть бренда, не переводится
+        };
+        coffee.Click += (_, _) => Open("https://buymeacoffee.com/3CLiAI1");
+        Controls.Add(coffee);
+
         ui.AddKv(this, "settings.about.model", SafeModel());
         ui.AddKv(this, "settings.about.iface", "MiCommonInterface (MIFS)");
         ui.AddKv(this, "settings.about.config", "%APPDATA%\\XiControl\\config.json");

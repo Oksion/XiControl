@@ -60,8 +60,12 @@ public static class SvgIcons
     public const string TraySettings = "tray-settings";
     public const string TrayLanguage = "tray-language"; // «文A» для пункта выбора языка в меню
 
+    // Широкие картинки (не иконки): кнопка «Buy me a coffee» — 545×153
+    public const string BuyMeACoffee = "bmc-button";
+
     private static readonly Dictionary<string, string> _sources = new();       // имя → svg-текст
     private static readonly Dictionary<(string, int, int), Bitmap> _bitmaps = new(); // (имя, размер, argb-цвет|0)
+    private static readonly Dictionary<(string, int), Bitmap> _wide = new();   // (имя, высота) — неквадратные
 
     private static string Source(string name)
     {
@@ -81,6 +85,35 @@ public static class SvgIcons
 
     /// <summary>Растр монохромной иконки: currentColor → color. Кэшируется, не Dispose-ить.</summary>
     public static Bitmap Render(string name, int size, Color color) => RenderCore(name, size, color);
+
+    /// <summary>
+    /// Растр НЕквадратной картинки по заданной высоте: ширина берётся из пропорций самого SVG
+    /// (иконочный <see cref="Render(string, int)"/> рисует строго в квадрат и растянул бы кнопку).
+    /// Кэшируется, не Dispose-ить.
+    /// </summary>
+    public static Bitmap RenderByHeight(string name, int height)
+    {
+        if (_wide.TryGetValue((name, height), out var cached)) return cached;
+
+        var doc = SvgDocument.FromSvg<SvgDocument>(Source(name));
+        // ViewBox — источник пропорций; если его нет, берём объявленные Width/Height документа
+        float w = doc.ViewBox.Width > 0 ? doc.ViewBox.Width : doc.Width.Value;
+        float h = doc.ViewBox.Height > 0 ? doc.ViewBox.Height : doc.Height.Value;
+        int width = h > 0 ? (int)Math.Round(height * (w / h)) : height;
+
+        doc.Width = width;
+        doc.Height = height;
+
+        var bmp = new Bitmap(Math.Max(1, width), Math.Max(1, height));
+        using (var g = Graphics.FromImage(bmp))
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+            doc.Draw(g);
+        }
+        _wide[(name, height)] = bmp;
+        return bmp;
+    }
 
     private static Bitmap RenderCore(string name, int size, Color? color)
     {
