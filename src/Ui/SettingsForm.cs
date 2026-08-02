@@ -230,7 +230,7 @@ public sealed class SettingsForm : Form
         AddTab("settings.tab.perf", NavGlyph.Perf, () => new PerfTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.keys", NavGlyph.Keys, () => new KeysTab(_ui, _cfg, rebuild));
         AddTab("settings.tab.api", NavGlyph.Api, () => new ApiTab(_ui, _cfg, _act, rebuild));
-        AddTab("settings.tab.about", NavGlyph.About, () => new AboutTab(_ui));
+        AddTab("settings.tab.about", NavGlyph.About, () => new AboutTab(_ui, _act, rebuild));
 
         _nav.Tabs = [.. tabs];
         if (_tab >= _panes.Count) _tab = 0; // раскладка сузилась (скрыли «Экран») — на первую вкладку

@@ -3,10 +3,10 @@ using XiControl.Localization;
 
 namespace XiControl.Ui.Settings;
 
-/// <summary>Вкладка «О программе»: версия, ссылки, модель, пути конфига/лога.</summary>
+/// <summary>Вкладка «О программе»: версия, обновление, ссылки, модель, пути конфига/лога.</summary>
 public sealed class AboutTab : SettingsPane
 {
-    public AboutTab(SettingsToolkit ui) : base(ui)
+    public AboutTab(SettingsToolkit ui, SettingsActions act, Action rebuild) : base(ui)
     {
         ui.AddHeader(this, "settings.tab.about", "settings.about.sub");
 
@@ -25,6 +25,33 @@ public sealed class AboutTab : SettingsPane
         var ver = new Label { Text = $"{Loc.T("settings.version")} {AppVersion()}  ·  GPLv3", Tag = "dim", AutoSize = true, ForeColor = ui.T.Text2, BackColor = Color.Transparent, Font = ui.NoteFont, Location = new Point(ui.Sc(74), ui.Sc(40)) };
         hero.Controls.Add(name); hero.Controls.Add(ver);
         Controls.Add(hero);
+
+        // Отметка о новой версии — из результата стартовой проверки, что уже лежит в памяти.
+        // Своего запроса вкладка НЕ делает: окно пересобирается на каждый показ (и на смену
+        // темы/DPI/языка), запрос отсюда улетал бы по нескольку раз за сессию.
+        if (act.GetUpdate() is { } upd)
+        {
+            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, 0, 0, ui.Sc(8)), BackColor = ui.T.WinBg };
+            row.Controls.Add(new Label
+            {
+                Text = Loc.T("settings.updates.available", upd.Tag),
+                AutoSize = true,
+                ForeColor = ui.T.Accent,
+                BackColor = Color.Transparent,
+                Font = ui.NoteFont,
+                Margin = new Padding(0, ui.Sc(6), ui.Sc(8), 0),
+            });
+            row.Controls.Add(ui.LinkButton("settings.updates.open", () => Open(upd.Url)));
+            Controls.Add(row);
+        }
+        else
+        {
+            // проверки могло и не быть (тумблер выключен) — даём явную кнопку: запрос
+            // только по нажатию, фонового трафика по-прежнему ноль
+            var check = ui.LinkButton("settings.updates.now", () => act.CheckUpdatesNow(rebuild));
+            check.Margin = new Padding(0, 0, 0, ui.Sc(8));
+            Controls.Add(check);
+        }
 
         var links = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, 0, 0, ui.Sc(14)), BackColor = ui.T.WinBg };
         links.Controls.Add(ui.LinkButton("GitHub", () => Open("https://github.com/Oksion/XiControl")));

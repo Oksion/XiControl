@@ -1,4 +1,5 @@
-﻿using Microsoft.Win32;
+﻿using System.Diagnostics;
+using Microsoft.Win32;
 using XiControl.Config;
 using XiControl.Input;
 using XiControl.Localization;
@@ -20,6 +21,7 @@ public sealed class TrayApp : IDisposable
     private readonly QuickPanelForm _panel;
     private bool _lastOnline;  // прошлое состояние питания (для OSD только на реальном переходе)
     private bool _locked;      // сессия заблокирована (Win+L): OSD не виден — обратная связь звуком/тостом (XIC-11)
+    private string? _pendingUpdateUrl; // куда вести по клику на тост об обновлении
 
     // Кэш отчёта о батарее (BatteryTab + /status API): износ/циклы/ёмкость меняются раз в
     // сутки-недели, а окно настроек пересобирается на каждый Popup/смену языка — держим короткий
@@ -174,6 +176,13 @@ public sealed class TrayApp : IDisposable
         _controller.FlyoutThemeChanged = RepaintFlyouts;     // палитру уже пересчитал контроллер
         // честная обратная связь: команда прошивке не прошла — говорим прямо, а не «успех»
         _controller.FirmwareFailed = () => _osd.Flash(OsdKind.Error, Loc.T("osd.failed"), Loc.T("osd.failed.sub"));
+        _controller.UpdateFound = OnUpdateFound;
+        _tray.BalloonTipClicked += (_, _) =>
+        {
+            if (_pendingUpdateUrl is not string url) return; // тост мог быть и не про обновление
+            _pendingUpdateUrl = null;
+            Safe(() => { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); return true; }, false);
+        };
         // тачпад/экран: колбэк приходит с фонового потока — маршалим в UI
         _controller.TouchpadToggled = b => _osd.BeginInvoke(new Action(() =>
         {
@@ -255,6 +264,31 @@ public sealed class TrayApp : IDisposable
             _cfg.Save();
             _tray.ShowBalloonTip(10000, Loc.T("toast.firstrun.title"), Loc.T("toast.firstrun.text"), ToolTipIcon.None);
         }
+
+        // Проверка обновления — с задержкой и в фоне: старт не замедляем, сеть в UI-поток не тащим
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            await _controller.CheckUpdatesAsync(force: false).ConfigureAwait(false);
+        });
+    }
+
+    // Новая версия: тост показываем ОДИН раз на версию (сразу помечаем её как показанную),
+    // клик открывает страницу релиза. Отметка на «О программе» остаётся в любом случае.
+    private void OnUpdateFound(ReleaseInfo release)
+    {
+        // колбэк приходит с фонового потока — в UI через форму OSD (NotifyIcon сам не Control)
+        Safe(() =>
+        {
+            _osd.BeginInvoke(new Action(() =>
+            {
+                UpdateCheck.MarkNotified(_cfg, release);
+                _pendingUpdateUrl = release.Url;
+                _tray.ShowBalloonTip(10000, Loc.T("toast.update.title"),
+                    Loc.T("toast.update.text", release.Tag), ToolTipIcon.None);
+            }));
+            return true;
+        }, false);
     }
 
     // Тултип трея: имя • режим • заряд (NotifyIcon.Text ограничен 127 символами).
@@ -499,6 +533,14 @@ public sealed class TrayApp : IDisposable
                 SetRefreshRateFeature = _controller.ToggleRefreshRateFeature,
                 SetHoldRefreshRate = _controller.SetHoldRefreshRate,
                 SetRefreshRates = _controller.SetRefreshRates,
+                SetCheckUpdates = _controller.SetCheckUpdates,
+                GetUpdate = () => _controller.Update,
+                CheckUpdatesNow = done => _ = Task.Run(async () =>
+                {
+                    await _controller.CheckUpdatesAsync(force: true).ConfigureAwait(false);
+                    // перерисовать вкладку с найденной версией — обратно в UI-поток
+                    _osd.BeginInvoke(done);
+                }),
                 SetTouchpadDeadZone = _controller.SetTouchpadDeadZone,
                 SetTouchpadDeadZoneMm = _controller.SetTouchpadDeadZoneMm,
                 SetOwlFeature = _controller.ToggleOwlFeature,

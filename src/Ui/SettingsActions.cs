@@ -1,4 +1,5 @@
 ﻿using XiControl.Localization;
+using XiControl.SystemIntegration;
 using XiControl.Wmi;
 
 namespace XiControl.Ui;
@@ -32,6 +33,9 @@ public sealed class SettingsActions
     public required Action<bool> SetHoldRefreshRate;         // возвращать частоту после чужих изменений
     public required Action<bool> SetRefreshRateFeature;      // «управление частотой» как фича вкл/выкл
     public required Action<int, int> SetRefreshRates;        // ac, batt
+    public required Action<bool> SetCheckUpdates;            // «проверять обновления» вкл/выкл
+    public required Func<ReleaseInfo?> GetUpdate;            // найденный релиз (из проверки на старте)
+    public required Action<Action> CheckUpdatesNow;          // проверить по кнопке; колбэк — перерисовать вкладку
     public required Action<bool> SetTouchpadDeadZone;        // мёртвая зона у нижнего края тачпада
     public required Action<int> SetTouchpadDeadZoneMm;       // её высота в мм
     public required Action<bool> SetOwlFeature;

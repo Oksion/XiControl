@@ -31,6 +31,9 @@ public sealed class GeneralTab : SettingsPane
         ui.AddGroup(this, "settings.general.comfort");
         ui.AddRow(this, "settings.profile.brightness", "settings.brightness.desc",
             ui.Toggle(cfg.RememberBrightness, act.SetRememberBrightness));
+        // выключенный тумблер = ноль исходящих запросов, поэтому подпись прямая, без оговорок
+        ui.AddRow(this, "settings.updates.check", "settings.updates.check.desc",
+            ui.Toggle(cfg.CheckUpdates, act.SetCheckUpdates));
         // «Режим совы», тачпад и сенсорный экран как функции переехали на вкладку «Функции».
         ui.AddRow(this, "settings.log", "settings.log.desc",
             ui.Toggle(cfg.LogEnabled, on =>
