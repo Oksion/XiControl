@@ -527,6 +527,50 @@ public sealed class AppController
         if (on is bool b) TouchscreenToggled?.Invoke(b);
     });
 
+    // ---- Проверка обновлений (XIC-20) ----
+
+    /// <summary>Найденный релиз или null. Держим на всю сессию: окно настроек пересобирается
+    /// на каждый показ (и на смену темы/DPI/языка), запрос оттуда улетал бы по нескольку раз.</summary>
+    public ReleaseInfo? Update { get; private set; }
+
+    /// <summary>Новая версия найдена — TrayApp решает, показывать ли тост.</summary>
+    public Action<ReleaseInfo>? UpdateFound;
+
+    /// <summary>
+    /// Проверить выход новой версии. Тумблер выключен — не ходим в сеть вообще (он и есть
+    /// выключатель трафика). Обычная проверка — не чаще раза в сутки; force (кнопка «Проверить
+    /// сейчас») это окно игнорирует, потому что это явное действие пользователя.
+    /// </summary>
+    public async Task CheckUpdatesAsync(bool force)
+    {
+        if (!force && !UpdateCheck.DueForCheck(_cfg.CheckUpdates, _cfg.LastUpdateCheckUtc, DateTime.UtcNow)) return;
+        if (force && !_cfg.CheckUpdates) return; // выключено — молчим даже по кнопке
+
+        _cfg.LastUpdateCheckUtc = DateTime.UtcNow;
+        _cfg.Save();
+
+        var release = await UpdateCheck.FetchLatestAsync().ConfigureAwait(false);
+        if (release is null) return;
+
+        var current = UpdateCheck.CurrentVersion();
+        // отметку на «О программе» держим, только если релиз реально новее: иначе на свежей
+        // установке вкладка писала бы «доступна X», когда X и так стоит
+        if (UpdateCheck.IsNewer(release.Version, current)) Update = release;
+
+        // тост — раз на версию; отметка на «О программе» при этом остаётся
+        if (UpdateCheck.ShouldNotify(release.Version, current, _cfg.SkippedVersion))
+            UpdateFound?.Invoke(release);
+    }
+
+    /// <summary>Тумблер «Проверять обновления». Включили — сразу проверяем, иначе пришлось бы
+    /// ждать следующего запуска.</summary>
+    public void SetCheckUpdates(bool on)
+    {
+        _cfg.CheckUpdates = on;
+        _cfg.Save();
+        if (on) _ = Task.Run(() => CheckUpdatesAsync(force: true));
+    }
+
     /// <summary>
     /// Мёртвая зона у нижнего края тачпада вкл/выкл. Реестр правим только отсюда — то есть
     /// только по явному переключению пользователем; перезапуск узла тачпада (сотни мс, панель
