@@ -147,6 +147,7 @@
   "settings.updates.open": "Открыть страницу релиза",
   "settings.updates.now": "Проверить обновления",
   "settings.updates.uptodate": "У вас последняя версия",
+  "settings.updates.dev": "Локальная сборка · последний релиз {0}",
   "settings.updates.failed": "Проверить не удалось — нет связи с GitHub",
   "toast.update.title": "Вышла новая версия",
   "toast.update.text": "Доступна {0}. Нажмите, чтобы открыть страницу релиза — или обновитесь командой winget upgrade Oksion.XiControl.",

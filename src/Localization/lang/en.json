@@ -147,6 +147,7 @@
   "settings.updates.open": "Open the release page",
   "settings.updates.now": "Check for updates",
   "settings.updates.uptodate": "You're on the latest version",
+  "settings.updates.dev": "Local build · latest release is {0}",
   "settings.updates.failed": "Check failed — couldn't reach GitHub",
   "toast.update.title": "A new version is out",
   "toast.update.text": "{0} is available. Click to open the release page — or update with winget upgrade Oksion.XiControl.",

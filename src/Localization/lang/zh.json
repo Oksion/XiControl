@@ -147,6 +147,7 @@
   "settings.updates.open": "打开发布页面",
   "settings.updates.now": "检查更新",
   "settings.updates.uptodate": "已是最新版本",
+  "settings.updates.dev": "本地构建 · 最新发布版本为 {0}",
   "settings.updates.failed": "检查失败——无法连接 GitHub",
   "toast.update.title": "新版本已发布",
   "toast.update.text": "{0} 已可用。点击打开发布页面，或使用 winget upgrade Oksion.XiControl 更新。",

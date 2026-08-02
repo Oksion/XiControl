@@ -95,6 +95,17 @@ public sealed class UpdateCheckTests
         UpdateCheck.ShouldNotify(Version.Parse(latest), Version.Parse("0.9.0"), null).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("0.0.0", true)]
+    [InlineData("0.0.0.0", true)]
+    [InlineData("0.9.0", false)]
+    [InlineData("0.0.1", false)]
+    public void IsDevBuild_OnlyForZeroVersion(string version, bool expected)
+    {
+        // от этого зависит текст на «О программе»: дев-сборку нельзя звать «последней версией»
+        UpdateCheck.IsDevBuild(Version.Parse(version)).Should().Be(expected);
+    }
+
     [Fact]
     public void ShouldNotify_False_ForDevBuild()
     {

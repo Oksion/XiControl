@@ -8,8 +8,10 @@ namespace XiControl.SystemIntegration;
 public sealed record ReleaseInfo(Version Version, string Tag, string Url);
 
 /// <summary>Чем закончилась последняя проверка — чтобы кнопка «Проверить обновления» не молчала:
-/// без ответа нажатие выглядит как «ничего не произошло».</summary>
-public enum UpdateStatus { NotChecked, UpToDate, Available, Failed }
+/// без ответа нажатие выглядит как «ничего не произошло». <see cref="DevBuild"/> отдельно от
+/// <see cref="UpToDate"/> намеренно: у локальной сборки версия `0.0.0`, и назвать её «последней»
+/// значило бы соврать — релиз на GitHub заведомо свежее.</summary>
+public enum UpdateStatus { NotChecked, UpToDate, Available, Failed, DevBuild }
 
 /// <summary>
 /// Проверка выхода новой версии — только оповещение, без самообновления: запущенный exe нельзя
@@ -52,9 +54,12 @@ public static class UpdateCheck
     internal static bool IsNewer(Version? latest, Version? current)
     {
         if (latest is null || current is null) return false;
-        if (current is { Major: 0, Minor: 0, Build: 0 }) return false;
+        if (IsDevBuild(current)) return false;
         return latest > current;
     }
+
+    /// <summary>Локальная сборка: версия `0.0.0` (реальную подставляет CI из тега).</summary>
+    internal static bool IsDevBuild(Version? v) => v is { Major: 0, Minor: 0, Build: 0 };
 
     /// <summary>Показывать ли тост: версия новее и про неё ещё не говорили (тост — раз на версию).</summary>
     internal static bool ShouldNotify(Version? latest, Version? current, string? skipped) =>
