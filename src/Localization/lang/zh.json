@@ -177,6 +177,8 @@
   "settings.about.forum": "4PDA 论坛",
   "settings.about.license": "许可证",
   "settings.about.updates": "所有版本",
+  "settings.about.support": "支持本项目",
+  "settings.about.support.desc": "XiControl 利用业余时间开发，并且一直免费。如果它对你有帮助，可以请作者喝杯咖啡。",
   "settings.about.model": "型号",
   "settings.about.iface": "固件接口",
   "settings.about.config": "配置文件",
