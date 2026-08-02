@@ -535,6 +535,7 @@ public sealed class TrayApp : IDisposable
                 SetRefreshRates = _controller.SetRefreshRates,
                 SetCheckUpdates = _controller.SetCheckUpdates,
                 GetUpdate = () => _controller.Update,
+                GetUpdateStatus = () => _controller.LastUpdateCheck,
                 CheckUpdatesNow = done => _ = Task.Run(async () =>
                 {
                     await _controller.CheckUpdatesAsync(force: true).ConfigureAwait(false);

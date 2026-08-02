@@ -7,6 +7,10 @@ namespace XiControl.SystemIntegration;
 /// <summary>Найденный релиз: числовая версия, тег как на GitHub и ссылка на страницу.</summary>
 public sealed record ReleaseInfo(Version Version, string Tag, string Url);
 
+/// <summary>Чем закончилась последняя проверка — чтобы кнопка «Проверить обновления» не молчала:
+/// без ответа нажатие выглядит как «ничего не произошло».</summary>
+public enum UpdateStatus { NotChecked, UpToDate, Available, Failed }
+
 /// <summary>
 /// Проверка выхода новой версии — только оповещение, без самообновления: запущенный exe нельзя
 /// перезаписать («file is being used by another process»), а приложение и есть тот файл, который
