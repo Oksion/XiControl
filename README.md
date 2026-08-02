@@ -1,8 +1,14 @@
 # Xi Control
 
+[![Release](https://img.shields.io/github/v/release/Oksion/XiControl?label=release&color=success)](https://github.com/Oksion/XiControl/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Oksion/XiControl/total?label=downloads)](https://github.com/Oksion/XiControl/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/Oksion/XiControl/ci.yml?branch=main&label=build)](https://github.com/Oksion/XiControl/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=Oksion_XiControl&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Oksion_XiControl)
+
 ![Windows](https://img.shields.io/badge/Windows%2010%2F11-x64-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)
 ![License](https://img.shields.io/badge/license-GPLv3-blue)
+[![winget](https://img.shields.io/badge/winget-Oksion.XiControl-0078D6)](https://github.com/microsoft/winget-pkgs/tree/master/manifests/o/Oksion/XiControl)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-FFDD00)](https://buymeacoffee.com/3CLiAI1)
 
 🌐 **English** · [Русский](README.ru.md)
