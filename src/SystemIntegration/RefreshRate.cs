@@ -59,7 +59,9 @@ public static class RefreshRate
         int hz = PowerLine.IsOnline() ? cfg.AcRefreshRate : cfg.BatteryRefreshRate;
         Task.Run(() =>
         {
-            if (!Apply(hz))
+            // «панели нет» — штатная ситуация (крышка закрыта, «только второй экран»), про неё
+            // ApplyCore уже написал сам; дублировать её как «не удалось» — врать в лог
+            if (ApplyCore(hz) == ApplyResult.Failed)
                 Log.Write($"RefreshRate: не удалось установить {hz} Гц");
         });
     }
@@ -83,9 +85,15 @@ public static class RefreshRate
     /// <summary>Установить ближайшую к hz поддерживаемую частоту встроенной панели.
     /// true — установлена (или уже стояла). Можно звать с любого потока; параллельные
     /// вызовы сериализуются.</summary>
-    public static bool Apply(int hz)
+    public static bool Apply(int hz) => ApplyCore(hz) == ApplyResult.Ok;
+
+    /// <summary>«Панели нет» — не сбой, а нормальный расклад, и звать его так в логе нельзя:
+    /// разбирая чужой log.txt, «не удалось установить» отправит искать несуществующую поломку.</summary>
+    private enum ApplyResult { Ok, NoPanel, Failed }
+
+    private static ApplyResult ApplyCore(int hz)
     {
-        if (hz <= 0) return false; // мусор из config.json: иначе |f−hz| выберет минимальную частоту
+        if (hz <= 0) return ApplyResult.Failed; // мусор из config.json: иначе |f−hz| выберет минимальную частоту
         lock (Sync)
         {
             try
@@ -96,21 +104,22 @@ public static class RefreshRate
                 if (InternalPanel() is not string panel)
                 {
                     Log.Write("RefreshRate: встроенная панель не активна — частоту не трогаем");
-                    return false;
+                    return ApplyResult.NoPanel;
                 }
 
                 var cur = NewDevmode();
-                if (!EnumDisplaySettingsExW(panel, EnumCurrentSettings, ref cur, 0)) return false;
+                if (!EnumDisplaySettingsExW(panel, EnumCurrentSettings, ref cur, 0)) return ApplyResult.Failed;
 
                 int best = Nearest(panel, cur, hz);
-                if (best == 0) return false;
-                if ((int)cur.dmDisplayFrequency == best) return true; // уже стоит — не мигаем экраном
+                if (best == 0) return ApplyResult.Failed;
+                if ((int)cur.dmDisplayFrequency == best) return ApplyResult.Ok; // уже стоит — не мигаем экраном
 
                 cur.dmDisplayFrequency = (uint)best;
                 cur.dmFields = DmPelsWidth | DmPelsHeight | DmBitsPerPel | DmDisplayFrequency;
-                return ChangeDisplaySettingsExW(panel, ref cur, IntPtr.Zero, CdsUpdateRegistry, IntPtr.Zero) == DispChangeSuccessful;
+                return ChangeDisplaySettingsExW(panel, ref cur, IntPtr.Zero, CdsUpdateRegistry, IntPtr.Zero) == DispChangeSuccessful
+                    ? ApplyResult.Ok : ApplyResult.Failed;
             }
-            catch (Exception ex) { Log.Ex("RefreshRate.Apply", ex); return false; }
+            catch (Exception ex) { Log.Ex("RefreshRate.Apply", ex); return ApplyResult.Failed; }
         }
     }
 
