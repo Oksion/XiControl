@@ -74,25 +74,25 @@ public sealed class AboutTab : SettingsPane
         links.Controls.Add(ui.LinkButton("settings.about.updates", () => Open("https://github.com/Oksion/XiControl/releases")));
         Controls.Add(links);
 
-        // Официальная кнопка Buy Me a Coffee: фирменный ассет, поэтому картинкой, а не ссылкой —
-        // среди четырёх текстовых она бы потерялась. Высота от DPI, ширина из пропорций SVG.
-        var coffee = new PictureBox
-        {
-            Image = SvgIcons.RenderByHeight(SvgIcons.BuyMeACoffee, ui.Sc(34)),
-            SizeMode = PictureBoxSizeMode.AutoSize,
-            BackColor = Color.Transparent,
-            Cursor = Cursors.Hand,
-            Margin = new Padding(0, 0, 0, ui.Sc(14)),
-            AccessibleName = "Buy me a coffee", // текст на кнопке — часть бренда, не переводится
-        };
-        coffee.Click += (_, _) => Open("https://buymeacoffee.com/3CLiAI1");
-        Controls.Add(coffee);
 
         ui.AddKv(this, "settings.about.model", SafeModel());
         ui.AddKv(this, "settings.about.iface", "MiCommonInterface (MIFS)");
         ui.AddKv(this, "settings.about.config", "%APPDATA%\\XiControl\\config.json");
         ui.AddKv(this, "settings.about.log", "%APPDATA%\\XiControl\\log.txt");
         ui.AddNote(this, "settings.about.note");
+
+        // Поддержка — отдельной строкой в самом низу: в ряду ссылок фирменная кнопка смотрелась
+        // чужеродно. Карточка «текст слева, контрол справа» — тот же язык, что во всех настройках,
+        // и заодно объясняет, зачем она тут. Текст на самой кнопке не переводится: часть бренда.
+        var coffee = new PictureBox
+        {
+            Image = SvgIcons.RenderByHeight(SvgIcons.BuyMeACoffee, ui.Sc(30)),
+            SizeMode = PictureBoxSizeMode.AutoSize,
+            BackColor = Color.Transparent,
+            Cursor = Cursors.Hand,
+        };
+        coffee.Click += (_, _) => Open("https://buymeacoffee.com/3CLiAI1");
+        ui.AddRow(this, "settings.about.support", "settings.about.support.desc", coffee);
     }
 
     private static string AppVersion()

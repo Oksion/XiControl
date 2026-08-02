@@ -177,6 +177,8 @@
   "settings.about.forum": "Форум 4PDA",
   "settings.about.license": "Лицензия",
   "settings.about.updates": "Все релизы",
+  "settings.about.support": "Поддержать проект",
+  "settings.about.support.desc": "XiControl делается в свободное время и остаётся бесплатным. Если утилита пригодилась — можно угостить автора кофе.",
   "settings.about.model": "Модель",
   "settings.about.iface": "Интерфейс прошивки",
   "settings.about.config": "Конфигурация",
