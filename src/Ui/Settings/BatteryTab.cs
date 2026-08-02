@@ -6,7 +6,20 @@ namespace XiControl.Ui.Settings;
 /// <summary>Вкладка «Батарея»: джингл «в дорогу», OSD зарядника, здоровье батареи (read-only).</summary>
 public sealed class BatteryTab : SettingsPane
 {
-    public BatteryTab(SettingsToolkit ui, AppConfig cfg, SettingsActions act) : base(ui)
+    /// <summary>
+    /// Пояснение к выбранному порогу: уровни группируются по сценарию, а не по числу —
+    /// 40/50 «ноутбук вместо десктопа», 60/70 «компромисс», 80 «баланс». Неизвестное значение
+    /// (правка config.json руками, другой набор у другой модели) отдаёт текст ближайшей группы
+    /// снизу, а не роняет вкладку.
+    /// </summary>
+    internal static string CareHintKey(int percent) => percent switch
+    {
+        <= 50 => "settings.battery.care.hint.low",
+        <= 70 => "settings.battery.care.hint.mid",
+        _ => "settings.battery.care.hint.high",
+    };
+
+    public BatteryTab(SettingsToolkit ui, AppConfig cfg, SettingsActions act, Action rebuild) : base(ui)
     {
         ui.AddHeader(this, "settings.tab.battery", "settings.battery.sub");
 
@@ -29,8 +42,12 @@ public sealed class BatteryTab : SettingsPane
                 limit.SelectedIndex = PresetIndex();
                 reverting = false;
             }
+            rebuild(); // пояснение ниже — про выбранный уровень, пересобрать под новый (или под откат)
         }, ui.Sc(120));
         ui.AddRow(this, "settings.battery.care.limit", "settings.battery.care.limit.desc", limit);
+        // «для кого этот уровень» — по фактическому значению из конфига, а не по индексу комбо:
+        // при отказе прошивки индекс уже откатан, а текст должен совпасть с тем, что реально стоит
+        ui.AddNote(this, CareHintKey(cfg.CarePercent()));
         ui.AddNote(this, "settings.battery.note");
 
         ui.AddGroup(this, "settings.battery.travel");
