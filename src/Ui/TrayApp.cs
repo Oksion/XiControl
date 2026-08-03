@@ -539,6 +539,11 @@ public sealed class TrayApp : IDisposable
                 SetStartStrategy = _controller.SetStartStrategy,
                 SetProfileMode = _controller.SetProfileMode,
                 SetRememberBrightness = _controller.SetRememberBrightness,
+                SetBrightnessCap = _controller.SetBrightnessCap,
+                SetBrightnessCaps = _controller.SetBrightnessCaps,
+                // предупреждаем, если адаптивная яркость включена хоть для одного источника:
+                // лимит не сработает ровно тогда, когда питание переключится на него
+                IsAdaptiveBrightness = () => AdaptiveBrightness.IsEnabled(true) || AdaptiveBrightness.IsEnabled(false),
                 SetAutoHz = _controller.ToggleAutoHz,
                 SetRefreshRateFeature = _controller.ToggleRefreshRateFeature,
                 SetHoldRefreshRate = _controller.SetHoldRefreshRate,

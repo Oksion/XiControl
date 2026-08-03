@@ -29,8 +29,7 @@ public sealed class GeneralTab : SettingsPane
                 i => act.SetFlyoutTheme(themeValues[i]), ui.Sc(150)));
 
         ui.AddGroup(this, "settings.general.comfort");
-        ui.AddRow(this, "settings.profile.brightness", "settings.brightness.desc",
-            ui.Toggle(cfg.RememberBrightness, act.SetRememberBrightness));
+        // «Запоминать яркость» переехала на вкладку «Экран» — к лимитам яркости (XIC-29)
         // выключенный тумблер = ноль исходящих запросов, поэтому подпись прямая, без оговорок
         ui.AddRow(this, "settings.updates.check", "settings.updates.check.desc",
             ui.Toggle(cfg.CheckUpdates, act.SetCheckUpdates));

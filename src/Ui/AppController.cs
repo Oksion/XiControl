@@ -20,6 +20,7 @@ public sealed class AppController
     private readonly ChargeGuard _charge;
     private readonly RefreshRateGuard _hz;
     private readonly PowerProfileGuard _profiles;
+    private readonly BrightnessCapGuard _capGuard;
     private readonly TravelChargeMonitor _travel;
     private readonly TouchpadControl _touchpad;
     private readonly TouchscreenControl _touchscreen;
@@ -52,7 +53,7 @@ public sealed class AppController
     public Action? FirmwareFailed;             // команда прошивке не прошла — UI показывает честную ошибку
 
     public AppController(IMifsClient mifs, AppConfig cfg, IPowerEvents power, ILocalizer loc,
-        ChargeGuard charge, RefreshRateGuard hz, PowerProfileGuard profiles,
+        ChargeGuard charge, RefreshRateGuard hz, PowerProfileGuard profiles, BrightnessCapGuard capGuard,
         TravelChargeMonitor travel, TouchpadControl touchpad, TouchscreenControl touchscreen,
         TouchpadDeadZone deadZone)
     {
@@ -63,6 +64,7 @@ public sealed class AppController
         _charge = charge;
         _hz = hz;
         _profiles = profiles;
+        _capGuard = capGuard;
         _travel = travel;
         _touchpad = touchpad;
         _touchscreen = touchscreen;
@@ -126,6 +128,11 @@ public sealed class AppController
         // «Запоминать яркость» — самостоятельная опция (без профилей): применить яркость
         // текущего питания на старте (при профилях это уже сделал _profiles.Reapply выше).
         if (_cfg.RememberBrightness && !_cfg.PowerProfiles) _profiles.Reapply();
+
+        // Лимит яркости (XIC-29): превышение на старте сводится тем же вежливым механизмом.
+        // Reapply выше уже сверяется сам; отдельная сверка нужна, когда включён только лимит.
+        if (_cfg.BrightnessCapEnabled && !_cfg.RememberBrightness && !_cfg.PowerProfiles)
+            Task.Run(_capGuard.Evaluate);
 
         // «Режим совы»: восстановить после сбоя, включить заново, либо погасить, если фичу отключили
         if (_cfg.Awake && !_cfg.OwlMode) { AwakeMode.Disable(_cfg); _cfg.Awake = false; _cfg.Save(); }
@@ -394,6 +401,28 @@ public sealed class AppController
         if (Brightness.Get() is not int lvl) return;
         if (_power.IsOnline) _cfg.AcBrightness = lvl;
         else _cfg.BatteryBrightness = lvl;
+    }
+
+    /// <summary>Лимит яркости вкл/выкл (XIC-29). Включили — текущее превышение сводится тем же
+    /// вежливым механизмом схождения; выключили — guard сам останавливает всё, включая паузу.</summary>
+    public void SetBrightnessCap(bool on)
+    {
+        if (_cfg.BrightnessCapEnabled == on) return;
+        _cfg.BrightnessCapEnabled = on;
+        _cfg.Save();
+        _capGuard.ResetBackoff();
+        Task.Run(_capGuard.Evaluate); // сверка читает WMI — не с UI-потока
+    }
+
+    /// <summary>Лимиты яркости из окна настроек (сеть, батарея) — сохранить и свериться.</summary>
+    public void SetBrightnessCaps(int ac, int batt)
+    {
+        _cfg.BrightnessCapAc = ac;
+        _cfg.BrightnessCapBattery = batt;
+        _cfg.Save();
+        if (!_cfg.BrightnessCapEnabled) return;
+        _capGuard.ResetBackoff(); // лимит сменили осознанно — старая пауза больше не про эти условия
+        Task.Run(_capGuard.Evaluate);
     }
 
     // ---- Авто-герцовка ----
