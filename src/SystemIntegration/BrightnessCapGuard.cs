@@ -116,14 +116,23 @@ public sealed class BrightnessCapGuard : IDisposable
     public void Evaluate()
     {
         bool online = _power.IsOnline;
-        if (!_cfg.BrightnessCapEnabled || _adaptive(online)) { Halt(); return; }
+        if (!_cfg.BrightnessCapEnabled || _adaptive(online))
+        {
+            if (_cfg.BrightnessCapEnabled) Log.Write("BrightnessCap: адаптивная яркость включена — лимит не работает");
+            Halt();
+            return;
+        }
 
         int? cur = _read();
         lock (_lock)
         {
             if (cur is int c) _last = c;
             if (_backoff) return;
-            if (_last > Cap(online)) EnsureConvergeLocked();
+            if (_last > Cap(online))
+            {
+                Log.Write($"BrightnessCap: яркость {_last}% выше лимита {Cap(online)}% — схождение взведено");
+                EnsureConvergeLocked();
+            }
             else EpisodeDoneLocked(); // яркость неизвестна (-1) или в норме — следить нечего
         }
     }
@@ -161,6 +170,7 @@ public sealed class BrightnessCapGuard : IDisposable
 
             int to = NextStep(level, cap, _cfg.BrightnessGapDivisor, _cfg.BrightnessSnapPercent);
             _stepped = true;
+            Log.Write($"BrightnessCap: шаг схождения {level}% → {to}% (лимит {cap}%)");
             if (to <= cap)
             {
                 // финальный шаг — доводим до лимита и закрываем эпизод; подъём во время этого
@@ -211,6 +221,7 @@ public sealed class BrightnessCapGuard : IDisposable
 
     private void BackoffLocked()
     {
+        Log.Write($"BrightnessCap: пользователь поднял яркость после нашего шага — пауза {_cfg.BrightnessBackoffMin} мин");
         EpisodeDoneLocked();
         _backoff = true;
         _backoffTimer.Interval = Math.Clamp(_cfg.BrightnessBackoffMin, 1, 24 * 60) * 60_000;

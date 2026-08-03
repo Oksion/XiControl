@@ -117,7 +117,7 @@ public sealed class PowerProfileGuard : IDisposable
     // событие яркости: классифицировать (наша запись/человек) и раздать лимиту и запоминанию
     private void OnBrightnessChanged(int level)
     {
-        bool own = Brightness.Own.Consume(level);
+        bool own = Brightness.Own.IsOwn(level);
         bool settling = Environment.TickCount - _settleUntil < 0;
         _cap.OnBrightness(level, own, settling); // лимиту — все события: свои шаги он не считает протестом
 
