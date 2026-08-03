@@ -69,6 +69,7 @@ public static class Brightness
         if (delta == 0) return;
         int interval = Math.Max(30, durationMs / delta); // пол на случай кривого config.json
         int step = to > from ? 1 : -1;
+        Own.Note(from); // запоздалое событие исходного уровня во время хода — эхо, не действие человека
         Task.Run(() =>
         {
             try
@@ -107,9 +108,11 @@ public static class Brightness
 }
 
 /// <summary>
-/// Учёт значений яркости, выставленных нами и ещё не подтверждённых событием. Метка живёт
-/// недолго: если запись не породила событие (панель не ответила), протухшая метка не должна
-/// позже проглотить настоящий пользовательский выбор того же значения. Чистая логика —
+/// Учёт значений яркости, выставленных нами недавно. Метка живёт по TTL и НЕ снимается при
+/// проверке: WMI-события приходят с потоков пула вразнобой и могут дублироваться, а «съеденная»
+/// первой проверкой метка делала бы дубль нашей же записи «пользовательским» — на живом железе
+/// это давало ложный протест и замораживало схождение на полпути. TTL короткий: протухшая метка
+/// не должна проглотить настоящий пользовательский выбор того же значения. Чистая логика —
 /// тестируется с явным временем.
 /// </summary>
 public sealed class OwnWrites
@@ -123,20 +126,21 @@ public sealed class OwnWrites
 
     public void Note(int level, long nowMs)
     {
-        lock (_lock) _until[level] = nowMs + TtlMs;
-    }
-
-    /// <summary>true — событие с этим значением наше; метка снимается (одноразовая).</summary>
-    public bool Consume(int level) => Consume(level, Environment.TickCount64);
-
-    public bool Consume(int level, long nowMs)
-    {
         lock (_lock)
         {
-            if (!_until.TryGetValue(level, out long until)) return false;
-            _until.Remove(level);
-            return nowMs <= until;
+            // заодно прибираем протухшее — словарь не растёт бесконечно
+            foreach (var k in _until.Where(p => nowMs > p.Value).Select(p => p.Key).ToArray())
+                _until.Remove(k);
+            _until[level] = nowMs + TtlMs;
         }
+    }
+
+    /// <summary>true — событие с этим значением наше (недавно писали его сами).</summary>
+    public bool IsOwn(int level) => IsOwn(level, Environment.TickCount64);
+
+    public bool IsOwn(int level, long nowMs)
+    {
+        lock (_lock) return _until.TryGetValue(level, out long until) && nowMs <= until;
     }
 }
 

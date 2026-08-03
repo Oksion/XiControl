@@ -46,25 +46,28 @@ public sealed class BrightnessCapGuardTests
     // ---- Метки своих записей ----
 
     [Fact]
-    public void OwnWrites_ConsumeIsOneShot()
+    public void OwnWrites_DuplicateEvent_IsStillOurs()
     {
+        // WMI-события приходят с пула вразнобой и дублируются: метка живёт по TTL, а не
+        // снимается первой проверкой — иначе дубль нашей записи читался бы как «пользователь
+        // поднял» и замораживал схождение ложной паузой (поймано вживую на TM2424)
         var own = new OwnWrites();
         own.Note(70, nowMs: 1000);
 
-        own.Consume(70, nowMs: 2000).Should().BeTrue("помеченное значение — наша запись");
-        own.Consume(70, nowMs: 2000).Should().BeFalse("метка одноразовая");
-        own.Consume(55, nowMs: 2000).Should().BeFalse("чужое значение — пользователь");
+        own.IsOwn(70, nowMs: 2000).Should().BeTrue("помеченное значение — наша запись");
+        own.IsOwn(70, nowMs: 2500).Should().BeTrue("дубль события — всё ещё наша запись, не протест");
+        own.IsOwn(55, nowMs: 2000).Should().BeFalse("чужое значение — пользователь");
     }
 
     [Fact]
     public void OwnWrites_ExpiredMark_IsNotOurs()
     {
-        // запись не породила событие (панель молчит) → протухшая метка не должна
-        // проглотить настоящий пользовательский выбор того же значения
+        // метка живёт недолго: протухшая не должна проглотить настоящий
+        // пользовательский выбор того же значения
         var own = new OwnWrites();
         own.Note(70, nowMs: 1000);
 
-        own.Consume(70, nowMs: 1000 + 60_000).Should().BeFalse();
+        own.IsOwn(70, nowMs: 1000 + 60_000).Should().BeFalse();
     }
 
     // ---- Машина состояний guard-а ----
