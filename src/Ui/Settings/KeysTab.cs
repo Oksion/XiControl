@@ -10,7 +10,8 @@ public sealed class KeysTab : SettingsPane
     private static readonly string[] KeyActionValues =
     [
         "modes", "charge", "panel", "owl", "monitor", "travel", "touchpad", "touchscreen",
-        "projection", "settings", "copilot", "launch", "none",
+        "projection", "settings", "copilot", "play", "next", "prev", "stop", "calc",
+        "launch", "none",
     ];
 
     // Единственное действие с полем ввода команды — по нему решаем, пересобирать ли слот.
@@ -33,7 +34,9 @@ public sealed class KeysTab : SettingsPane
         AddKeySlot("settings.key.mi.double", "settings.key.mi.double.desc",
             () => cfg.MiDoubleAction, v => cfg.MiDoubleAction = v,
             () => cfg.MiDoubleCommand, v => cfg.MiDoubleCommand = v);
-        ui.AddNote(this, "settings.keys.mi.hold");
+        AddKeySlot("settings.key.mi.hold", "settings.key.mi.hold.desc",
+            () => cfg.MiHoldAction, v => cfg.MiHoldAction = v,
+            () => cfg.MiHoldCommand, v => cfg.MiHoldCommand = v);
 
         ui.AddGroup(this, "settings.keys.other");
         AddKeySlot("settings.key.settings", "settings.key.settings.desc",

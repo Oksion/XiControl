@@ -98,6 +98,21 @@ public sealed class MiButtonGestureTests
     }
 
     [Fact]
+    public void HoldDisabled_LongPressActsAsClick()
+    {
+        _mi.HoldEnabled = () => false;
+
+        _mi.Down();
+        _hold.Running.Should().BeFalse("выключенный жест не взводит порог удержания");
+
+        _hold.Fire();          // даже если тик придёт — таймер стоит, удержания нет
+        _holds.Should().Be(0);
+
+        _mi.Up(); _click.Fire();
+        _clicks.Should().Be(1, "долгое нажатие уходит в обычный клик, а не пропадает");
+    }
+
+    [Fact]
     public void QuickTapBeforeHoldThreshold_DoesNotHold()
     {
         _mi.Down();

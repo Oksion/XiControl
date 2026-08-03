@@ -19,6 +19,7 @@ public sealed class AppConfigMigrationTests
 
         cfg.MiClickAction.Should().Be("modes");
         cfg.MiDoubleAction.Should().Be("charge");   // MiDoubleClick=true по умолчанию
+        cfg.MiHoldAction.Should().Be("panel");      // до XIC-28 удержание было зашито на панель
         cfg.SettingsKeyAction.Should().Be("charge");
         cfg.AiKeyAction.Should().Be("copilot");
         cfg.ProjKeyAction.Should().Be("projection");
@@ -38,6 +39,27 @@ public sealed class AppConfigMigrationTests
 
         cfg.MiClickAction.Should().Be("charge");
         cfg.MiDoubleAction.Should().Be("modes");
+    }
+
+    [Fact]
+    public void ExistingConfigWithoutHoldAction_KeepsPanelBehaviour()
+    {
+        // конфиг «из прошлой версии»: клик/двойной уже заданы, про удержание он не знает
+        var cfg = new AppConfig { MiClickAction = "modes", MiDoubleAction = "none" };
+
+        cfg.MigrateKeyActions();
+
+        cfg.MiHoldAction.Should().Be("panel", "поведение удержания не должно измениться");
+    }
+
+    [Fact]
+    public void ExplicitHoldAction_SurvivesMigration()
+    {
+        var cfg = new AppConfig { MiHoldAction = "travel" };
+
+        cfg.MigrateKeyActions();
+
+        cfg.MiHoldAction.Should().Be("travel");
     }
 
     [Fact]

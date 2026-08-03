@@ -26,6 +26,11 @@ public sealed class KeyRouter
     public Action? Projection;
     public Action? OpenSettings;
     public Action? Copilot;
+    public Action? MediaPlayPause;
+    public Action? MediaNext;
+    public Action? MediaPrev;
+    public Action? MediaStop;
+    public Action? Calculator;
     public Action<string>? Launch;
 
     // --- клавиши-уведомления (прошивка уже всё сделала — показать OSD) ---
@@ -83,6 +88,11 @@ public sealed class KeyRouter
             case "projection": Projection?.Invoke(); break;
             case "settings": OpenSettings?.Invoke(); break;
             case "copilot": Copilot?.Invoke(); break;
+            case "play": MediaPlayPause?.Invoke(); break;
+            case "next": MediaNext?.Invoke(); break;
+            case "prev": MediaPrev?.Invoke(); break;
+            case "stop": MediaStop?.Invoke(); break;
+            case "calc": Calculator?.Invoke(); break;
             case "launch":
                 if (!string.IsNullOrWhiteSpace(command)) Launch?.Invoke(command);
                 break;
