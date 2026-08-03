@@ -28,6 +28,11 @@ public sealed class MiButtonGesture : IDisposable
     /// без окна ожидания ~300 мс (MiDoubleAction = "none").</summary>
     public Func<bool> DoubleEnabled = () => true;
 
+    /// <summary>Включён ли жест удержания; false — таймер не заводим вовсе, и долгое нажатие
+    /// отработает обычным кликом по отпусканию (MiHoldAction = "none"). Иначе удержание
+    /// «съело» бы и себя, и клик — кнопка выглядела бы сломанной.</summary>
+    public Func<bool> HoldEnabled = () => true;
+
     // holdMs/doubleClickMs настраиваются из config.json (AppConfig.MiHoldMs/MiDoubleClickMs);
     // клэмп снизу — чтобы кривое значение не сломало жест (мгновенное удержание / нулевое окно).
     public MiButtonGesture(IAppTimer? hold = null, IAppTimer? click = null,
@@ -47,7 +52,7 @@ public sealed class MiButtonGesture : IDisposable
     {
         _handled = false;
         _hold.Stop();
-        _hold.Start();
+        if (HoldEnabled()) _hold.Start();
     }
 
     /// <summary>Кнопка отпущена (KeyMiUp).</summary>

@@ -223,15 +223,20 @@ public sealed class AppConfig
     // ---- Действия клавиш ----
     // На каждый слот — своё действие из общего списка: "modes" (цикл режимов), "charge"
     // (заряд 80/100), "panel" (быстрая панель), "owl", "monitor", "travel", "projection"
-    // (Win+P), "settings" (Параметры Windows), "copilot" (Win+C), "launch" (команда из
-    // соответствующего *Command), "none". null → дефолт слота (см. MigrateKeyActions).
+    // (Win+P), "settings" (Параметры Windows), "copilot" (Win+C), "play"/"next"/"prev"/"stop"
+    // (мультимедиа), "calc" (калькулятор), "launch" (команда из соответствующего *Command),
+    // "none". null → дефолт слота (см. MigrateKeyActions).
 
-    /// <summary>Одиночный клик Mi-кнопки (дефолт "modes"). Удержание всегда открывает панель.</summary>
+    /// <summary>Одиночный клик Mi-кнопки (дефолт "modes").</summary>
     public string? MiClickAction { get; set; }
 
     /// <summary>Двойной клик Mi-кнопки (дефолт "charge"). "none" — жест отключён,
     /// одиночный клик срабатывает мгновенно (без окна ожидания ~300 мс).</summary>
     public string? MiDoubleAction { get; set; }
+
+    /// <summary>Удержание Mi-кнопки (дефолт "panel" — прежнее зашитое поведение). "none" —
+    /// жест отключён, долгое нажатие отрабатывает обычным кликом.</summary>
+    public string? MiHoldAction { get; set; }
 
     /// <summary>Клавиша «настройки» (шестерёнка), дефолт "charge". При открытой панели — всегда заряд.</summary>
     public string? SettingsKeyAction { get; set; }
@@ -246,6 +251,7 @@ public sealed class AppConfig
     /// (поддерживаются %ПЕРЕМЕННЫЕ%; путь с пробелами — в кавычках).</summary>
     public string? MiClickCommand { get; set; }
     public string? MiDoubleCommand { get; set; }
+    public string? MiHoldCommand { get; set; }
     public string? SettingsKeyCommand { get; set; }
     public string? AiKeyCommand { get; set; }
     public string? ProjKeyCommand { get; set; }
@@ -330,6 +336,8 @@ public sealed class AppConfig
             MiDoubleAction ??= !MiDoubleClick ? "none" : (chargeFirst ? "modes" : Charge);
         }
         MiDoubleAction ??= Charge;
+        // до XIC-28 удержание было зашито на панель — старые конфиги ведут себя как прежде
+        MiHoldAction ??= "panel";
         SettingsKeyAction ??= string.Equals(SettingsKey, "settings", StringComparison.OrdinalIgnoreCase)
             ? "settings" : Charge;
         if (AiKeyAction is null)

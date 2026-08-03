@@ -36,12 +36,30 @@ public sealed class KeyRouterTests
             Projection = () => _hits.Add("projection"),
             OpenSettings = () => _hits.Add("settings"),
             Copilot = () => _hits.Add("copilot"),
+            MediaPlayPause = () => _hits.Add("play"),
+            MediaNext = () => _hits.Add("next"),
+            MediaPrev = () => _hits.Add("prev"),
+            MediaStop = () => _hits.Add("stop"),
+            Calculator = () => _hits.Add("calc"),
             Launch = cmd => _hits.Add("launch:" + cmd),
             MicKey = v => _hits.Add("mic:" + v),
             BacklightKey = v => _hits.Add("backlight:" + v),
             FnLockKey = v => _hits.Add("fnlock:" + v),
         };
         mi.Click = () => _router.Run(_cfg.MiClickAction, _cfg.MiClickCommand);
+    }
+
+    [Theory]
+    [InlineData("play")]
+    [InlineData("next")]
+    [InlineData("prev")]
+    [InlineData("stop")]
+    [InlineData("calc")]
+    public void MediaAndCalcActions_RunTheirExecutor(string action)
+    {
+        _router.Run(action, null);
+
+        _hits.Should().Equal(action);
     }
 
     [Fact]

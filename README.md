@@ -77,7 +77,8 @@ double-click; current direction is shown by color (charging green / discharging 
 - 🅼 **Mi button**:
   - short press — cycle through modes with an OSD (configurable);
   - double click — toggle the charge limit (configurable);
-  - hold — quick settings panel (modes + charge limit, closes on Esc/X/click-outside).
+  - hold — quick settings panel (modes + charge limit, closes on Esc/X/click-outside;
+    configurable).
 - ⌨️ **Reviving "dead" keys** with remapping: the Mi clicks and the "settings" / AI /
   "projection" keys can be bound to any function — from cycling modes to launching your
   own program (see "Key remapping"); the microphone key mutes the system mic, the backlight
@@ -389,30 +390,37 @@ disappears for a second). Turning the option off **removes** the value rather th
 
 ### Key remapping
 
-Each key gets its own action: **Settings → Keys**. The slots are the single and double Mi-button
-click, the "Settings" (gear), AI and "Projection" keys. Any slot can be bound to: cycle modes,
-charge limit on/off, quick panel, owl mode, Monitor, "travel", touchpad and touchscreen on/off, the
-system "Projection (Win+P)" / "Windows Settings" / "Copilot (Win+C)", launching your own program,
+Each key gets its own action: **Settings → Keys**. The slots are the single click, double click and
+hold of the Mi button, plus the "Settings" (gear), AI and "Projection" keys. Any slot can be bound
+to: cycle modes, charge limit on/off, quick panel, owl mode, Monitor, "travel", touchpad and
+touchscreen on/off, the system "Projection (Win+P)" / "Windows Settings" / "Copilot (Win+C)", media
+controls (play/pause, next and previous track, stop), the calculator, launching your own program,
 or "Nothing".
+
+Media actions work with any player — the key goes to whoever owns the Windows media session. Volume
+is deliberately absent: the keyboard already has dedicated keys for it.
 
 The touchpad and touchscreen are disabled with Windows' stock mechanism (like "Disable device" in
 Device Manager, no drivers) and **always re-enable on their own after a reboot** — they can't get
 stuck disabled. Their cells are also in the quick panel, next to auto refresh rate (the touchscreen
 cell only if a touchscreen is present).
 
-- Holding the Mi button always opens the quick panel (not configurable).
+- Holding the Mi button opens the quick panel by default, but it can be remapped — e.g. put the
+  panel on a single click and "travel" on the hold.
 - Double-click Mi = "Nothing" → the gesture is off, a single click fires instantly
   (no ~300 ms wait window).
+- Hold Mi = "Nothing" → the gesture is off, and a long press falls back to a plain click
+  (rather than doing nothing at all).
 - With the panel open, the "Settings" key always toggles charge (the pill in the panel).
 - For "Launch a program…" an exe, a document or a URL will do; environment variables
   (`%USERPROFILE%` etc.) are expanded, a path with spaces goes in quotes, arguments can follow the
   path: `"C:\\Program Files\\App\\app.exe" --flag`. Note: Xi Control runs with administrator rights —
   the launched program inherits them.
 
-In `config.json` these are `*Action`/`*Command` pairs (`MiClick`, `MiDouble`, `SettingsKey`,
-`AiKey`, `ProjKey`); action values: `modes`, `charge`, `panel`, `owl`, `monitor`, `touchpad`,
-`touchscreen`,
-`travel`, `projection`, `settings`, `copilot`, `launch`, `none`:
+In `config.json` these are `*Action`/`*Command` pairs (`MiClick`, `MiDouble`, `MiHold`,
+`SettingsKey`, `AiKey`, `ProjKey`); action values: `modes`, `charge`, `panel`, `owl`, `monitor`,
+`touchpad`, `touchscreen`, `travel`, `projection`, `settings`, `copilot`, `play`, `next`, `prev`,
+`stop`, `calc`, `launch`, `none`:
 
 ```json
 "MiClickAction": "modes",

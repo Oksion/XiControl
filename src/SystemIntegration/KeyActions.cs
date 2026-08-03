@@ -3,10 +3,13 @@ using System.Runtime.InteropServices;
 
 namespace XiControl.SystemIntegration;
 
-/// <summary>Действия для «оживления» спец-клавиш: проекция, настройки, Copilot.</summary>
+/// <summary>Действия для «оживления» спец-клавиш: проекция, настройки, Copilot, мультимедиа.</summary>
 public static class KeyActions
 {
     private const byte VK_LWIN = 0x5B, VK_P = 0x50, VK_C = 0x43;
+    // Мультимедиа и «калькулятор» — стандартные VK, их ловит шелл, а не конкретное окно
+    private const byte VK_MEDIA_NEXT = 0xB0, VK_MEDIA_PREV = 0xB1, VK_MEDIA_STOP = 0xB2,
+                       VK_MEDIA_PLAY_PAUSE = 0xB3, VK_LAUNCH_APP2 = 0xB7;
     private const uint KEYEVENTF_KEYUP = 0x02;
 
     [DllImport("user32.dll")]
@@ -91,6 +94,33 @@ public static class KeyActions
             Process.Start(psi);
         }
         catch (Exception ex) { Log.Ex("KeyActions.Launch", ex); }
+    }
+
+    /// <summary>Воспроизведение / пауза. Медиа-клавишу получает владелец медиа-сессии
+    /// Windows (SMTC), поэтому работает с любым плеером — своей интеграции не нужно.</summary>
+    public static void MediaPlayPause() => TapKey(VK_MEDIA_PLAY_PAUSE);
+
+    /// <summary>Следующий трек.</summary>
+    public static void MediaNext() => TapKey(VK_MEDIA_NEXT);
+
+    /// <summary>Предыдущий трек.</summary>
+    public static void MediaPrev() => TapKey(VK_MEDIA_PREV);
+
+    /// <summary>Остановить воспроизведение.</summary>
+    public static void MediaStop() => TapKey(VK_MEDIA_STOP);
+
+    /// <summary>
+    /// Калькулятор — именно клавишей, а не Process.Start: в Win11 это UWP-приложение, а мы
+    /// запущены elevated, и запуск UWP из-под админа ненадёжен. VK уходит в шелл, поэтому
+    /// калькулятор открывается от имени пользователя — как и должен.
+    /// </summary>
+    public static void Calculator() => TapKey(VK_LAUNCH_APP2);
+
+    // Нажать и отпустить одну клавишу (медиа/запуск приложения — без модификаторов)
+    private static void TapKey(byte vk)
+    {
+        keybd_event(vk, 0, 0, UIntPtr.Zero);
+        keybd_event(vk, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
     }
 
     private static void WinCombo(byte vk)

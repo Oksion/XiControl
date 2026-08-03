@@ -196,14 +196,15 @@ public sealed class TrayApp : IDisposable
             else _osd.Flash(b ? OsdKind.TouchscreenOn : OsdKind.TouchscreenOff,
                             Loc.T(b ? "osd.touchscreen.on" : "osd.touchscreen.off"));
         }));
-        // Жесты Mi: одинарный/двойной клик настраиваются (MiClickAction/MiDoubleAction);
-        // двойной = "none" — жест отключён, одинарный срабатывает мгновенно; удержание → панель
+        // Все три жеста Mi настраиваются (MiClickAction/MiDoubleAction/MiHoldAction); "none"
+        // гасит жест: двойной — одинарный срабатывает мгновенно, удержание — уходит в клик
         _mi = new MiButtonGesture(holdMs: _cfg.MiHoldMs, doubleClickMs: _cfg.MiDoubleClickMs)
         {
             Click = () => _router!.Run(_cfg.MiClickAction, _cfg.MiClickCommand),
             DoubleClick = () => _router!.Run(_cfg.MiDoubleAction, _cfg.MiDoubleCommand),
-            Hold = () => _panel.Toggle(),
-            DoubleEnabled = () => !string.Equals(_cfg.MiDoubleAction, "none", StringComparison.OrdinalIgnoreCase),
+            Hold = () => _router!.Run(_cfg.MiHoldAction, _cfg.MiHoldCommand),
+            DoubleEnabled = () => !IsNone(_cfg.MiDoubleAction),
+            HoldEnabled = () => !IsNone(_cfg.MiHoldAction),
         };
         // Роутинг клавиш: исполнители действий — командный слой (окна/панель — наши)
         _router = new KeyRouter(_cfg, _mi)
@@ -219,6 +220,11 @@ public sealed class TrayApp : IDisposable
             Projection = KeyActions.Projection,
             OpenSettings = KeyActions.OpenSettings,
             Copilot = KeyActions.Copilot,
+            MediaPlayPause = KeyActions.MediaPlayPause,
+            MediaNext = KeyActions.MediaNext,
+            MediaPrev = KeyActions.MediaPrev,
+            MediaStop = KeyActions.MediaStop,
+            Calculator = KeyActions.Calculator,
             Launch = KeyActions.LaunchCommand,
             MicKey = OnMicKey,
             BacklightKey = OnBacklightKey,
@@ -438,6 +444,10 @@ public sealed class TrayApp : IDisposable
 
     // Склейка строк подписи OSD через « • » (любая часть может быть null).
     private static string? Append(string? a, string? b) => a is null ? b : b is null ? a : $"{a} • {b}";
+
+    // Жест выключен: действие слота — "none" (null = ещё не мигрированный конфиг, жест жив).
+    private static bool IsNone(string? action) =>
+        string.Equals(action, "none", StringComparison.OrdinalIgnoreCase);
 
     // ---- HTTP API (XIC-13) ----
 
