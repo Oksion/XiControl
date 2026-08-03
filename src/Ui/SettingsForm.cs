@@ -233,7 +233,7 @@ public sealed class SettingsForm : Form
         AddTab("settings.tab.about", NavGlyph.About, () => new AboutTab(_ui, _act, rebuild));
 
         _nav.Tabs = [.. tabs];
-        if (_tab >= _panes.Count) _tab = 0; // раскладка сузилась (скрыли «Экран») — на первую вкладку
+        _tab = UiNav.ClampTab(_tab, _panes.Count); // вкладка исчезла (скрыли «Экран») — на первую
         _nav.Selected = _tab;
 
         SelectTab(_tab);

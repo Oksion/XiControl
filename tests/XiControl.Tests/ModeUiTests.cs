@@ -20,4 +20,17 @@ public sealed class ModeUiTests
         AppController.AllModes.Select(ModeUi.Accent).Should().OnlyHaveUniqueItems();
         AppController.AllModes.Select(ModeUi.Kind).Should().OnlyHaveUniqueItems();
     }
+
+    // Чужая модель может прислать код режима, которого у нас нет: подписи для него не
+    // существует (рисовать нечего), но цвет и вид OSD обязаны деградировать к «Авто»,
+    // а не уронить отрисовку панели.
+    [Fact]
+    public void UnknownMode_DegradesToAuto()
+    {
+        var alien = (Wmi.PerfMode)0x7F;
+
+        ModeUi.Key(alien).Should().BeNull();
+        ModeUi.Kind(alien).Should().Be(ModeUi.Kind(Wmi.PerfMode.Auto));
+        ModeUi.Accent(alien).Should().Be(ModeUi.Accent(Wmi.PerfMode.Auto));
+    }
 }
