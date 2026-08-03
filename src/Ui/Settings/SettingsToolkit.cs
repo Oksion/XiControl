@@ -132,14 +132,18 @@ public sealed class SettingsToolkit
         p.Controls.Add(note);
     }
 
-    public void AddKv(Panel p, string key, string val)
+    /// <summary>Строка «ключ — значение». Возвращает label значения: вызывающий может сделать
+    /// его кликабельным (так раскрывается скрытый серийник на «О программе»).</summary>
+    public Label AddKv(Panel p, string key, string val)
     {
         var row = new Panel { Width = RowW, Height = Sc(34), BackColor = T.WinBg, Margin = new Padding(0) };
         row.Paint += (_, e) => { using var pen = new Pen(T.Border); e.Graphics.DrawLine(pen, 0, row.Height - 1, RowW, row.Height - 1); };
         // Font задаём явно: наследованный ambient не пересчитывался бы вместе с Sc() при смене DPI
         row.Controls.Add(new Label { Text = Loc.T(key), Tag = "dim", AutoSize = true, ForeColor = T.Text2, BackColor = Color.Transparent, Font = NoteFont, Location = new Point(Sc(2), Sc(9)) });
-        row.Controls.Add(new Label { Text = val, AutoSize = true, ForeColor = T.Text, BackColor = Color.Transparent, Font = NoteFont, Location = new Point(Sc(180), Sc(9)) });
+        var value = new Label { Text = val, AutoSize = true, ForeColor = T.Text, BackColor = Color.Transparent, Font = NoteFont, Location = new Point(Sc(180), Sc(9)) };
+        row.Controls.Add(value);
         p.Controls.Add(row);
+        return value;
     }
 
     public Panel SubRow(string titleKey, Control ctl)

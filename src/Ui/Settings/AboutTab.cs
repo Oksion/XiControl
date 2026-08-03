@@ -75,7 +75,24 @@ public sealed class AboutTab : SettingsPane
         Controls.Add(links);
 
 
-        ui.AddKv(this, "settings.about.model", SafeModel());
+        // Сведения о железе — из кэша SystemInfo: вкладка пересобирается на каждый показ,
+        // свой WMI-запрос отсюда улетал бы по нескольку раз за сессию. Пустое поле не
+        // показываем вовсе: на чужой машине лучше короткий список, чем столбик прочерков.
+        var sys = SystemInfo.Current;
+        if (sys.ModelLine is { } model) ui.AddKv(this, "settings.about.model", model);
+        if (sys.BiosLine is { } bios) ui.AddKv(this, "settings.about.bios", bios);
+        if (sys.SerialMasked is { } masked && sys.Serial is { } serial)
+        {
+            // Серийник закрыт по умолчанию: скриншот этой вкладки уходит в тему совместимости,
+            // и уникальный идентификатор устройства ни к чему в публичном треде. Клик раскрывает —
+            // и только до следующей пересборки окна, залипнуть открытым он не может.
+            var sn = ui.AddKv(this, "settings.about.serial", masked);
+            sn.Cursor = Cursors.Hand;
+            sn.AccessibleName = Loc.T("settings.about.serial.show");
+            var tip = new ToolTip();
+            tip.SetToolTip(sn, Loc.T("settings.about.serial.show"));
+            sn.Click += (_, _) => { sn.Text = serial; sn.Cursor = Cursors.Default; tip.SetToolTip(sn, null); };
+        }
         ui.AddKv(this, "settings.about.iface", "MiCommonInterface (MIFS)");
         ui.AddKv(this, "settings.about.config", "%APPDATA%\\XiControl\\config.json");
         ui.AddKv(this, "settings.about.log", "%APPDATA%\\XiControl\\log.txt");
@@ -99,17 +116,6 @@ public sealed class AboutTab : SettingsPane
     {
         try { return FileVersionInfo.GetVersionInfo(Environment.ProcessPath!).ProductVersion?.Split('+')[0] ?? "—"; }
         catch { return "—"; }
-    }
-
-    private static string SafeModel()
-    {
-        try
-        {
-            using var s = new System.Management.ManagementObjectSearcher("SELECT Model FROM Win32_ComputerSystem");
-            foreach (var o in s.Get()) return o["Model"]?.ToString() ?? "—";
-        }
-        catch { /* WMI недоступен */ }
-        return "—";
     }
 
     private static void Open(string url)
