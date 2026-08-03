@@ -110,11 +110,16 @@ double-click; current direction is shown by color (charging green / discharging 
   (rates configurable in config: `AcRefreshRate`/`BatteryRefreshRate`; if the panel lacks
   such a rate, the nearest one is used). A menu toggle and a panel cell;
   holds after sleep and power-source changes. Refresh-rate control can be hidden entirely
-  (Settings → Features or `"RefreshRateFeature": false`) — the menu item, cell and Display tab go away.
+  (Settings → Features or `"RefreshRateFeature": false`) — the menu item, panel cell and the
+  refresh-rate section of the Display tab go away (the tab itself stays — brightness lives there).
 - 🔌 **Power profiles** — your own performance mode on AC and on battery
   ("Don't change" — leave alone). Applied at startup and on power-source changes; driver-free (firmware WMI).
 - 💡 **Brightness memory** — a separate option (no profiles): screen brightness is remembered
   and restored separately for AC and battery (WMI ACPI, the same channel Windows uses).
+- 🌗 **Brightness limit** — a maximum brightness, separately for AC and battery (protects an
+  OLED panel from burn-in): anything above the limit smoothly slides back, and not as an
+  ultimatum but as a "bargain" — once a minute, half the gap; raise it again and the utility
+  backs off for 2 hours. See "Screen brightness limit" below.
 - 🌐 UI language: Russian / English / Chinese (中文).
 - 🚀 Autostart via Task Scheduler (no UAC prompt at logon, works on battery).
 - 🛰️ **HTTP API for the local network** (optional, **off by default**) — control it from a
@@ -202,18 +207,20 @@ Launch `XiControl.exe` (confirm the UAC prompt) — a tray icon appears.
 | Right-click the icon | Menu: charge, "travel", owl, auto refresh rate, Monitor, mode, Settings…, exit |
 | Mi button, single click | Next performance mode + OSD *(configurable)* |
 | Mi button, double click | Toggle charge limit threshold ↔ 100% + OSD *(configurable)* |
-| Mi button, hold ~0.5 s | Quick settings panel |
+| Mi button, hold ~0.5 s | Quick settings panel *(configurable)* |
 | Microphone key | Mute/unmute the system microphone + OSD |
 | "Settings" key | Toggle charge limit threshold ↔ 100% + OSD *(configurable)* |
 | Keyboard backlight key | OSD with the level (off / 50% / 100% / auto) |
 
 All options live in the **Settings…** window (tray menu item): tabs General (language,
-autostart, panel theme, brightness memory, update check, logging), Features (owl, touchpad,
+autostart, panel theme, update check, logging), Features (owl, touchpad,
 touchscreen, refresh-rate control), Battery (charge threshold with a hint, "travel" sound and file,
 lock-screen sound and toast, charger-wattage OSD, "weak PSU" threshold, battery health), Display
-(auto refresh rate, "Keep refresh rate" and the rates; the tab is hidden if refresh-rate control is
-off), Touchpad (bottom dead zone), Performance (mode visibility, startup mode, power profiles),
-Keys (remapping), HTTP API (port, token, permissions) and About. The quick toggles (charge, "travel", owl, refresh rate, Monitor,
+(brightness limit and memory; auto refresh rate, "Keep refresh rate" and the rates — the section is
+hidden if refresh-rate control is off), Touchpad (bottom dead zone), Performance (mode visibility,
+startup mode, power profiles), Keys (remapping), HTTP API (port, token, permissions) and About
+(version, model with the board code, BIOS, serial number — masked by default, click to reveal).
+The quick toggles (charge, "travel", owl, refresh rate, Monitor,
 mode) stay in the tray menu and the panel.
 
 Fine timings are edited only in `%APPDATA%\XiControl\config.json` (applied on the next
@@ -310,7 +317,7 @@ below the radio choice appear "Mode on AC" and "Mode on battery" (or "Don't chan
 
 ### Screen brightness memory
 
-A separate option **Settings → General → "Remember screen brightness"** (**off** by default),
+A separate option **Settings → Display → "Remember screen brightness"** (**off** by default),
 independent of "Power profiles". The utility tracks your brightness separately for AC and battery
 and restores it on each transition: you set 80% on AC → the next plug-in returns 80%. Driver-free:
 WMI `WmiMonitorBrightness*` (ACPI backlight, the same channel Windows uses).
@@ -321,6 +328,36 @@ WMI `WmiMonitorBrightness*` (ACPI backlight, the same channel Windows uses).
 - Mode and brightness changes run **in the background** (the UI isn't blocked); on a panel without
   WMI brightness the feature degrades silently (logs to `log.txt`, doesn't crash). Config writes are
   debounced (sparing the SSD).
+
+### Screen brightness limit
+
+**Settings → Display → "Limit brightness"** (**off** by default) + two limits — one for AC, one
+for battery. Made with OLED panels in mind: constant high brightness accelerates burn-in, and the
+limit gently keeps it from living there. Driver-free — the same ACPI backlight WMI channel.
+
+Up front and honestly: **locking the Windows brightness slider itself is impossible** — no such
+API exists. The utility can only bring brightness back after the fact, so the rollback is made as
+unobtrusive as possible:
+
+- Excess is lowered **smoothly** (~10 s for the whole path, 1% steps), never as a jump.
+- **A "polite bargain" instead of an ultimatum**: set 80 with a limit of 60 — the utility doesn't
+  rewind immediately, but halves the gap once a minute: 80 → 70 → 65 → 63 → … → 60. A remainder
+  of ≤2% is closed in one go.
+- **Raised it again after its step** — that's a "I really need it brighter" signal: the utility
+  yields and **leaves brightness alone for 2 hours**. The pause resets on session lock, sleep,
+  a power-source change and an app restart.
+- **Lowering below the limit is never touched** — the utility never raises brightness.
+- **With Windows adaptive brightness on, the limit doesn't work** (two systems would fight over
+  brightness): the utility detects this and states the reason right on the tab. Turn adaptive off
+  in Settings → System → Display.
+- Plays nice with "Remember brightness": values above the limit are **not remembered at all**
+  (rather than clamped) — your comfortable brightness in the slot isn't eroded; on restore the
+  slot is pressed down to the current limit but stays untouched in the config.
+
+In `config.json`: `BrightnessCapEnabled`, `BrightnessCapAc`/`BrightnessCapBattery` (limits, %),
+and fine timings — `BrightnessRampMs` (smooth-slide duration, 10000), `BrightnessConvergeMs`
+(interval between bargain steps, 60000), `BrightnessBackoffMin` (pause after a repeated raise, 120),
+`BrightnessGapDivisor` (gap divisor, 2), `BrightnessSnapPercent` (close-out threshold, 2).
 
 ### Auto refresh rate (screen rate by power source)
 

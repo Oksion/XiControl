@@ -115,14 +115,17 @@ xi_control/
  │   ├─ Ui/                 — AppController (командный слой — все Set*/Toggle*, честные ошибки),
  │   │                         TrayApp (тонкий монтажник), TrayMenuBuilder, TrayIconController,
  │   │                         QuickPanelForm, OsdForm, MonitorForm, FlyoutForm(+FlyoutPalette),
- │   │                         FormChrome, ModeUi, SettingsForm, SettingsActions, ToggleSwitch,
+ │   │                         FormChrome, ModeUi, UiNav (чистая навигация — под тестами),
+ │   │                         SettingsForm, SettingsActions, ToggleSwitch,
  │   │                         ScaledFonts, SvgIcons, FlyoutTip, Draw, TrayIcons, DarkMenu
  │   ├─ Ui/Settings/        — SettingsToolkit (фабрика виджетов), SettingsTheme, NavStrip,
  │   │                         SettingsPane (база вкладок), вкладки-контролы
  │   │                         General/Features/Battery/Display/Touchpad/Perf/Keys/Api/AboutTab
  │   ├─ SystemIntegration/  — ChargeGuard, RefreshRate(+Guard), PowerProfileGuard,
+ │   │                         BrightnessCapGuard (лимит яркости, XIC-29),
  │   │                         TravelChargeMonitor, IPowerEvents+IDisplayEvents/SystemEventsSource,
- │   │                         IAppTimer/UiTimer, Brightness, TouchpadControl/TouchscreenControl
+ │   │                         IAppTimer/UiTimer/WorkerTimer, Brightness (+Ramp/Own/
+ │   │                         AdaptiveBrightness), TouchpadControl/TouchscreenControl
  │   │                         (общий HidNodeToggle), TouchpadDeadZone, AwakeMode, MicControl,
  │   │                         KeyActions, AutoStart, UpdateCheck, Sound, BatteryInfo, PowerDraw,
  │   │                         GpuTelemetry,
