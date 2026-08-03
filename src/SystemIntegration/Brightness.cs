@@ -26,12 +26,10 @@ public static class Brightness
         {
             using var s = new ManagementObjectSearcher(ScopePath,
                 "SELECT CurrentBrightness FROM WmiMonitorBrightness");
-            foreach (ManagementObject mo in s.Get())
-                using (mo)
-                    return Convert.ToInt32(mo["CurrentBrightness"], System.Globalization.CultureInfo.InvariantCulture);
+            return WmiQuery.First(s, mo =>
+                Convert.ToInt32(mo["CurrentBrightness"], System.Globalization.CultureInfo.InvariantCulture));
         }
-        catch (Exception ex) { Log.Ex("Brightness.Get", ex); }
-        return null;
+        catch (Exception ex) { Log.Ex("Brightness.Get", ex); return null; }
     }
 
     /// <summary>

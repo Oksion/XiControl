@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Text;
 
+namespace XiControl.Ui; // как Icons.cs: генератор живёт рядом с геометрией иконок
+
 /// <summary>
 /// Генерирует SVG-версии иконок (та же геометрия, что в Icons.cs) и собирает лист,
 /// как в PNG-превью. Координаты считаются кодом — без ручной арифметики.
