@@ -378,18 +378,16 @@ public sealed class MonitorForm : FlyoutForm
         {
             _battery ??= new ManagementObjectSearcher(@"root\wmi",
                 "SELECT ChargeRate, DischargeRate, Discharging FROM BatteryStatus");
-            foreach (ManagementObject o in _battery.Get())
+            return SystemIntegration.WmiQuery.First(_battery, o =>
             {
                 bool discharging = (bool)o["Discharging"];
                 uint rate = discharging ? (uint)(int)o["DischargeRate"] : (uint)(int)o["ChargeRate"];
-                o.Dispose();
                 if (rate == 0) return float.NaN;
                 float w = rate / 1000f;
                 return discharging ? -w : w;   // разряд — вниз (минус), заряд — вверх (плюс)
-            }
+            }) ?? float.NaN;                   // датчика нет вовсе — как и раньше, «неизвестно»
         }
-        catch (Exception ex) { Log.Ex("Monitor.Power", ex); _battery = null; }
-        return float.NaN;
+        catch (Exception ex) { Log.Ex("Monitor.Power", ex); _battery = null; return float.NaN; }
     }
 
     // ---------- отрисовка ----------

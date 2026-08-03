@@ -109,11 +109,8 @@ public sealed class SystemInfo
         try
         {
             using var s = new ManagementObjectSearcher(wql);
-            foreach (ManagementObject mo in s.Get())
-                using (mo)
-                    return mo[field]?.ToString();
+            return WmiQuery.FirstString(s, mo => mo[field]?.ToString());
         }
-        catch (Exception ex) { Log.Ex($"SystemInfo.Query({field})", ex); }
-        return null;
+        catch (Exception ex) { Log.Ex($"SystemInfo.Query({field})", ex); return null; }
     }
 }
