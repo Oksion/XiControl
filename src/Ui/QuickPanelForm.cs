@@ -198,16 +198,10 @@ public sealed class QuickPanelForm : FlyoutForm
         Size = new Size(width, height);
         SetRoundedRegion(Sc(18));
 
-        // порядок клавиатурного обхода: режимы, нижний ряд слева направо, кнопки шапки
+        // порядок клавиатурного обхода — чистая логика в UiNav (покрыта тестами)
         _order.Clear();
-        for (int i = 0; i < n; i++) _order.Add(i);
-        _order.Add(16); _order.Add(10); _order.Add(11);
-        if (!_tsCell.IsEmpty) _order.Add(18);
-        if (!_tpCell.IsEmpty) _order.Add(17);
-        if (!_hzCell.IsEmpty) _order.Add(15);
-        if (!_awake.IsEmpty) _order.Add(13);
-        _order.Add(19); _order.Add(14); _order.Add(12); // шестерёнка, монитор, крестик
-        if (_focus >= _order.Count) _focus = -1; // раскладка сузилась — сбросить
+        _order.AddRange(UiNav.PanelOrder(n, !_tsCell.IsEmpty, !_tpCell.IsEmpty, !_hzCell.IsEmpty, !_awake.IsEmpty));
+        _focus = UiNav.KeepFocus(_focus, _order.Count); // раскладка сузилась — сбросить
     }
 
     private Rectangle RectOf(int id) => id switch
@@ -232,12 +226,12 @@ public sealed class QuickPanelForm : FlyoutForm
         {
             case Keys.Right:
             case Keys.Down:
-                _focus = (_focus + 1 + _order.Count) % _order.Count;
+                _focus = UiNav.NextFocus(_focus, _order.Count, forward: true);
                 Invalidate();
                 return true;
             case Keys.Left:
             case Keys.Up:
-                _focus = (_focus <= 0 ? _order.Count : _focus) - 1;
+                _focus = UiNav.NextFocus(_focus, _order.Count, forward: false);
                 Invalidate();
                 return true;
             case Keys.Enter:
