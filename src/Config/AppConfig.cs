@@ -121,10 +121,44 @@ public sealed class AppConfig
     public PerfMode? BatteryPerfMode { get; set; }
 
     /// <summary>Запоминать и восстанавливать яркость экрана отдельно для сети и батареи.
-    /// Самостоятельная опция (в «Общих»): работает и без «Профилей питания» — держит её
+    /// Самостоятельная опция (вкладка «Экран»): работает и без «Профилей питания» — держит её
     /// PowerProfileGuard независимо. По умолчанию выкл: утилита перебивает яркость Windows
     /// только по явному выбору пользователя.</summary>
     public bool RememberBrightness { get; set; } = false;
+
+    /// <summary>
+    /// Ограничивать яркость экрана (XIC-29, бережёт OLED от выгорания): выше лимита яркость
+    /// плавно сводится обратно. Заблокировать сам ползунок Windows невозможно — только вернуть
+    /// после факта, о чём честно сказано в описании настройки. Держит BrightnessCapGuard.
+    /// </summary>
+    public bool BrightnessCapEnabled { get; set; } = false;
+
+    /// <summary>Лимит яркости (%) при питании от сети.</summary>
+    public int BrightnessCapAc { get; set; } = 80;
+
+    /// <summary>Лимит яркости (%) при питании от батареи.</summary>
+    public int BrightnessCapBattery { get; set; } = 60;
+
+    // Тайминги лимита яркости — только правкой config.json (в UI не выносим, дефолты согласованы
+    // в XIC-29). Кривые значения клэмпит BrightnessCapGuard при чтении.
+
+    /// <summary>Длительность плавного хода яркости на весь путь, мс: интервал шага = длительность /
+    /// дельта, поэтому спуск 100→70 и 75→70 занимает одинаковое время. Дефолт 10 с.</summary>
+    public int BrightnessRampMs { get; set; } = 10_000;
+
+    /// <summary>Интервал между шагами схождения к лимиту. Дефолт 1 мин.</summary>
+    public int BrightnessConvergeMs { get; set; } = 60_000;
+
+    /// <summary>Пауза после повторного подъёма яркости пользователем («мне правда нужно ярче»), минут.
+    /// Сбрасывается блокировкой, сном, сменой питания и перезапуском. Дефолт 2 часа.</summary>
+    public int BrightnessBackoffMin { get; set; } = 120;
+
+    /// <summary>Делитель разрыва при схождении: за шаг сокращаем (яркость − лимит) во столько раз.</summary>
+    public int BrightnessGapDivisor { get; set; } = 2;
+
+    /// <summary>Порог схождения, %: если до лимита осталось не больше — доводим сразу
+    /// (иначе гонялись бы за половинками бесконечно).</summary>
+    public int BrightnessSnapPercent { get; set; } = 2;
 
     /// <summary>Запомненная яркость экрана (0–100) от сети; null — ещё не запомнена.</summary>
     public int? AcBrightness { get; set; }

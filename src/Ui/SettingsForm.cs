@@ -224,8 +224,9 @@ public sealed class SettingsForm : Form
         AddTab("settings.tab.general", NavGlyph.General, () => new GeneralTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.features", NavGlyph.Features, () => new FeaturesTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.battery", NavGlyph.Battery, () => new BatteryTab(_ui, _cfg, _act, rebuild));
-        if (_cfg.RefreshRateFeature)
-            AddTab("settings.tab.display", NavGlyph.Display, () => new DisplayTab(_ui, _cfg, _act, rebuild));
+        // «Экран» с XIC-29 виден всегда (там яркость); фича «управление частотой» скрывает
+        // только раздел частоты внутри вкладки
+        AddTab("settings.tab.display", NavGlyph.Display, () => new DisplayTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.touchpad", NavGlyph.Touchpad, () => new TouchpadTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.perf", NavGlyph.Perf, () => new PerfTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.keys", NavGlyph.Keys, () => new KeysTab(_ui, _cfg, rebuild));

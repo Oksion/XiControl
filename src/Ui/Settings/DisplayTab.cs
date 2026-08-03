@@ -1,14 +1,39 @@
-﻿using XiControl.Config;
+using XiControl.Config;
 using XiControl.Localization;
 
 namespace XiControl.Ui.Settings;
 
-/// <summary>Вкладка «Экран»: авто-герцовка и частоты для сети/батареи.</summary>
+/// <summary>
+/// Вкладка «Экран»: яркость (лимит + запоминание, XIC-29) и авто-герцовка. С XIC-29 вкладка
+/// видна всегда — яркость от фичи «управление частотой» не зависит; при выключенной фиче
+/// скрывается только раздел частоты.
+/// </summary>
 public sealed class DisplayTab : SettingsPane
 {
     public DisplayTab(SettingsToolkit ui, AppConfig cfg, SettingsActions act, Action rebuild) : base(ui)
     {
         ui.AddHeader(this, "settings.tab.display", "settings.display.sub");
+
+        // ---- Яркость ----
+        ui.AddGroup(this, "settings.bright.group");
+        // rebuild — зажечь/погасить комбо лимитов и плашку про адаптивную яркость
+        ui.AddRow(this, "settings.bright.cap", "settings.bright.cap.desc",
+            ui.Toggle(cfg.BrightnessCapEnabled, on => { act.SetBrightnessCap(on); rebuild(); }));
+        var capAc = PercentCombo(cfg.BrightnessCapAc, v => act.SetBrightnessCaps(v, cfg.BrightnessCapBattery));
+        capAc.Enabled = cfg.BrightnessCapEnabled;
+        ui.AddRow(this, "settings.bright.cap.ac", "settings.bright.cap.ac.desc", capAc);
+        var capBatt = PercentCombo(cfg.BrightnessCapBattery, v => act.SetBrightnessCaps(cfg.BrightnessCapAc, v));
+        capBatt.Enabled = cfg.BrightnessCapEnabled;
+        ui.AddRow(this, "settings.bright.cap.battery", "settings.bright.cap.battery.desc", capBatt);
+        // честная плашка: с адаптивной яркостью лимит не работает (иначе качель с датчиком)
+        if (cfg.BrightnessCapEnabled && act.IsAdaptiveBrightness())
+            ui.AddNote(this, "settings.bright.adaptive");
+        ui.AddRow(this, "settings.profile.brightness", "settings.brightness.desc",
+            ui.Toggle(cfg.RememberBrightness, act.SetRememberBrightness));
+
+        // ---- Частота — только пока «управление частотой» включено во вкладке «Функции» ----
+        if (!cfg.RefreshRateFeature) return;
+        ui.AddGroup(this, "settings.hz.group");
         // мастер-тумблер: rebuild гасит/зажигает «удерживать» — без авто-частоты возвращать нечего
         ui.AddRow(this, "settings.hz.auto", "settings.hz.auto.desc",
             ui.Toggle(cfg.AutoRefreshRate, on => { act.SetAutoHz(on); rebuild(); }));
@@ -31,5 +56,14 @@ public sealed class DisplayTab : SettingsPane
         int[] rates = presets.Contains(current) ? presets : [current, .. presets];
         return Ui.Combo([.. rates.Select(r => $"{r} " + Loc.T("settings.hz.unit"))],
             Array.IndexOf(rates, current), i => apply(rates[i]), Ui.Sc(110));
+    }
+
+    // Комбо лимита яркости: та же механика — рукописное значение из config.json не подменяем пресетом
+    private ComboBox PercentCombo(int current, Action<int> apply)
+    {
+        int[] presets = [90, 80, 70, 60, 50, 40, 30];
+        int[] caps = presets.Contains(current) ? presets : [current, .. presets];
+        return Ui.Combo([.. caps.Select(c => $"{c}%")],
+            Array.IndexOf(caps, current), i => apply(caps[i]), Ui.Sc(110));
     }
 }

@@ -23,12 +23,17 @@ public sealed class PowerProfileGuardTests
 
     public PowerProfileGuardTests() => Log.Enabled = false; // не сорим в реальный log.txt
 
+    // Лимит яркости на фейках: без WMI-чтений и без реальных таймеров (сам он проверяется
+    // в BrightnessCapGuardTests, здесь — лишь обязательная зависимость guard-а профилей)
+    private BrightnessCapGuard NewCap(AppConfig cfg) =>
+        new(cfg, _power, new FakeTimer(), new FakeTimer(), () => null, (_, _, _) => { }, _ => false);
+
     [Fact]
     public void Reapply_OnAc_AppliesAcMode()
     {
         var cfg = new AppConfig { PowerProfiles = true, AcPerfMode = PerfMode.Turbo, BatteryPerfMode = PerfMode.Quiet };
         _power.IsOnline = true;
-        using var guard = new PowerProfileGuard(_mifs, cfg, _power, _timer);
+        using var guard = new PowerProfileGuard(_mifs, cfg, _power, NewCap(cfg), _timer);
 
         guard.Reapply();
 
@@ -41,7 +46,7 @@ public sealed class PowerProfileGuardTests
     {
         var cfg = new AppConfig { PowerProfiles = true, AcPerfMode = PerfMode.Turbo, BatteryPerfMode = PerfMode.Quiet };
         _power.IsOnline = false;
-        using var guard = new PowerProfileGuard(_mifs, cfg, _power, _timer);
+        using var guard = new PowerProfileGuard(_mifs, cfg, _power, NewCap(cfg), _timer);
 
         guard.Reapply();
 
@@ -56,7 +61,7 @@ public sealed class PowerProfileGuardTests
         var cfg = new AppConfig { PowerProfiles = true, BatteryPerfMode = PerfMode.FullSpeed };
         _power.IsOnline = false;
         _mifs.SetPerfModeResult = false;
-        using var guard = new PowerProfileGuard(_mifs, cfg, _power, _timer);
+        using var guard = new PowerProfileGuard(_mifs, cfg, _power, NewCap(cfg), _timer);
 
         guard.Reapply();
 
@@ -69,7 +74,7 @@ public sealed class PowerProfileGuardTests
     public void ProfilesDisabled_ReapplyDoesNothing()
     {
         var cfg = new AppConfig { PowerProfiles = false, RememberBrightness = false, AcPerfMode = PerfMode.Turbo };
-        using var guard = new PowerProfileGuard(_mifs, cfg, _power, _timer);
+        using var guard = new PowerProfileGuard(_mifs, cfg, _power, NewCap(cfg), _timer);
 
         guard.Reapply(); // ранний выход до Task.Run — синхронно
 
@@ -81,7 +86,7 @@ public sealed class PowerProfileGuardTests
     {
         var cfg = new AppConfig { PowerProfiles = true, AcPerfMode = PerfMode.Auto };
         _power.IsOnline = true;
-        using var guard = new PowerProfileGuard(_mifs, cfg, _power, _timer);
+        using var guard = new PowerProfileGuard(_mifs, cfg, _power, NewCap(cfg), _timer);
 
         _power.RaisePower(PowerModes.StatusChange);
         _mifs.PerfModeCalls.Should().BeEmpty(); // до тика дебаунса — тишина
@@ -97,7 +102,7 @@ public sealed class PowerProfileGuardTests
     public void Suspend_DoesNotTriggerApply()
     {
         var cfg = new AppConfig { PowerProfiles = true, AcPerfMode = PerfMode.Turbo };
-        using var guard = new PowerProfileGuard(_mifs, cfg, _power, _timer);
+        using var guard = new PowerProfileGuard(_mifs, cfg, _power, NewCap(cfg), _timer);
 
         _power.RaisePower(PowerModes.Suspend); // профили реагируют только на Resume/StatusChange
 

@@ -44,6 +44,7 @@ internal static class Program
                 () => c.ChargeCare && !c.TravelMode ? c.CarePercent() : 100);
         });
         services.AddSingleton<RefreshRateGuard>();
+        services.AddSingleton<BrightnessCapGuard>(); // лимит яркости (XIC-29); события ему раздаёт PowerProfileGuard
         services.AddSingleton<PowerProfileGuard>();
         services.AddSingleton<TravelChargeMonitor>();
         services.AddSingleton<TrayIconController>();

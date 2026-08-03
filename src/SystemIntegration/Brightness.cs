@@ -11,6 +11,14 @@ public static class Brightness
 {
     private const string ScopePath = @"root\wmi";
 
+    /// <summary>
+    /// Метки наших записей яркости: событие WmiMonitorBrightnessEvent с помеченным значением —
+    /// наше (восстановление слота, шаг плавного хода), любое другое — человек. Сравнение по
+    /// значению надёжнее окна затишья по времени: WMI-вызовы асинхронные и по таймингу не
+    /// выстраиваются, а плавный ход длиннее любого разумного окна (XIC-29).
+    /// </summary>
+    public static readonly OwnWrites Own = new();
+
     /// <summary>Текущая яркость 0–100, либо null (панель не отдаёт WMI-яркость).</summary>
     public static int? Get()
     {
@@ -29,7 +37,8 @@ public static class Brightness
     /// <summary>
     /// Установить яркость (0–100). WMI-вызов может подтормаживать — уводим в фон, как смену
     /// видеорежима. Если нужное значение уже стоит — не трогаем (без лишнего моргания и без
-    /// паразитного WmiMonitorBrightnessEvent, который иначе запишется как «пользовательский»).
+    /// паразитного WmiMonitorBrightnessEvent; метку Own в этом случае тоже не ставим — событие
+    /// не придёт, а протухшая метка позже «съела» бы настоящий пользовательский выбор).
     /// </summary>
     public static void Apply(int percent)
     {
@@ -39,23 +48,146 @@ public static class Brightness
             try
             {
                 if (Get() == lvl) return;
-                using var s = new ManagementObjectSearcher(ScopePath,
-                    "SELECT * FROM WmiMonitorBrightnessMethods");
-                foreach (ManagementObject mo in s.Get())
-                    using (mo)
-                    {
-                        try
-                        {
-                            using var args = mo.GetMethodParameters("WmiSetBrightness");
-                            args["Timeout"] = (uint)1;
-                            args["Brightness"] = (byte)lvl;
-                            mo.InvokeMethod("WmiSetBrightness", args, null);
-                        }
-                        catch (Exception ex) { Log.Ex("Brightness.Apply.instance", ex); /* внешний монитор и т.п. */ }
-                    }
+                Own.Note(lvl);
+                Set(lvl);
             }
             catch (Exception ex) { Log.Ex("Brightness.Apply", ex); }
         });
+    }
+
+    /// <summary>
+    /// Плавный ход от <paramref name="from"/> к <paramref name="to"/> шагами по 1% (шкала
+    /// непрерывная, проверено на TM2424). Весь путь занимает ~<paramref name="durationMs"/>
+    /// независимо от дельты. Идёт в фоне: WmiSetBrightness небыстрый, спуск на 30% — 30 вызовов,
+    /// UI-поток их не ждёт. Отмена — пользователь схватил ползунок или сменились условия.
+    /// </summary>
+    public static void Ramp(int from, int to, int durationMs, CancellationToken ct)
+    {
+        from = Math.Clamp(from, 0, 100);
+        to = Math.Clamp(to, 0, 100);
+        int delta = Math.Abs(from - to);
+        if (delta == 0) return;
+        int interval = Math.Max(30, durationMs / delta); // пол на случай кривого config.json
+        int step = to > from ? 1 : -1;
+        Task.Run(() =>
+        {
+            try
+            {
+                for (int v = from + step; ; v += step)
+                {
+                    if (ct.IsCancellationRequested) return;
+                    Own.Note(v);
+                    Set(v);
+                    if (v == to) return;
+                    if (ct.WaitHandle.WaitOne(interval)) return; // сон с мгновенной отменой
+                }
+            }
+            catch (Exception ex) { Log.Ex("Brightness.Ramp", ex); }
+        }, ct); // отменили до старта — ход и не начнётся (CA2016)
+    }
+
+    // Синхронная запись во все панели (вызывать только с фонового потока).
+    private static void Set(int lvl)
+    {
+        using var s = new ManagementObjectSearcher(ScopePath,
+            "SELECT * FROM WmiMonitorBrightnessMethods");
+        foreach (ManagementObject mo in s.Get())
+            using (mo)
+            {
+                try
+                {
+                    using var args = mo.GetMethodParameters("WmiSetBrightness");
+                    args["Timeout"] = (uint)1;
+                    args["Brightness"] = (byte)lvl;
+                    mo.InvokeMethod("WmiSetBrightness", args, null);
+                }
+                catch (Exception ex) { Log.Ex("Brightness.Set.instance", ex); /* внешний монитор и т.п. */ }
+            }
+    }
+}
+
+/// <summary>
+/// Учёт значений яркости, выставленных нами и ещё не подтверждённых событием. Метка живёт
+/// недолго: если запись не породила событие (панель не ответила), протухшая метка не должна
+/// позже проглотить настоящий пользовательский выбор того же значения. Чистая логика —
+/// тестируется с явным временем.
+/// </summary>
+public sealed class OwnWrites
+{
+    private const int TtlMs = 10_000;
+
+    private readonly Dictionary<int, long> _until = [];  // значение → тик, до которого метка жива
+    private readonly object _lock = new();
+
+    public void Note(int level) => Note(level, Environment.TickCount64);
+
+    public void Note(int level, long nowMs)
+    {
+        lock (_lock) _until[level] = nowMs + TtlMs;
+    }
+
+    /// <summary>true — событие с этим значением наше; метка снимается (одноразовая).</summary>
+    public bool Consume(int level) => Consume(level, Environment.TickCount64);
+
+    public bool Consume(int level, long nowMs)
+    {
+        lock (_lock)
+        {
+            if (!_until.TryGetValue(level, out long until)) return false;
+            _until.Remove(level);
+            return nowMs <= until;
+        }
+    }
+}
+
+/// <summary>
+/// Детект адаптивной яркости (ADAPTBRIGHT в активной схеме питания) — чистый Win32 из
+/// powrprof.dll, без запуска powercfg. С ней лимит яркости не работает: Windows поднимала бы
+/// яркость по датчику, мы — возвращали, получилась бы качель (XIC-29).
+/// </summary>
+public static class AdaptiveBrightness
+{
+    private static readonly Guid SubVideo = new("7516b95f-f776-4464-8c53-06167f40cc99");
+    private static readonly Guid AdaptBright = new("fbd9aa66-9553-4097-ba44-ed6e9d65eab8");
+
+    [System.Runtime.InteropServices.DllImport("powrprof.dll")]
+    private static extern uint PowerGetActiveScheme(IntPtr rootKey, out IntPtr scheme);
+
+    [System.Runtime.InteropServices.DllImport("powrprof.dll")]
+    private static extern uint PowerReadACValueIndex(IntPtr rootKey, ref Guid scheme, ref Guid sub, ref Guid setting, out uint value);
+
+    [System.Runtime.InteropServices.DllImport("powrprof.dll")]
+    private static extern uint PowerReadDCValueIndex(IntPtr rootKey, ref Guid scheme, ref Guid sub, ref Guid setting, out uint value);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern IntPtr LocalFree(IntPtr mem);
+
+    /// <summary>Включена ли адаптивная яркость для указанного источника питания.
+    /// Ошибка чтения (нет датчика, урезанная схема) трактуется как «выключена» —
+    /// лучше работающий лимит, чем молча отключённая фича.</summary>
+    public static bool IsEnabled(bool ac)
+    {
+        try
+        {
+            if (PowerGetActiveScheme(IntPtr.Zero, out var p) != 0 || p == IntPtr.Zero) return false;
+            try
+            {
+                var scheme = System.Runtime.InteropServices.Marshal.PtrToStructure<Guid>(p);
+                var sub = SubVideo;
+                var setting = AdaptBright;
+                uint v;
+                uint r = ac
+                    ? PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, out v)
+                    : PowerReadDCValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, out v);
+                return r == 0 && v != 0;
+            }
+            finally { LocalFree(p); }
+        }
+        catch (Exception ex)
+        {
+            Log.Ex("AdaptiveBrightness.IsEnabled", ex);
+            return false;
+        }
     }
 }
 

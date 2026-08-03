@@ -19,7 +19,8 @@ public sealed class FeaturesTab : SettingsPane
             ui.Toggle(cfg.TouchpadFeature, on => { cfg.TouchpadFeature = on; cfg.Save(); }));
         ui.AddRow(this, "settings.touchscreen.feature", "settings.touchscreen.feature.desc",
             ui.Toggle(cfg.TouchscreenFeature, on => { cfg.TouchscreenFeature = on; cfg.Save(); }));
-        // выкл/вкл прячет-показывает вкладку «Экран» → пересобрать окно (после выхода из обработчика)
+        // выкл/вкл прячет-показывает раздел частоты во вкладке «Экран» → пересобрать окно
+        // (после выхода из обработчика); сама вкладка с XIC-29 видна всегда — там яркость
         ui.AddRow(this, "settings.refresh.feature", "settings.refresh.feature.desc",
             ui.Toggle(cfg.RefreshRateFeature, on => { act.SetRefreshRateFeature(on); rebuild(); }));
     }
