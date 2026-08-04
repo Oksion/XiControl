@@ -151,6 +151,32 @@ public sealed class AutoBrightnessGuard : IDisposable
         _cfg.Save(); // раз в правку (после раздумья) — SSD не страдает
     }
 
+    /// <summary>Принудительный сброс обучения (кнопка в настройках): выученные точки стираются,
+    /// сеется кривая по умолчанию. Выключение/включение фичи кривую НЕ трогает — забыть её
+    /// можно только этой явной командой.</summary>
+    public void ResetCurve()
+    {
+        lock (_lock)
+        {
+            _cfg.AutoBrightnessPoints.Clear();
+            _cfg.AutoBrightnessPoints.AddRange(BrightnessCurve.DefaultPoints());
+            _learning = false;
+            _learn.Stop();
+            _actedLux = float.NaN; // следующие люксы значимы — пересчитаемся по свежей кривой
+        }
+        Log.Write("AutoBrightness: кривая обучения сброшена к умолчанию");
+        _cfg.Save();
+        if (_cfg.AutoBrightness) Task.Run(Evaluate);
+    }
+
+    /// <summary>Снимок точек кривой для отрисовки в настройках: копия под замком —
+    /// обучение может идти параллельно на пуле.</summary>
+    public BrightnessPoint[] CurveSnapshot()
+    {
+        lock (_lock)
+            return [.. _cfg.AutoBrightnessPoints.Select(p => new BrightnessPoint { Lux = p.Lux, Percent = p.Percent })];
+    }
+
     private double Hysteresis() => Math.Max(0.01, _cfg.AutoBrightnessHysteresis);
 
     private void StartRampLocked(int from, int to)
