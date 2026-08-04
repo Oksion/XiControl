@@ -54,16 +54,42 @@ public sealed class BrightnessCurve(List<BrightnessPoint> points)
     /// том же/большем — темнее), И точки ближе <paramref name="merge"/> в лог-шкале: глаз не
     /// люксметр — условия, неразличимые для гистерезиса, не должны копить противоречивые
     /// мнения, иначе между соседними якорями вырастает «обрыв» (сегодня 40%, завтра 70% при
-    /// том же на глаз свете). Свежее слово пользователя весомее старых.
+    /// том же на глаз свете).
+    ///
+    /// <b>Файн-тюнинг (XIC-32).</b> Клавишами Windows яркость меняется шагами по 10%, поэтому
+    /// комфортное значение между ступенями руками недостижимо, и человек колеблется: 50, 60,
+    /// снова 50… Если такую уточняющую правку записывать буквально, кривая скачет вслед за ним.
+    /// Поэтому правка <b>в пределах одной ступени</b> (<paramref name="fineStep"/>) не заменяет
+    /// прежнее мнение, а сдвигает его навстречу на долю <paramref name="blend"/>:
+    /// колебание 50/60 сходится к 55 — значению, которое кривая выставить может, а клавиши нет.
+    /// Заодно гаснет сама причина колебаний. Крупная правка (было 70, стало 40) — осознанная
+    /// смена, она записывается точно.
     /// </summary>
-    public void Learn(float lux, int percent, double merge = 0.1)
+    public void Learn(float lux, int percent, double merge = 0.1, double blend = 0.5, int fineStep = 10)
     {
         percent = Math.Clamp(percent, 0, 100);
+
+        // ближайшее прежнее мнение о ЭТИХ ЖЕ условиях (в пределах порога различимости)
+        var near = _points
+            .Where(p => Math.Abs(LogScale(p.Lux) - LogScale(lux)) < merge)
+            .OrderBy(p => Math.Abs(LogScale(p.Lux) - LogScale(lux)))
+            .FirstOrDefault();
+
+        int target = percent;
+        if (near is not null && Math.Abs(percent - near.Percent) <= Math.Max(1, fineStep))
+        {
+            double mixed = near.Percent + Math.Clamp(blend, 0.05, 1) * (percent - near.Percent);
+            // AwayFromZero, а не банковское: иначе 50.5 → 50, и настойчивый пользователь
+            // застревал бы на половине пути, не в силах довести кривую до своего значения
+            target = (int)Math.Round(mixed, MidpointRounding.AwayFromZero);
+        }
+
+        // вытесняем относительно ИТОГОВОГО значения — монотонность держится именно по нему
         _points.RemoveAll(p =>
-            (p.Lux <= lux && p.Percent >= percent) ||
-            (p.Lux >= lux && p.Percent <= percent) ||
+            (p.Lux <= lux && p.Percent >= target) ||
+            (p.Lux >= lux && p.Percent <= target) ||
             Math.Abs(LogScale(p.Lux) - LogScale(lux)) < merge);
-        _points.Add(new BrightnessPoint { Lux = lux, Percent = percent });
+        _points.Add(new BrightnessPoint { Lux = lux, Percent = target });
     }
 
     /// <summary>Точек в кривой (для тестов и диагностики).</summary>
