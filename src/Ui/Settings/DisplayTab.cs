@@ -14,9 +14,11 @@ namespace XiControl.Ui.Settings;
 public sealed class DisplayTab : SettingsPane
 {
     private readonly UiTimer _live = new() { Interval = 1000 };
+    private readonly AppConfig _cfg; // графику нужны живые лимиты (XIC-29) при перерисовке
 
     public DisplayTab(SettingsToolkit ui, AppConfig cfg, SettingsActions act, Action rebuild) : base(ui)
     {
+        _cfg = cfg;
         ui.AddHeader(this, "settings.tab.display", "settings.display.sub");
 
         // ---- Яркость ----
@@ -169,6 +171,28 @@ public sealed class DisplayTab : SettingsPane
         using var dot = new SolidBrush(Ui.T.Accent);
         foreach (var p in pts)
             g.FillEllipse(dot, X(p.Lux) - Ui.Sc(3), Y(p.Percent) - Ui.Sc(3), Ui.Sc(6), Ui.Sc(6));
+
+        // горизонтали лимитов яркости (XIC-29): видно, где кривую прижмёт фильтр.
+        // 100% = «здесь не ограничивать» — такую линию не рисуем; равные лимиты сливаем в одну
+        if (_cfg.BrightnessCapEnabled)
+        {
+            int ac = Math.Clamp(_cfg.BrightnessCapAc, 10, 100);
+            int bat = Math.Clamp(_cfg.BrightnessCapBattery, 10, 100);
+            var caps = new List<(string Label, int Pct)>();
+            if (ac < 100 && ac == bat) caps.Add(("AC+BAT", ac));
+            else
+            {
+                if (ac < 100) caps.Add(("AC", ac));
+                if (bat < 100) caps.Add(("BAT", bat));
+            }
+            using var capPen = new Pen(Ui.T.Text2) { DashStyle = DashStyle.Dot };
+            foreach (var (label, pct) in caps)
+            {
+                float y = Y(pct);
+                g.DrawLine(capPen, plot.Left, y, plot.Right, y);
+                g.DrawString(label, Ui.DescFont, dim, plot.Right - Ui.Sc(42), y - Ui.Sc(13));
+            }
+        }
 
         // маркер текущей освещённости: пунктир + точка на кривой
         float now = act.CurrentLux();

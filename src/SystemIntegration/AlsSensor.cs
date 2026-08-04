@@ -9,8 +9,10 @@ namespace XiControl.SystemIntegration;
 /// framework-dependent exe на порядок (XIC-30).
 ///
 /// Люксы приходят СОБЫТИЕМ (ISensorEvents.OnDataUpdated) — без опроса, как мы любим.
-/// Вся COM-работа идёт на MTA-потоках пула: инициализация в Task.Run, колбэки сенсорного
-/// сервиса приходят на RPC-потоках — STA главного потока не участвует, маршалинг не нужен.
+/// Подписку держит ВЫДЕЛЕННЫЙ фоновый MTA-поток, живущий до Dispose: проверено на железе —
+/// та же инициализация из короткоживущего Task.Run молча глохла (available=true, событий
+/// ноль): квартира умирает вместе с потоком, и сенсорный сервис теряет наш приёмник.
+/// Колбэки приходят на RPC-потоках пула; STA главного потока не участвует.
 /// На машине без датчика (десктоп, другая модель) Start молча не взводится — фича скрыта.
 /// </summary>
 public sealed class AlsWatcher : IDisposable
@@ -20,6 +22,8 @@ public sealed class AlsWatcher : IDisposable
 
     private ISensor? _sensor;
     private SensorSink? _sink;   // держим ссылку: COM видит только IUnknown, GC — только нас
+    private Thread? _thread;
+    private readonly ManualResetEventSlim _stop = new();
     private volatile bool _started;
     private volatile bool _disposed;
 
@@ -29,9 +33,17 @@ public sealed class AlsWatcher : IDisposable
     /// <summary>Последнее известное значение, лк; NaN — ещё не было события.</summary>
     public float LastLux { get; private set; } = float.NaN;
 
-    /// <summary>Найти датчик и подписаться. Идёт в фон: CoCreateInstance + RPC к сенсорному
-    /// сервису не мгновенны, а вызывают нас со старта приложения.</summary>
-    public void Start(Action<bool>? ready = null) => Task.Run(() =>
+    /// <summary>Найти датчик и подписаться. Идёт в фон (CoCreateInstance + RPC не мгновенны,
+    /// а зовут нас со старта приложения); поток остаётся жить хозяином подписки.</summary>
+    public void Start(Action<bool>? ready = null)
+    {
+        if (_thread is not null || _disposed) return;
+        _thread = new Thread(() => Run(ready)) { IsBackground = true, Name = "AlsWatcher" };
+        _thread.SetApartmentState(ApartmentState.MTA);
+        _thread.Start();
+    }
+
+    private void Run(Action<bool>? ready)
     {
         try
         {
@@ -64,13 +76,16 @@ public sealed class AlsWatcher : IDisposable
 
             _started = true;
             ready?.Invoke(true);
+
+            _stop.Wait(); // живём: умрёт поток — умрёт квартира, и события перестанут приходить
+            try { _sensor?.SetEventSink(null); } catch { /* сервис мог уже уйти */ }
         }
         catch (Exception ex)
         {
             Log.Ex("AlsWatcher.Start", ex); // сервис сенсоров мог быть выключен — деградируем мягко
             ready?.Invoke(false);
         }
-    });
+    }
 
     private void ReadLux(ISensorDataReport report)
     {
@@ -98,7 +113,7 @@ public sealed class AlsWatcher : IDisposable
     public void Dispose()
     {
         _disposed = true;
-        try { _sensor?.SetEventSink(null); } catch { /* сервис мог уже уйти */ }
+        _stop.Set(); // поток-хозяин снимет подписку и завершится
         _sink = null;
         _sensor = null;
     }
