@@ -64,10 +64,12 @@ public sealed class DisplayTab : SettingsPane
             Array.IndexOf(rates, current), i => apply(rates[i]), Ui.Sc(110));
     }
 
-    // Комбо лимита яркости: та же механика — рукописное значение из config.json не подменяем пресетом
+    // Комбо лимита яркости: та же механика — рукописное значение из config.json не подменяем
+    // пресетом. 100% = «здесь не ограничивать»: типовой сценарий — от сети максимум,
+    // от батареи лимит (просьба пользователей).
     private ComboBox PercentCombo(int current, Action<int> apply)
     {
-        int[] presets = [90, 80, 70, 60, 50, 40, 30];
+        int[] presets = [100, 90, 80, 70, 60, 50, 40, 30];
         int[] caps = presets.Contains(current) ? presets : [current, .. presets];
         return Ui.Combo([.. caps.Select(c => $"{c}%")],
             Array.IndexOf(caps, current), i => apply(caps[i]), Ui.Sc(110));
