@@ -180,10 +180,11 @@ public sealed class DisplayTab : SettingsPane
         var curveAc = DrawOne(g, plot, X, Yax, acPts, capAc, Ui.T.Accent);
         var curveBat = DrawOne(g, plot, X, Yax, batPts, capBat, BatteryColor);
 
-        // легенда: чья линия какого цвета
+        // легенда: чья линия какого цвета. Слева вверху — там пусто: при малых люксах
+        // обе кривые прижаты к низу
         using var acBrush = new SolidBrush(Ui.T.Accent);
         using var batBrush = new SolidBrush(BatteryColor);
-        int lx = plot.Right - Ui.Sc(46), ly = plot.Top + Ui.Sc(2);
+        int lx = plot.Left + Ui.Sc(8), ly = plot.Top + Ui.Sc(2);
         g.FillRectangle(acBrush, lx, ly + Ui.Sc(4), Ui.Sc(10), Ui.Sc(3));
         g.DrawString("AC", Ui.DescFont, dim, lx + Ui.Sc(14), ly);
         g.FillRectangle(batBrush, lx, ly + Ui.Sc(17), Ui.Sc(10), Ui.Sc(3));
