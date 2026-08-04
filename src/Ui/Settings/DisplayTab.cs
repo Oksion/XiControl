@@ -58,11 +58,20 @@ public sealed class DisplayTab : SettingsPane
             Panel? graph = null;
             if (cfg.AutoBrightness)
             {
+                // «инерция»: медиана люксов за окно — случайные блики не дёргают яркость
+                ui.AddRow(this, "settings.bright.median", "settings.bright.median.desc",
+                    MedianCombo(cfg.AutoBrightnessMedianSec, act.SetBrightnessMedianSec));
+
                 graph = CurveGraph(act);
                 Controls.Add(graph);
-                // сброс обучения — только явной кнопкой: выключение фичи кривую не трогает
-                ui.AddRow(this, "settings.bright.curve.reset", "settings.bright.curve.reset.desc",
-                    ui.LinkButton("settings.bright.curve.reset.btn", act.ResetBrightnessCurve));
+                // сброс обучения — только явной кнопкой: выключение фичи кривую не трогает.
+                // Ширину меряем сами: AutoSize у кнопки срабатывает позже, чем карточка
+                // считает раскладку, — кнопка выходила микроскопической
+                var reset = ui.LinkButton("settings.bright.curve.reset.btn", act.ResetBrightnessCurve);
+                reset.AutoSize = false;
+                reset.Width = TextRenderer.MeasureText(Loc.T("settings.bright.curve.reset.btn"), ui.CtlFont).Width + ui.Sc(28);
+                reset.Height = ui.Sc(30);
+                ui.AddRow(this, "settings.bright.curve.reset", "settings.bright.curve.reset.desc", reset);
             }
 
             _live.Tick += () =>
@@ -145,7 +154,8 @@ public sealed class DisplayTab : SettingsPane
             : 100;
 
         float X(float lux) => plot.Left + (float)(Math.Log10(1 + Math.Max(0, lux)) / maxLog) * plot.Width;
-        float Y(int pct) => plot.Bottom - Math.Min(pct, cap) / 100f * plot.Height;
+        float Yax(int pct) => plot.Bottom - pct / 100f * plot.Height; // ось — БЕЗ клампа (иначе 50 и 100 слипаются)
+        float Y(int pct) => Yax(Math.Min(pct, cap));                  // кривая/точки — срезаны лимитом
 
         // сетка: декады люксов и 0/50/100% яркости
         using var grid = new Pen(Ui.T.Border);
@@ -159,7 +169,7 @@ public sealed class DisplayTab : SettingsPane
         }
         foreach (int p in (int[])[0, 50, 100])
         {
-            float y = Y(p);
+            float y = Yax(p);
             g.DrawLine(grid, plot.Left, y, plot.Right, y);
             g.DrawString($"{p}", Ui.DescFont, dim, Ui.Sc(4), y - Ui.Sc(7));
         }
@@ -204,6 +214,16 @@ public sealed class DisplayTab : SettingsPane
         int[] rates = presets.Contains(current) ? presets : [current, .. presets];
         return Ui.Combo([.. rates.Select(r => $"{r} " + Loc.T("settings.hz.unit"))],
             Array.IndexOf(rates, current), i => apply(rates[i]), Ui.Sc(110));
+    }
+
+    // Комбо «инерции» датчика: медианное окно в секундах; 0 — фильтр выключен (мгновенно)
+    private ComboBox MedianCombo(int current, Action<int> apply)
+    {
+        int[] presets = [0, 5, 10, 20, 30, 60];
+        int[] secs = presets.Contains(current) ? presets : [current, .. presets];
+        return Ui.Combo(
+            [.. secs.Select(s => s == 0 ? Loc.T("settings.bright.median.off") : Loc.T("settings.bright.median.val", s))],
+            Array.IndexOf(secs, current), i => apply(secs[i]), Ui.Sc(110));
     }
 
     // Комбо лимита яркости: та же механика — рукописное значение из config.json не подменяем

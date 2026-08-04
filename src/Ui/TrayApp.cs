@@ -547,6 +547,7 @@ public sealed class TrayApp : IDisposable
                 SetAutoBrightness = _controller.SetAutoBrightness,
                 IsAlsAvailable = () => _controller.AlsAvailable,
                 CurrentLux = () => _controller.CurrentLux,
+                SetBrightnessMedianSec = _controller.SetBrightnessMedianSec,
                 ResetBrightnessCurve = _controller.ResetBrightnessCurve,
                 BrightnessCurvePoints = _controller.BrightnessCurvePoints,
                 SetAutoHz = _controller.ToggleAutoHz,

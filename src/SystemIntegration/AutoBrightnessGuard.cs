@@ -26,6 +26,8 @@ public sealed class AutoBrightnessGuard : IDisposable
     private readonly Func<int, bool, int> _clamp;
     private readonly BrightnessCurve _curveAc;    // кривых две: комфорт у розетки и в дороге разный
     private readonly BrightnessCurve _curveBatt;
+    private readonly MedianWindow _filter = new(); // «инерция»: медиана окна гасит блики
+    private readonly Func<long> _clock;            // шов времени для тестов фильтра
     private readonly object _lock = new();
 
     private float _pendingLux = float.NaN; // последние люксы с датчика
@@ -40,8 +42,10 @@ public sealed class AutoBrightnessGuard : IDisposable
     public AutoBrightnessGuard(AppConfig cfg, IPowerEvents power,
         IAppTimer? settle = null, IAppTimer? learn = null,
         Func<int?>? read = null, BrightnessCapGuard.RampFn? ramp = null,
-        Func<bool, bool>? adaptive = null, Func<int, bool, int>? clamp = null)
+        Func<bool, bool>? adaptive = null, Func<int, bool, int>? clamp = null,
+        Func<long>? clock = null)
     {
+        _clock = clock ?? (static () => Environment.TickCount64);
         _cfg = cfg;
         _power = power;
         _settle = settle ?? new WorkerTimer();
@@ -57,15 +61,24 @@ public sealed class AutoBrightnessGuard : IDisposable
         _learn.Tick += OnLearnTick;
     }
 
-    /// <summary>Свежие люксы (поток пула, из AlsWatcher). Мелкие колебания гасятся гистерезисом,
-    /// значимые — взводят дебаунс стабилизации: экран не «дышит» на каждый лк.</summary>
+    /// <summary>
+    /// Очередной сэмпл люксов (поток пула, из AlsWatcher, ~раз в 1.5 с). Решения принимаются
+    /// не по мгновенному значению, а по МЕДИАНЕ окна «инерции»: у датчика нет интеграционной
+    /// сферы, и случайный блик даёт всплеск на сэмпл-другой — медиану он не сдвигает вообще.
+    /// Дальше как раньше: значимое (гистерезис в лог-шкале) изменение медианы взводит дебаунс
+    /// стабилизации — экран не «дышит».
+    /// </summary>
     public void OnLux(float lux)
     {
         lock (_lock)
         {
-            _pendingLux = lux;
+            int windowMs = Math.Clamp(_cfg.AutoBrightnessMedianSec, 0, 600) * 1000;
+            long now = _clock();
+            _filter.Add(now, lux, windowMs);
+            float filtered = windowMs <= 0 ? lux : _filter.Median(now, windowMs);
+            _pendingLux = filtered;
             if (!_cfg.AutoBrightness) return;
-            if (!BrightnessCurve.Significant(_actedLux, lux, Hysteresis())) return;
+            if (!BrightnessCurve.Significant(_actedLux, filtered, Hysteresis())) return;
             _settle.Interval = Math.Max(500, _cfg.AutoBrightnessSettleMs);
             _settle.Stop();
             _settle.Start();

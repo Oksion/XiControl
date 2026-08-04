@@ -78,3 +78,33 @@ public sealed class BrightnessCurve(List<BrightnessPoint> points)
     public static bool Significant(float fromLux, float toLux, double threshold = 0.1) =>
         float.IsNaN(fromLux) || Math.Abs(LogScale(toLux) - LogScale(fromLux)) >= threshold;
 }
+
+/// <summary>
+/// Медиана люксов по скользящему окну времени — «инерция» авто-яркости (XIC-30): у датчика
+/// нет интеграционной сферы, случайный блик даёт честный, но бесполезный всплеск на один-два
+/// сэмпла. Медиана, в отличие от среднего, выбросом не сдвигается вообще: реагируем только
+/// на изменения, продержавшиеся больше половины окна. Чистая логика — время передаётся явно.
+/// </summary>
+public sealed class MedianWindow
+{
+    private readonly List<(long Ms, float Lux)> _samples = [];
+
+    public void Add(long nowMs, float lux, int windowMs)
+    {
+        Prune(nowMs, windowMs);
+        _samples.Add((nowMs, lux));
+    }
+
+    /// <summary>Медиана окна; NaN — сэмплов нет. Чётное число — среднее двух средних.</summary>
+    public float Median(long nowMs, int windowMs)
+    {
+        Prune(nowMs, windowMs);
+        if (_samples.Count == 0) return float.NaN;
+        var sorted = _samples.Select(s => s.Lux).OrderBy(v => v).ToArray();
+        int mid = sorted.Length / 2;
+        return sorted.Length % 2 == 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2f;
+    }
+
+    private void Prune(long nowMs, int windowMs) =>
+        _samples.RemoveAll(s => nowMs - s.Ms > Math.Max(0, windowMs));
+}

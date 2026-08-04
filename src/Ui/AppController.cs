@@ -458,6 +458,14 @@ public sealed class AppController
     /// <summary>Текущая освещённость, лк (NaN — событий ещё не было) — живой индикатор в настройках.</summary>
     public float CurrentLux => _als.LastLux;
 
+    /// <summary>«Инерция» датчика: окно медианы, сек (0 — мгновенные значения). Новые сэмплы
+    /// подхватят окно сами — guard дёргать не нужно.</summary>
+    public void SetBrightnessMedianSec(int seconds)
+    {
+        _cfg.AutoBrightnessMedianSec = Math.Clamp(seconds, 0, 600);
+        _cfg.Save();
+    }
+
     /// <summary>Сброс кривой обучения — только по явной кнопке (выкл/вкл фичи кривую не трогает).</summary>
     public void ResetBrightnessCurve() => _autoGuard.ResetCurve();
 

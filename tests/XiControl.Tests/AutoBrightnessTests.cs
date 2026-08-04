@@ -114,14 +114,14 @@ public sealed class AutoBrightnessTests
     private int? _brightness = 50;
     private bool _adaptive;
 
-    private AutoBrightnessGuard NewGuard()
+    private AutoBrightnessGuard NewGuard(Func<long>? clock = null)
     {
         if (_cfg.AutoBrightnessPointsAc.Count == 0)
             _cfg.AutoBrightnessPointsAc.AddRange(BrightnessCurve.DefaultPoints());
         if (_cfg.AutoBrightnessPointsBattery.Count == 0)
             _cfg.AutoBrightnessPointsBattery.AddRange(BrightnessCurve.DefaultPoints());
         return new AutoBrightnessGuard(_cfg, _power, _settle, _learn,
-            () => _brightness, (f, t, _) => _ramps.Add((f, t)), _ => _adaptive, (l, _) => l);
+            () => _brightness, (f, t, _) => _ramps.Add((f, t)), _ => _adaptive, (l, _) => l, clock);
     }
 
     [Fact]
@@ -252,6 +252,58 @@ public sealed class AutoBrightnessTests
 
         _settle.Running.Should().BeFalse();
         _ramps.Should().BeEmpty();
+    }
+
+    // ---- Медианный фильтр («инерция») ----
+
+    [Fact]
+    public void MedianWindow_SpikeDoesNotMoveMedian()
+    {
+        var f = new MedianWindow();
+        f.Add(0, 200, 10_000);
+        f.Add(1500, 200, 10_000);
+        f.Add(3000, 200, 10_000);
+        f.Add(4500, 9000, 10_000); // блик фарой в датчик
+
+        f.Median(4500, 10_000).Should().Be(200, "медиану одиночный выброс не сдвигает вообще");
+    }
+
+    [Fact]
+    public void MedianWindow_SustainedChange_WinsAfterHalfWindow()
+    {
+        var f = new MedianWindow();
+        for (long t = 0; t <= 4500; t += 1500) f.Add(t, 200, 10_000);
+        for (long t = 6000; t <= 12_000; t += 1500) f.Add(t, 2000, 10_000); // свет реально включили
+
+        f.Median(12_000, 10_000).Should().Be(2000, "устойчивое изменение прожило больше половины окна");
+    }
+
+    [Fact]
+    public void MedianWindow_OldSamplesFallOut()
+    {
+        var f = new MedianWindow();
+        f.Add(0, 9000, 5_000);
+        f.Add(10_000, 200, 5_000);
+
+        f.Median(10_000, 5_000).Should().Be(200, "старый сэмпл выпал из окна");
+    }
+
+    [Fact]
+    public void Guard_GlareSpike_DoesNotTouchScreen()
+    {
+        _cfg.AutoBrightnessMedianSec = 10;
+        long now = 0;
+        using var g = NewGuard(() => now);
+        for (now = 0; now <= 4500; now += 1500) g.OnLux(200); // комнатный свет устоялся
+        _settle.Fire();
+        g.OnBrightness(60, own: true, settling: false);
+        int before = _ramps.Count;
+
+        now = 6000;
+        g.OnLux(9000); // случайный блик — один сэмпл
+
+        _settle.Running.Should().BeFalse("медиана окна не сдвинулась — реакции нет");
+        _ramps.Should().HaveCount(before);
     }
 
     [Fact]
