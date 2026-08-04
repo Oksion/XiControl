@@ -116,10 +116,11 @@ public sealed class DisplayTab : SettingsPane
         float.IsNaN(lux) ? "—" : Loc.T("settings.bright.lux.val", Math.Round(lux));
 
     /// <summary>
-    /// Карточка-график кривой lux → % ТЕКУЩЕГО источника питания (кривых две): ось X — люксы в
-    /// лог-шкале, Y — яркость. Линия — предсказание, точки — якоря (в т.ч. выученные), пунктир —
-    /// текущая освещённость; лимит яркости «срезает» кривую сверху — график показывает
-    /// эффективное поведение. Перерисовывается секундным таймером — обучение видно живьём.
+    /// Карточка-график ОБЕИХ кривых lux → % (сеть — акцентом, батарея — оранжевым, как разряд
+    /// в «Мониторе»): ось X — люксы в лог-шкале, Y — яркость. Линии — предсказания, точки —
+    /// якоря (в т.ч. выученные), пунктир — текущая освещённость с маркером на активной кривой;
+    /// лимит своего источника «срезает» каждую кривую сверху — график показывает эффективное
+    /// поведение. Перерисовывается секундным таймером — обучение видно живьём.
     /// </summary>
     private BufferedPanel CurveGraph(SettingsActions act)
     {
@@ -135,27 +136,27 @@ public sealed class DisplayTab : SettingsPane
         return card;
     }
 
+    // батарейная кривая — оранжевым (Material Orange 500, как разряд в «Мониторе»)
+    private static readonly Color BatteryColor = Color.FromArgb(0xFF, 0x98, 0x00);
+
     private void PaintCurve(Graphics g, int w, int h, SettingsActions act)
     {
-        var pts = act.BrightnessCurvePoints();
-        if (pts.Length == 0) return;
-        var curve = new BrightnessCurve([.. pts]); // копия-снимок: обучение может идти параллельно
+        var acPts = act.BrightnessCurvePoints(true);
+        var batPts = act.BrightnessCurvePoints(false);
+        if (acPts.Length == 0 && batPts.Length == 0) return;
 
         g.SmoothingMode = SmoothingMode.AntiAlias;
         int padL = Ui.Sc(30), padR = Ui.Sc(14), padT = Ui.Sc(10), padB = Ui.Sc(20);
         var plot = new Rectangle(padL, padT, w - padL - padR, h - padT - padB);
         double maxLog = Math.Log10(1 + 10_000); // шкала до 10к лк — дальше только прямое солнце
 
-        // лимит текущего источника питания (XIC-29) «срезает» кривую сверху прямо на графике:
-        // рисуем эффективное поведение, а не намерение — линия и точки клампятся к лимиту
-        bool online = PowerLine.IsOnline();
-        int cap = _cfg.BrightnessCapEnabled
-            ? Math.Clamp(online ? _cfg.BrightnessCapAc : _cfg.BrightnessCapBattery, 10, 100)
-            : 100;
+        // лимит своего источника (XIC-29) «срезает» каждую кривую сверху прямо на графике:
+        // рисуем эффективное поведение, а не намерение
+        int capAc = _cfg.BrightnessCapEnabled ? Math.Clamp(_cfg.BrightnessCapAc, 10, 100) : 100;
+        int capBat = _cfg.BrightnessCapEnabled ? Math.Clamp(_cfg.BrightnessCapBattery, 10, 100) : 100;
 
         float X(float lux) => plot.Left + (float)(Math.Log10(1 + Math.Max(0, lux)) / maxLog) * plot.Width;
         float Yax(int pct) => plot.Bottom - pct / 100f * plot.Height; // ось — БЕЗ клампа (иначе 50 и 100 слипаются)
-        float Y(int pct) => Yax(Math.Min(pct, cap));                  // кривая/точки — срезаны лимитом
 
         // сетка: декады люксов и 0/50/100% яркости
         using var grid = new Pen(Ui.T.Border);
@@ -174,30 +175,58 @@ public sealed class DisplayTab : SettingsPane
             g.DrawString($"{p}", Ui.DescFont, dim, Ui.Sc(4), y - Ui.Sc(7));
         }
 
-        // линия предсказания — семплируем кривую по лог-оси
-        const int Samples = 64;
-        var line = new PointF[Samples + 1];
-        for (int i = 0; i <= Samples; i++)
-        {
-            float lux = (float)(Math.Pow(10, maxLog * i / Samples) - 1);
-            line[i] = new PointF(X(lux), Y(curve.Predict(lux)));
-        }
-        using var pen = new Pen(Ui.T.Accent, Ui.Sc(2));
-        g.DrawLines(pen, line);
+        // обе кривые всегда (независимо от подключения); активная различима по маркеру света;
+        // при одинаковых кривых линии честно совпадают (видна верхняя — батарейная)
+        var curveAc = DrawOne(g, plot, X, Yax, acPts, capAc, Ui.T.Accent);
+        var curveBat = DrawOne(g, plot, X, Yax, batPts, capBat, BatteryColor);
 
-        // якорные точки (дефолтные и выученные — все они теперь «кривая пользователя»)
-        using var dot = new SolidBrush(Ui.T.Accent);
-        foreach (var p in pts)
-            g.FillEllipse(dot, X(p.Lux) - Ui.Sc(3), Y(p.Percent) - Ui.Sc(3), Ui.Sc(6), Ui.Sc(6));
+        // легенда: чья линия какого цвета
+        using var acBrush = new SolidBrush(Ui.T.Accent);
+        using var batBrush = new SolidBrush(BatteryColor);
+        int lx = plot.Right - Ui.Sc(46), ly = plot.Top + Ui.Sc(2);
+        g.FillRectangle(acBrush, lx, ly + Ui.Sc(4), Ui.Sc(10), Ui.Sc(3));
+        g.DrawString("AC", Ui.DescFont, dim, lx + Ui.Sc(14), ly);
+        g.FillRectangle(batBrush, lx, ly + Ui.Sc(17), Ui.Sc(10), Ui.Sc(3));
+        g.DrawString("BAT", Ui.DescFont, dim, lx + Ui.Sc(14), ly + Ui.Sc(13));
 
-        // маркер текущей освещённости: пунктир + точка на кривой
+        // маркер текущей освещённости: пунктир + точка на АКТИВНОЙ кривой (она рулит экраном)
         float now = act.CurrentLux();
         if (float.IsNaN(now)) return;
+        bool online = PowerLine.IsOnline();
+        var active = online ? curveAc : curveBat;
+        int activeCap = online ? capAc : capBat;
+        if (active is null) return;
         using var cur = new Pen(Ui.T.Text2) { DashStyle = DashStyle.Dash };
         float cx = X(now);
         g.DrawLine(cur, cx, plot.Top, cx, plot.Bottom);
         using var mark = new SolidBrush(Ui.T.Text);
-        g.FillEllipse(mark, cx - Ui.Sc(3), Y(curve.Predict(now)) - Ui.Sc(3), Ui.Sc(6), Ui.Sc(6));
+        float my = Yax(Math.Min(active.Predict(now), activeCap));
+        g.FillEllipse(mark, cx - Ui.Sc(3), my - Ui.Sc(3), Ui.Sc(6), Ui.Sc(6));
+    }
+
+    // Одна кривая: линия предсказания (срезана своим лимитом) + якорные точки своим цветом.
+    // Возвращает построенную кривую — маркеру света нужен Predict активной.
+    private BrightnessCurve? DrawOne(Graphics g, Rectangle plot, Func<float, float> x,
+        Func<int, float> yAxis, BrightnessPoint[] pts, int cap, Color color)
+    {
+        if (pts.Length == 0) return null;
+        var curve = new BrightnessCurve([.. pts]); // копия-снимок: обучение может идти параллельно
+
+        const int Samples = 64;
+        double maxLog = Math.Log10(1 + 10_000);
+        var line = new PointF[Samples + 1];
+        for (int i = 0; i <= Samples; i++)
+        {
+            float lux = (float)(Math.Pow(10, maxLog * i / Samples) - 1);
+            line[i] = new PointF(x(lux), yAxis(Math.Min(curve.Predict(lux), cap)));
+        }
+        using var pen = new Pen(color, Ui.Sc(2));
+        g.DrawLines(pen, line);
+
+        using var dot = new SolidBrush(color);
+        foreach (var p in pts)
+            g.FillEllipse(dot, x(p.Lux) - Ui.Sc(3), yAxis(Math.Min(p.Percent, cap)) - Ui.Sc(3), Ui.Sc(6), Ui.Sc(6));
+        return curve;
     }
 
     // FlowLayoutPanel перерисовывает карточку раз в секунду — без буфера она бы мигала
