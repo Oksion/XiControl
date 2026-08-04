@@ -81,6 +81,34 @@ public sealed class AutoBrightnessTests
     }
 
     [Fact]
+    public void Learn_IndistinguishableLux_ReplacesNeighbour()
+    {
+        // глаз не люксметр: 100 и 110 лк неразличимы (меньше гистерезиса в лог-шкале) —
+        // противоречивые мнения в такой близости растили бы «обрыв» на кривой
+        var curve = DefaultCurve(out var pts);
+
+        curve.Learn(100, 40);
+        curve.Learn(110, 70); // тот же на глаз свет, новое настроение
+
+        pts.Should().NotContain(p => Math.Abs(p.Lux - 100) < 0.01, "последнее слово побеждает");
+        curve.Predict(110).Should().Be(70, "в этих условиях действует свежая правка");
+        curve.Predict(105).Should().BeInRange(65, 70, "рядом — пологая интерполяция, а не ступенька 40→70");
+    }
+
+    [Fact]
+    public void Learn_DistantPoints_Coexist()
+    {
+        // а вот честно различимые условия живут рядом — склейка не съедает настоящую кривую
+        var curve = DefaultCurve(out var pts);
+
+        curve.Learn(100, 40);
+        curve.Learn(400, 70); // вчетверо светлее — другой мир
+
+        pts.Should().Contain(p => Math.Abs(p.Lux - 100) < 0.01 && p.Percent == 40);
+        pts.Should().Contain(p => Math.Abs(p.Lux - 400) < 0.01 && p.Percent == 70);
+    }
+
+    [Fact]
     public void Learn_SameLux_ReplacesOldPoint()
     {
         var curve = DefaultCurve(out var pts);

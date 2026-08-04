@@ -164,7 +164,8 @@ public sealed class AutoBrightnessGuard : IDisposable
             online = _learnOnline;
             if (!_cfg.AutoBrightness || float.IsNaN(lux)) return;
 
-            CurveFor(online).Learn(lux, percent);
+            // порог склейки = гистерезис: неразличимые для триггера условия не копят мнения
+            CurveFor(online).Learn(lux, percent, Hysteresis());
             // предсказание в этих условиях теперь равно выученному — не воюем с пользователем
             _actedLux = lux;
         }

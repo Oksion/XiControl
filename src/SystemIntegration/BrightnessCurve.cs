@@ -49,16 +49,20 @@ public sealed class BrightnessCurve(List<BrightnessPoint> points)
     }
 
     /// <summary>
-    /// Выучить правку пользователя: «при таком свете мне нужно столько». Существующие точки,
+    /// Выучить правку пользователя: «при таком свете мне нужно столько». Вытесняются точки,
     /// ломающие монотонность относительно новой (при том же/меньшем свете просили ярче, при
-    /// том же/большем — темнее), вытесняются: свежее слово пользователя весомее старых.
+    /// том же/большем — темнее), И точки ближе <paramref name="merge"/> в лог-шкале: глаз не
+    /// люксметр — условия, неразличимые для гистерезиса, не должны копить противоречивые
+    /// мнения, иначе между соседними якорями вырастает «обрыв» (сегодня 40%, завтра 70% при
+    /// том же на глаз свете). Свежее слово пользователя весомее старых.
     /// </summary>
-    public void Learn(float lux, int percent)
+    public void Learn(float lux, int percent, double merge = 0.1)
     {
         percent = Math.Clamp(percent, 0, 100);
         _points.RemoveAll(p =>
             (p.Lux <= lux && p.Percent >= percent) ||
-            (p.Lux >= lux && p.Percent <= percent));
+            (p.Lux >= lux && p.Percent <= percent) ||
+            Math.Abs(LogScale(p.Lux) - LogScale(lux)) < merge);
         _points.Add(new BrightnessPoint { Lux = lux, Percent = percent });
     }
 
