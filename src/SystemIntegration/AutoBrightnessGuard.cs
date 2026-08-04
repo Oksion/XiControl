@@ -190,7 +190,10 @@ public sealed class AutoBrightnessGuard : IDisposable
         }
         Log.Write("AutoBrightness: кривые обучения сброшены к умолчанию");
         _cfg.Save();
-        if (_cfg.AutoBrightness) Task.Run(Evaluate);
+        // CancellationToken.None намеренно (S8949): _rampCts отменяет ПЛАВНЫЙ ХОД яркости, и
+        // подставить его сюда было бы ошибкой — сверка по свежей кривой обязана доработать
+        // независимо от того, жив ли предыдущий ход.
+        if (_cfg.AutoBrightness) Task.Run(Evaluate, CancellationToken.None);
     }
 
     /// <summary>Снимок точек кривой выбранного источника питания для отрисовки в настройках
