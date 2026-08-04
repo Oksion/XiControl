@@ -108,6 +108,71 @@ public sealed class AutoBrightnessTests
         pts.Should().Contain(p => Math.Abs(p.Lux - 400) < 0.01 && p.Percent == 70);
     }
 
+    // ---- Файн-тюнинг: сглаживание уточняющих правок (XIC-32) ----
+
+    [Fact]
+    public void Learn_FineAdjustment_MovesHalfway()
+    {
+        // клавишами Windows доступны только 10-шаги, поэтому уточняющая правка означает
+        // «хочу где-то между» — кривая встаёт посередине, а не прыгает за пользователем
+        var curve = DefaultCurve(out _);
+
+        curve.Learn(200, 65); // прежнее мнение об этом свете — 60
+
+        curve.Predict(200).Should().Be(63);
+    }
+
+    [Fact]
+    public void Learn_BigAdjustment_IsTakenLiterally()
+    {
+        // крупная правка — осознанная смена, а не поиск середины
+        var curve = DefaultCurve(out _);
+
+        curve.Learn(200, 85); // было 60, разница 25 — больше ступени
+
+        curve.Predict(200).Should().Be(85);
+    }
+
+    [Fact]
+    public void Learn_OscillationBetweenSteps_Converges()
+    {
+        // главный сценарий: 55 клавишами не выставить, человек скачет 65/55 —
+        // без сглаживания кривая скакала бы вместе с ним на всю ступень
+        var curve = DefaultCurve(out _);
+
+        for (int i = 0; i < 4; i++)
+        {
+            curve.Learn(200, 65);
+            curve.Learn(200, 55);
+        }
+
+        curve.Predict(200).Should().BeInRange(56, 62, "кривая держится между ступенями, а не мечется");
+    }
+
+    [Fact]
+    public void Learn_Persistence_ReachesExactValue()
+    {
+        // настойчивость побеждает: повтор одного значения доводит кривую ровно до него
+        // (округление AwayFromZero не даёт застрять на половине пути)
+        var curve = DefaultCurve(out _);
+
+        for (int i = 0; i < 6; i++) curve.Learn(200, 65);
+
+        curve.Predict(200).Should().Be(65);
+    }
+
+    [Fact]
+    public void Learn_Smoothing_KeepsCurveMonotonic()
+    {
+        var curve = DefaultCurve(out var pts);
+
+        for (int i = 0; i < 3; i++) { curve.Learn(200, 65); curve.Learn(700, 75); }
+
+        var sorted = pts.OrderBy(p => p.Lux).ToArray();
+        for (int i = 1; i < sorted.Length; i++)
+            sorted[i].Percent.Should().BeGreaterThan(sorted[i - 1].Percent, "инвариант монотонности");
+    }
+
     [Fact]
     public void Learn_SameLux_ReplacesOldPoint()
     {

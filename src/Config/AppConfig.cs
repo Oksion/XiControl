@@ -203,6 +203,14 @@ public sealed class AppConfig
     /// окно — случайный блик её не сдвигает. 0 — фильтр выключен (мгновенные значения).</summary>
     public int AutoBrightnessMedianSec { get; set; } = 10;
 
+    /// <summary>Доля новой правки при УТОЧНЯЮЩЕМ обучении (XIC-32): 0.5 — кривая встаёт посередине
+    /// между прежним мнением и новым, 1 — как раньше, буквально по последней правке.</summary>
+    public double AutoBrightnessLearnBlend { get; set; } = 0.5;
+
+    /// <summary>До какой разницы (%) правка считается уточняющей и сглаживается; крупнее —
+    /// осознанная смена, запоминается точно. Дефолт 10 = шаг клавиш яркости Windows.</summary>
+    public int AutoBrightnessFineStep { get; set; } = 10;
+
     /// <summary>Запомненная яркость экрана (0–100) от сети; null — ещё не запомнена.</summary>
     public int? AcBrightness { get; set; }
 
