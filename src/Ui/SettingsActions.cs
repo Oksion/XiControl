@@ -37,7 +37,7 @@ public sealed class SettingsActions
     public required Func<float> CurrentLux;              // живые люксы для индикатора (NaN — ещё нет)
     public required Action<int> SetBrightnessMedianSec;  // «инерция» датчика: окно медианы, сек (0 — выкл)
     public required Action ResetBrightnessCurve;         // явный сброс кривой обучения
-    public required Func<Config.BrightnessPoint[]> BrightnessCurvePoints; // снимок кривой для графика
+    public required Func<bool, Config.BrightnessPoint[]> BrightnessCurvePoints; // снимок кривой (true=сеть) для графика
     public required Action<bool> SetAutoHz;
     public required Action<bool> SetHoldRefreshRate;         // возвращать частоту после чужих изменений
     public required Action<bool> SetRefreshRateFeature;      // «управление частотой» как фича вкл/выкл

@@ -192,11 +192,11 @@ public sealed class AutoBrightnessGuard : IDisposable
         if (_cfg.AutoBrightness) Task.Run(Evaluate);
     }
 
-    /// <summary>Снимок точек кривой ТЕКУЩЕГО источника питания для отрисовки в настройках:
-    /// копия под замком — обучение может идти параллельно на пуле.</summary>
-    public BrightnessPoint[] CurveSnapshot()
+    /// <summary>Снимок точек кривой выбранного источника питания для отрисовки в настройках
+    /// (график рисует обе): копия под замком — обучение может идти параллельно на пуле.</summary>
+    public BrightnessPoint[] CurveSnapshot(bool online)
     {
-        var points = _power.IsOnline ? _cfg.AutoBrightnessPointsAc : _cfg.AutoBrightnessPointsBattery;
+        var points = online ? _cfg.AutoBrightnessPointsAc : _cfg.AutoBrightnessPointsBattery;
         lock (_lock)
             return [.. points.Select(p => new BrightnessPoint { Lux = p.Lux, Percent = p.Percent })];
     }

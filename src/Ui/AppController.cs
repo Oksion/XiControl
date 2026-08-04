@@ -469,8 +469,8 @@ public sealed class AppController
     /// <summary>Сброс кривой обучения — только по явной кнопке (выкл/вкл фичи кривую не трогает).</summary>
     public void ResetBrightnessCurve() => _autoGuard.ResetCurve();
 
-    /// <summary>Снимок кривой для отрисовки графика на вкладке «Экран».</summary>
-    public Config.BrightnessPoint[] BrightnessCurvePoints() => _autoGuard.CurveSnapshot();
+    /// <summary>Снимок кривой (сеть/батарея) для отрисовки графика на вкладке «Экран».</summary>
+    public Config.BrightnessPoint[] BrightnessCurvePoints(bool online) => _autoGuard.CurveSnapshot(online);
 
     /// <summary>Лимиты яркости из окна настроек (сеть, батарея) — сохранить и свериться.</summary>
     public void SetBrightnessCaps(int ac, int batt)
