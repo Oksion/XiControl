@@ -60,6 +60,8 @@ public sealed class AutoStartTests
 
     [Theory]
     [InlineData("0.0.0.0", "0.9.0")]   // в задаче дев-сборка
+    [InlineData("0.0.312.0", "0.9.0")] // ...или тестовая из main (0.0.<прогон CI>)
+    [InlineData("0.9.0.0", "0.0.312")] // мы сами тестовая сборка — чужую задачу не трогаем
     [InlineData("0.9.0.0", "0.0.0")]   // мы сами дев-сборка: иначе локальный запуск переписал бы
     [InlineData("0.0.0.0", "0.0.0")]   // чужую задачу на себя — проверено на живой машине
     public void IsOutdated_IgnoresDevBuilds(string taskVersion, string current)

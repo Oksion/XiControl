@@ -59,8 +59,9 @@ public static class AutoStart
     /// <summary>
     /// Пора ли пересоздать задачу из-за версии exe: путь живой, но ведёт на сборку СТАРЕЕ текущей
     /// (типовой случай portable — распаковали в новую папку, а задача поднимает прежнюю).
-    /// Дев-сборка (`0.0.0`) не участвует ни с одной стороны: иначе локальный запуск переписывал бы
-    /// пользовательскую задачу на себя, а равные версии гоняли бы пересоздание по кругу.
+    /// Нерелизная сборка (`0.0.*` — локальная `0.0.0` или тестовая из main `0.0.<прогон CI>`) не
+    /// участвует ни с одной стороны: иначе локальный/тестовый запуск переписывал бы пользовательскую
+    /// задачу на себя, а равные версии гоняли бы пересоздание по кругу.
     /// </summary>
     internal static bool IsOutdated(string? taskFileVersion, Version? current)
     {
@@ -68,7 +69,7 @@ public static class AutoStart
         if (IsDev(inTask) || IsDev(current)) return false;
         return inTask < current;
 
-        static bool IsDev(Version v) => v.Major == 0 && v.Minor == 0 && v.Build == 0;
+        static bool IsDev(Version v) => v is { Major: 0, Minor: 0 };
     }
 
     /// <summary>

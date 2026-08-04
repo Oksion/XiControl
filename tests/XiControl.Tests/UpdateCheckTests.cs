@@ -96,14 +96,29 @@ public sealed class UpdateCheckTests
     }
 
     [Theory]
-    [InlineData("0.0.0", true)]
+    [InlineData("0.0.0", true)]      // локальная сборка
     [InlineData("0.0.0.0", true)]
-    [InlineData("0.9.0", false)]
-    [InlineData("0.0.1", false)]
-    public void IsDevBuild_OnlyForZeroVersion(string version, bool expected)
+    [InlineData("0.0.1", true)]      // тестовая из main: версия = 0.0.<номер прогона CI>
+    [InlineData("0.0.312", true)]
+    [InlineData("0.9.0", false)]     // релизы всегда 0.<минор ≥ 1>.<патч>
+    [InlineData("0.11.0", false)]
+    public void IsDevBuild_ForAnyNonReleaseVersion(string version, bool expected)
     {
-        // от этого зависит текст на «О программе»: дев-сборку нельзя звать «последней версией»
+        // от этого зависит текст на «О программе»: нерелизную сборку нельзя звать «последней версией»
         UpdateCheck.IsDevBuild(Version.Parse(version)).Should().Be(expected);
+    }
+
+    [Fact]
+    public void PreRelease_IsNotNagged_ToUpdateToRelease()
+    {
+        // скользящий pre-release из main собирается как 0.0.<прогон CI> и содержит фичи,
+        // которых в последнем релизе ещё нет: тост «вышла 0.11.0» увёл бы тестеров с той
+        // самой сборки, которую они взялись гонять
+        var latest = Version.Parse("0.11.0");
+        var testBuild = Version.Parse("0.0.312");
+
+        UpdateCheck.IsNewer(latest, testBuild).Should().BeFalse();
+        UpdateCheck.ShouldNotify(latest, testBuild, null).Should().BeFalse();
     }
 
     [Fact]
