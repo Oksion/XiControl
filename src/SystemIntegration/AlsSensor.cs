@@ -68,6 +68,12 @@ public sealed class AlsWatcher : IDisposable
             }
             finally { _ = WindowsDeleteString(hstr); }
 
+            // Заявляем интервал отчётов — это и есть «клиент заинтересован»: без него сервис
+            // через пару минут усыпляет датчик, и GetCurrentReading вечно отдаёт последний кэш
+            // (поймано вживую: значение замерло на 815 лк после вспышки фонарика).
+            _ = sensor.GetMinimumReportInterval(out uint minMs);
+            _ = sensor.PutReportInterval(Math.Max(minMs, 1000));
+
             _started = true;
             ready?.Invoke(true);
 
