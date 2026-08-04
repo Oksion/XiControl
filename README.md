@@ -120,6 +120,10 @@ double-click; current direction is shown by color (charging green / discharging 
   OLED panel from burn-in): anything above the limit smoothly slides back, and not as an
   ultimatum but as a "bargain" — once a minute, half the gap; raise it again and the utility
   backs off for 2 hours. See "Screen brightness limit" below.
+- 🔆 **Auto-brightness from the light sensor** *(if the laptop has one)* — the screen follows
+  ambient light along a curve that **learns from your corrections**: adjust the brightness once
+  and that's what it will be in that light from now on. Two curves (AC and battery); the
+  settings tab shows live lux and the learning graph. See "Auto-brightness by sensor" below.
 - 🌐 UI language: Russian / English / Chinese (中文).
 - 🚀 Autostart via Task Scheduler (no UAC prompt at logon, works on battery).
 - 🛰️ **HTTP API for the local network** (optional, **off by default**) — control it from a
@@ -359,6 +363,42 @@ and fine timings — `BrightnessRampMs` (smooth-slide duration, 10000), `Brightn
 (interval between bargain steps, 60000), `BrightnessBackoffMin` (pause after a repeated raise, 120),
 `BrightnessGapDivisor` (gap divisor, 2), `BrightnessSnapPercent` (close-out threshold, 2).
 
+### Auto-brightness by sensor
+
+**Settings → Display → "Auto-brightness by sensor"** (**off** by default; the option appears
+only if the laptop has an ambient light sensor). The screen follows the light — but unlike
+Windows' adaptive brightness, it does so **along a curve that learns from your corrections**:
+adjust the brightness by hand and the app remembers "in this light I want that much".
+
+- **Works out of the box**, no training required: a sensible default curve ships with it
+  (dark room ≈10%, office ≈60%, outdoors 100%).
+- **Two curves — AC and battery**: at the same lux level you want more brightness at your desk
+  than on the road. The one that learns is the one that was active when you turned the knob.
+- **No neural networks, no cloud** — a plain explainable model of a dozen points, stored in
+  your own `config.json`. "Why did the screen dim?" always has an exact answer.
+- **Learning is never reset** by turning the feature off — only the "Reset the learned curve"
+  button forgets it.
+- **"Sensor inertia"** (0–60 s, 10 by default) — the app reacts to the *median* ambient light
+  over that window: a stray glare, a headlight or your own shadow won't jerk the brightness.
+- **You can see it working**: the tab shows live lux and a graph of both curves (AC in the
+  accent color, battery in orange) with anchor points and a marker at the current light level.
+  Adjust the brightness and a few seconds later the new point appears on the graph.
+
+It plays nice with the other brightness features: the **limit** (above) acts as an output
+filter — the curve learns your true intent while the limit simply caps the result (you can see
+it "slicing" the curve on the graph); **"Remember brightness"** is switched off while
+auto-brightness is on (the curve replaces those slots). With **Windows adaptive brightness** the
+feature stays inactive (two controllers of one slider inevitably fight) and says so on the tab.
+
+In `config.json`: `AutoBrightness`, `AutoBrightnessPointsAc`/`…Battery` (the curves — they
+maintain themselves), `AutoBrightnessMedianSec`, plus fine thresholds
+`AutoBrightnessHysteresis`, `AutoBrightnessSettleMs`, `AutoBrightnessLearnMs`,
+`AutoBrightnessDeadband`.
+
+> 🤓 How it works inside — the logarithmic scale, the point-eviction rules, a proof that the
+> curve stays monotonic, why median and not mean: [docs/13-auto-brightness.md](docs/13-auto-brightness.md)
+> (in Russian).
+
 ### Auto refresh rate (screen rate by power source)
 
 The screen switches to a different rate depending on the power source: on AC — higher (smoothness),
@@ -527,7 +567,8 @@ The MIFS protocol is reverse-engineered and documented in [docs/](docs/):
 - [01-wmi-protocol.md](docs/01-wmi-protocol.md) — transport, buffer format, command codes, key events (**the main document**);
 - [02-feature-catalog.md](docs/02-feature-catalog.md) — the feature catalog;
 - [03-architecture.md](docs/03-architecture.md) — the app architecture;
-- [07-keymap.md](docs/07-keymap.md) — the key-code map.
+- [07-keymap.md](docs/07-keymap.md) — the key-code map;
+- [13-auto-brightness.md](docs/13-auto-brightness.md) — the math behind the learned auto-brightness curve 🤓.
 
 In short: the `MiInterface` method takes a 32-byte buffer
 (`[1]` — GET `0xFA` / SET `0xFB`, `[3]` — command, `[4]/[6]` — arguments) and returns a

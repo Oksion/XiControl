@@ -123,6 +123,8 @@ xi_control/
  │   │                         General/Features/Battery/Display/Touchpad/Perf/Keys/Api/AboutTab
  │   ├─ SystemIntegration/  — ChargeGuard, RefreshRate(+Guard), PowerProfileGuard,
  │   │                         BrightnessCapGuard (лимит яркости, XIC-29),
+ │   │                         AutoBrightnessGuard + BrightnessCurve/MedianWindow +
+ │   │                         AlsSensor (авто-яркость по датчику, XIC-30 — см. docs/13),
  │   │                         TravelChargeMonitor, IPowerEvents+IDisplayEvents/SystemEventsSource,
  │   │                         IAppTimer/UiTimer/WorkerTimer, Brightness (+Ramp/Own/
  │   │                         AdaptiveBrightness), TouchpadControl/TouchscreenControl
