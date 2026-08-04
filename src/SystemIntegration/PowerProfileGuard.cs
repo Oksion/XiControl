@@ -89,9 +89,10 @@ public sealed class PowerProfileGuard : IDisposable
 
     private void Apply()
     {
-        // режим держат «Профили питания», яркость — самостоятельные опции «Запоминать яркость»
-        // и лимит (XIC-29). Нечего делать — выходим, не будим пул.
-        if (!_cfg.PowerProfiles && !_cfg.RememberBrightness && !_cfg.BrightnessCapEnabled) return;
+        // режим держат «Профили питания», яркость — самостоятельные опции «Запоминать яркость»,
+        // лимит (XIC-29) и авто-яркость (XIC-30). Нечего делать — выходим, не будим пул.
+        if (!_cfg.PowerProfiles && !_cfg.RememberBrightness &&
+            !_cfg.BrightnessCapEnabled && !_cfg.AutoBrightness) return;
         bool online = _power.IsOnline;
         PerfMode? wantMode = _cfg.PowerProfiles ? (online ? _cfg.AcPerfMode : _cfg.BatteryPerfMode) : null;
         // при включённой авто-яркости (XIC-30) слоты не восстанавливаем — яркостью владеет кривая
@@ -114,7 +115,8 @@ public sealed class PowerProfileGuard : IDisposable
             catch (Exception ex) { Log.Ex("PowerProfileGuard.Apply.mode", ex); /* железо могло быть недоступно */ }
 
             if (wantBright is int lvl) Brightness.Apply(lvl);
-            _cap.Evaluate(); // после смены питания яркость могла остаться выше лимита нового источника
+            _cap.Evaluate();  // после смены питания яркость могла остаться выше лимита нового источника
+            _auto.Evaluate(); // и у авто-яркости сменилась кривая (сеть↔батарея) — пересчитаться
         });
     }
 

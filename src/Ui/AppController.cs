@@ -142,9 +142,8 @@ public sealed class AppController
 
         // Авто-яркость (XIC-30): датчик стартуем всегда (нужен вкладке «Экран», чтобы знать,
         // показывать ли фичу); первые люксы придут событием и сами дадут сверку через дебаунс.
-        // Кривую сеем и здесь: фичу могли включить правкой config.json мимо SetAutoBrightness.
-        if (_cfg.AutoBrightness && _cfg.AutoBrightnessPoints.Count == 0)
-            _cfg.AutoBrightnessPoints.AddRange(BrightnessCurve.DefaultPoints());
+        // Кривые сеем и здесь: фичу могли включить правкой config.json мимо SetAutoBrightness.
+        if (_cfg.AutoBrightness) SeedCurves();
         _als.Start();
 
         // «Режим совы»: восстановить после сбоя, включить заново, либо погасить, если фичу отключили
@@ -436,12 +435,21 @@ public sealed class AppController
         _cfg.AutoBrightness = on;
         if (on)
         {
-            if (_cfg.AutoBrightnessPoints.Count == 0)
-                _cfg.AutoBrightnessPoints.AddRange(BrightnessCurve.DefaultPoints());
+            SeedCurves();
             _cfg.RememberBrightness = false; // взаимоисключение: два хозяина яркости не нужны
         }
         _cfg.Save();
         if (on) Task.Run(_autoGuard.Evaluate); // сверка может читать WMI — не с UI-потока
+    }
+
+    // Пустые кривые (первое включение / ручная правка конфига) заполняем дефолтом — обеим:
+    // кривых две, для сети и батареи (комфорт в одних люксах у розетки и в дороге разный).
+    private void SeedCurves()
+    {
+        if (_cfg.AutoBrightnessPointsAc.Count == 0)
+            _cfg.AutoBrightnessPointsAc.AddRange(BrightnessCurve.DefaultPoints());
+        if (_cfg.AutoBrightnessPointsBattery.Count == 0)
+            _cfg.AutoBrightnessPointsBattery.AddRange(BrightnessCurve.DefaultPoints());
     }
 
     /// <summary>Есть ли датчик освещённости (для видимости фичи на вкладке «Экран»).</summary>

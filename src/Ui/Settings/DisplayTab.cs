@@ -107,9 +107,10 @@ public sealed class DisplayTab : SettingsPane
         float.IsNaN(lux) ? "—" : Loc.T("settings.bright.lux.val", Math.Round(lux));
 
     /// <summary>
-    /// Карточка-график кривой lux → %: ось X — люксы в лог-шкале (как воспринимает глаз и как
-    /// интерполирует кривая), Y — яркость. Линия — предсказание, точки — якоря (в т.ч. выученные),
-    /// пунктир — текущая освещённость. Перерисовывается секундным таймером — обучение видно живьём.
+    /// Карточка-график кривой lux → % ТЕКУЩЕГО источника питания (кривых две): ось X — люксы в
+    /// лог-шкале, Y — яркость. Линия — предсказание, точки — якоря (в т.ч. выученные), пунктир —
+    /// текущая освещённость; лимит яркости «срезает» кривую сверху — график показывает
+    /// эффективное поведение. Перерисовывается секундным таймером — обучение видно живьём.
     /// </summary>
     private BufferedPanel CurveGraph(SettingsActions act)
     {
@@ -136,8 +137,15 @@ public sealed class DisplayTab : SettingsPane
         var plot = new Rectangle(padL, padT, w - padL - padR, h - padT - padB);
         double maxLog = Math.Log10(1 + 10_000); // шкала до 10к лк — дальше только прямое солнце
 
+        // лимит текущего источника питания (XIC-29) «срезает» кривую сверху прямо на графике:
+        // рисуем эффективное поведение, а не намерение — линия и точки клампятся к лимиту
+        bool online = PowerLine.IsOnline();
+        int cap = _cfg.BrightnessCapEnabled
+            ? Math.Clamp(online ? _cfg.BrightnessCapAc : _cfg.BrightnessCapBattery, 10, 100)
+            : 100;
+
         float X(float lux) => plot.Left + (float)(Math.Log10(1 + Math.Max(0, lux)) / maxLog) * plot.Width;
-        float Y(int pct) => plot.Bottom - pct / 100f * plot.Height;
+        float Y(int pct) => plot.Bottom - Math.Min(pct, cap) / 100f * plot.Height;
 
         // сетка: декады люксов и 0/50/100% яркости
         using var grid = new Pen(Ui.T.Border);
@@ -171,28 +179,6 @@ public sealed class DisplayTab : SettingsPane
         using var dot = new SolidBrush(Ui.T.Accent);
         foreach (var p in pts)
             g.FillEllipse(dot, X(p.Lux) - Ui.Sc(3), Y(p.Percent) - Ui.Sc(3), Ui.Sc(6), Ui.Sc(6));
-
-        // горизонтали лимитов яркости (XIC-29): видно, где кривую прижмёт фильтр.
-        // 100% = «здесь не ограничивать» — такую линию не рисуем; равные лимиты сливаем в одну
-        if (_cfg.BrightnessCapEnabled)
-        {
-            int ac = Math.Clamp(_cfg.BrightnessCapAc, 10, 100);
-            int bat = Math.Clamp(_cfg.BrightnessCapBattery, 10, 100);
-            var caps = new List<(string Label, int Pct)>();
-            if (ac < 100 && ac == bat) caps.Add(("AC+BAT", ac));
-            else
-            {
-                if (ac < 100) caps.Add(("AC", ac));
-                if (bat < 100) caps.Add(("BAT", bat));
-            }
-            using var capPen = new Pen(Ui.T.Text2) { DashStyle = DashStyle.Dot };
-            foreach (var (label, pct) in caps)
-            {
-                float y = Y(pct);
-                g.DrawLine(capPen, plot.Left, y, plot.Right, y);
-                g.DrawString(label, Ui.DescFont, dim, plot.Right - Ui.Sc(42), y - Ui.Sc(13));
-            }
-        }
 
         // маркер текущей освещённости: пунктир + точка на кривой
         float now = act.CurrentLux();

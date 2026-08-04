@@ -116,8 +116,10 @@ public sealed class AutoBrightnessTests
 
     private AutoBrightnessGuard NewGuard()
     {
-        if (_cfg.AutoBrightnessPoints.Count == 0)
-            _cfg.AutoBrightnessPoints.AddRange(BrightnessCurve.DefaultPoints());
+        if (_cfg.AutoBrightnessPointsAc.Count == 0)
+            _cfg.AutoBrightnessPointsAc.AddRange(BrightnessCurve.DefaultPoints());
+        if (_cfg.AutoBrightnessPointsBattery.Count == 0)
+            _cfg.AutoBrightnessPointsBattery.AddRange(BrightnessCurve.DefaultPoints());
         return new AutoBrightnessGuard(_cfg, _power, _settle, _learn,
             () => _brightness, (f, t, _) => _ramps.Add((f, t)), _ => _adaptive, (l, _) => l);
     }
@@ -171,7 +173,9 @@ public sealed class AutoBrightnessTests
         _learn.Running.Should().BeTrue("правка ждёт период раздумья");
         _learn.Fire();
 
-        _cfg.AutoBrightnessPoints.Should().Contain(p => Math.Abs(p.Lux - 200) < 0.01 && p.Percent == 80);
+        _cfg.AutoBrightnessPointsAc.Should().Contain(p => Math.Abs(p.Lux - 200) < 0.01 && p.Percent == 80);
+        _cfg.AutoBrightnessPointsBattery.Should().NotContain(p => Math.Abs(p.Lux - 200) < 0.01 && p.Percent == 80,
+            "правка на сети учит только сетевую кривую");
         int before = _ramps.Count;
         g.OnLux(200); // тот же свет — предсказание теперь 80, спорить не о чем
         _settle.Fire();
@@ -191,8 +195,27 @@ public sealed class AutoBrightnessTests
         g.OnBrightness(78, own: false, settling: false);
         _learn.Fire();
 
-        _cfg.AutoBrightnessPoints.Count(p => Math.Abs(p.Lux - 200) < 0.01).Should().Be(1);
-        _cfg.AutoBrightnessPoints.Should().Contain(p => Math.Abs(p.Lux - 200) < 0.01 && p.Percent == 78);
+        _cfg.AutoBrightnessPointsAc.Count(p => Math.Abs(p.Lux - 200) < 0.01).Should().Be(1);
+        _cfg.AutoBrightnessPointsAc.Should().Contain(p => Math.Abs(p.Lux - 200) < 0.01 && p.Percent == 78);
+    }
+
+    [Fact]
+    public void Curves_ArePerPowerSource()
+    {
+        using var g = NewGuard();
+        _power.IsOnline = true;
+        g.OnLux(200);
+        _settle.Fire();                                        // сеть: подъехали к 60
+        g.OnBrightness(60, own: true, settling: false);
+        g.OnBrightness(90, own: false, settling: false);       // на сети хочу ярко
+        _learn.Fire();
+
+        _power.IsOnline = false;                               // перешли на батарею
+        _ramps.Clear();
+        g.Evaluate();                                          // как после смены питания
+
+        _ramps.Should().Equal(new[] { (90, 60) },
+            "батарейная кривая не училась — предсказание по её якорям, не по выученным 90");
     }
 
     [Fact]
@@ -234,10 +257,11 @@ public sealed class AutoBrightnessTests
     [Fact]
     public void ClampSeam_LimitsPrediction()
     {
+        _cfg.AutoBrightnessPointsAc.AddRange(BrightnessCurve.DefaultPoints());
+        _cfg.AutoBrightnessPointsBattery.AddRange(BrightnessCurve.DefaultPoints());
         using var g = new AutoBrightnessGuard(_cfg, _power, _settle, _learn,
             () => _brightness, (f, t, _) => _ramps.Add((f, t)), _ => false,
             (level, _) => Math.Min(level, 70)); // лимит яркости как фильтр на выходе
-        _cfg.AutoBrightnessPoints.AddRange(BrightnessCurve.DefaultPoints());
 
         g.OnLux(2000); // кривая хочет 100
         _settle.Fire();
