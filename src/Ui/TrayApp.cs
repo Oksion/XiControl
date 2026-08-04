@@ -544,6 +544,8 @@ public sealed class TrayApp : IDisposable
                 // предупреждаем, если адаптивная яркость включена хоть для одного источника:
                 // лимит не сработает ровно тогда, когда питание переключится на него
                 IsAdaptiveBrightness = () => AdaptiveBrightness.IsEnabled(true) || AdaptiveBrightness.IsEnabled(false),
+                SetAutoBrightness = _controller.SetAutoBrightness,
+                IsAlsAvailable = () => _controller.AlsAvailable,
                 SetAutoHz = _controller.ToggleAutoHz,
                 SetRefreshRateFeature = _controller.ToggleRefreshRateFeature,
                 SetHoldRefreshRate = _controller.SetHoldRefreshRate,

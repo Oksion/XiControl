@@ -3,6 +3,13 @@ using XiControl.Wmi;
 
 namespace XiControl.Config;
 
+/// <summary>Якорная точка кривой авто-яркости: «при таком свете — такая яркость» (XIC-30).</summary>
+public sealed class BrightnessPoint
+{
+    public float Lux { get; set; }
+    public int Percent { get; set; }
+}
+
 /// <summary>Настройки приложения. Хранятся в %APPDATA%\XiControl\config.json.</summary>
 public sealed class AppConfig
 {
@@ -159,6 +166,34 @@ public sealed class AppConfig
     /// <summary>Порог схождения, %: если до лимита осталось не больше — доводим сразу
     /// (иначе гонялись бы за половинками бесконечно).</summary>
     public int BrightnessSnapPercent { get; set; } = 2;
+
+    /// <summary>
+    /// Авто-яркость по датчику освещённости (XIC-30): экран следует за светом по обучаемой
+    /// кривой AutoBrightnessPoints. Взаимоисключается с RememberBrightness (кривая заменяет
+    /// слоты). Требует датчика и выключенной адаптивной яркости Windows. Держит
+    /// AutoBrightnessGuard.
+    /// </summary>
+    public bool AutoBrightness { get; set; }
+
+    /// <summary>Якорные точки кривой lux → % (обучаются правками пользователя; при первом
+    /// включении сеются дефолтом из BrightnessCurve.DefaultPoints). Не редактировать руками
+    /// без нужды — кривая держит монотонность сама.</summary>
+    public List<BrightnessPoint> AutoBrightnessPoints { get; set; } = [];
+
+    // Тонкие настройки авто-яркости — только правкой config.json.
+
+    /// <summary>Мёртвая зона, %: не трогаем яркость, если предсказание отличается меньше.</summary>
+    public int AutoBrightnessDeadband { get; set; } = 5;
+
+    /// <summary>Стабилизация света, мс: реагируем, когда освещённость устоялась. Дефолт 2 с.</summary>
+    public int AutoBrightnessSettleMs { get; set; } = 2000;
+
+    /// <summary>«Период раздумья» ручной правки, мс: пользователь докрутил и остановился —
+    /// значение становится обучающей точкой. Дефолт 5 с.</summary>
+    public int AutoBrightnessLearnMs { get; set; } = 5000;
+
+    /// <summary>Гистерезис значимости света в лог-шкале (0.1 ≈ ±26% люксов).</summary>
+    public double AutoBrightnessHysteresis { get; set; } = 0.1;
 
     /// <summary>Запомненная яркость экрана (0–100) от сети; null — ещё не запомнена.</summary>
     public int? AcBrightness { get; set; }
