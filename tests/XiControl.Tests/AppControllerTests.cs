@@ -24,13 +24,16 @@ public sealed class AppControllerTests
     public AppControllerTests()
     {
         Log.Enabled = false;
-        // лимит яркости — на фейках: без WMI и реальных таймеров (сам тестируется отдельно)
+        // лимит и авто-яркость — на фейках: без WMI и реальных таймеров (тестируются отдельно);
+        // AlsWatcher без Start безопасен — COM трогается только при запуске
         var cap = new BrightnessCapGuard(_cfg, _power,
             new FakeTimer(), new FakeTimer(), () => null, (_, _, _) => { }, _ => false);
+        var auto = new AutoBrightnessGuard(_cfg, _power,
+            new FakeTimer(), new FakeTimer(), () => null, (_, _, _) => { }, _ => false, (l, _) => l);
         _c = new AppController(_mifs, _cfg, _power, new Localizer(),
             new ChargeGuard(_mifs, _power, () => _cfg.ChargeCare ? _cfg.CarePercent() : 100, new FakeTimer()),
             new RefreshRateGuard(_cfg, _power, new FakeDisplayEvents(), new FakeTimer()),
-            new PowerProfileGuard(_mifs, _cfg, _power, cap, new FakeTimer()), cap,
+            new PowerProfileGuard(_mifs, _cfg, _power, cap, auto, new FakeTimer()), cap, auto, new AlsWatcher(),
             new TravelChargeMonitor(_cfg, _power, new FakeTimer()),
             new TouchpadControl(_cfg), new TouchscreenControl(_cfg),
             new TouchpadDeadZone(_cfg, new TouchpadControl(_cfg)))

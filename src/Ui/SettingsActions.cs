@@ -32,6 +32,8 @@ public sealed class SettingsActions
     public required Action<bool> SetBrightnessCap;       // лимит яркости вкл/выкл (XIC-29)
     public required Action<int, int> SetBrightnessCaps;  // лимиты яркости: ac, batt
     public required Func<bool> IsAdaptiveBrightness;     // адаптивная яркость в схеме питания → лимит не работает
+    public required Action<bool> SetAutoBrightness;      // авто-яркость по датчику (XIC-30)
+    public required Func<bool> IsAlsAvailable;           // есть ли датчик освещённости (видимость фичи)
     public required Action<bool> SetAutoHz;
     public required Action<bool> SetHoldRefreshRate;         // возвращать частоту после чужих изменений
     public required Action<bool> SetRefreshRateFeature;      // «управление частотой» как фича вкл/выкл

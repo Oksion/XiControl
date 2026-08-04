@@ -21,6 +21,8 @@ public sealed class AppController
     private readonly RefreshRateGuard _hz;
     private readonly PowerProfileGuard _profiles;
     private readonly BrightnessCapGuard _capGuard;
+    private readonly AutoBrightnessGuard _autoGuard;
+    private readonly AlsWatcher _als;
     private readonly TravelChargeMonitor _travel;
     private readonly TouchpadControl _touchpad;
     private readonly TouchscreenControl _touchscreen;
@@ -54,6 +56,7 @@ public sealed class AppController
 
     public AppController(IMifsClient mifs, AppConfig cfg, IPowerEvents power, ILocalizer loc,
         ChargeGuard charge, RefreshRateGuard hz, PowerProfileGuard profiles, BrightnessCapGuard capGuard,
+        AutoBrightnessGuard autoGuard, AlsWatcher als,
         TravelChargeMonitor travel, TouchpadControl touchpad, TouchscreenControl touchscreen,
         TouchpadDeadZone deadZone)
     {
@@ -65,6 +68,9 @@ public sealed class AppController
         _hz = hz;
         _profiles = profiles;
         _capGuard = capGuard;
+        _autoGuard = autoGuard;
+        _als = als;
+        _als.LuxChanged += _autoGuard.OnLux; // датчик → авто-яркость (оба живут в DI весь сеанс)
         _travel = travel;
         _touchpad = touchpad;
         _touchscreen = touchscreen;
@@ -133,6 +139,13 @@ public sealed class AppController
         // Reapply выше уже сверяется сам; отдельная сверка нужна, когда включён только лимит.
         if (_cfg.BrightnessCapEnabled && !_cfg.RememberBrightness && !_cfg.PowerProfiles)
             Task.Run(_capGuard.Evaluate);
+
+        // Авто-яркость (XIC-30): датчик стартуем всегда (нужен вкладке «Экран», чтобы знать,
+        // показывать ли фичу); первые люксы придут событием и сами дадут сверку через дебаунс.
+        // Кривую сеем и здесь: фичу могли включить правкой config.json мимо SetAutoBrightness.
+        if (_cfg.AutoBrightness && _cfg.AutoBrightnessPoints.Count == 0)
+            _cfg.AutoBrightnessPoints.AddRange(BrightnessCurve.DefaultPoints());
+        _als.Start();
 
         // «Режим совы»: восстановить после сбоя, включить заново, либо погасить, если фичу отключили
         if (_cfg.Awake && !_cfg.OwlMode) { AwakeMode.Disable(_cfg); _cfg.Awake = false; _cfg.Save(); }
@@ -413,6 +426,26 @@ public sealed class AppController
         _capGuard.ResetBackoff();
         Task.Run(_capGuard.Evaluate); // сверка читает WMI — не с UI-потока
     }
+
+    /// <summary>Авто-яркость по датчику (XIC-30). Включение сеет дефолтную кривую и гасит
+    /// «Запоминать яркость» (кривая заменяет слоты); выключение ничего не трогает —
+    /// кривая остаётся в конфиге до следующего раза.</summary>
+    public void SetAutoBrightness(bool on)
+    {
+        if (_cfg.AutoBrightness == on) return;
+        _cfg.AutoBrightness = on;
+        if (on)
+        {
+            if (_cfg.AutoBrightnessPoints.Count == 0)
+                _cfg.AutoBrightnessPoints.AddRange(BrightnessCurve.DefaultPoints());
+            _cfg.RememberBrightness = false; // взаимоисключение: два хозяина яркости не нужны
+        }
+        _cfg.Save();
+        if (on) Task.Run(_autoGuard.Evaluate); // сверка может читать WMI — не с UI-потока
+    }
+
+    /// <summary>Есть ли датчик освещённости (для видимости фичи на вкладке «Экран»).</summary>
+    public bool AlsAvailable => _als.Available;
 
     /// <summary>Лимиты яркости из окна настроек (сеть, батарея) — сохранить и свериться.</summary>
     public void SetBrightnessCaps(int ac, int batt)

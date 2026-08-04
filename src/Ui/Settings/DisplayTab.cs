@@ -25,11 +25,17 @@ public sealed class DisplayTab : SettingsPane
         var capBatt = PercentCombo(cfg.BrightnessCapBattery, v => act.SetBrightnessCaps(cfg.BrightnessCapAc, v));
         capBatt.Enabled = cfg.BrightnessCapEnabled;
         ui.AddRow(this, "settings.bright.cap.battery", "settings.bright.cap.battery.desc", capBatt);
-        // честная плашка: с адаптивной яркостью лимит не работает (иначе качель с датчиком)
-        if (cfg.BrightnessCapEnabled && act.IsAdaptiveBrightness())
+        // авто-яркость по датчику (XIC-30) — только на машинах с датчиком; Available
+        // выясняется в фоне на старте, к открытию окна ответ обычно уже есть
+        if (act.IsAlsAvailable())
+            ui.AddRow(this, "settings.bright.auto", "settings.bright.auto.desc",
+                ui.Toggle(cfg.AutoBrightness, on => { act.SetAutoBrightness(on); rebuild(); }));
+        // честная плашка: с адаптивной яркостью Windows ни лимит, ни авто-яркость не работают
+        if ((cfg.BrightnessCapEnabled || cfg.AutoBrightness) && act.IsAdaptiveBrightness())
             ui.AddNote(this, "settings.bright.adaptive");
-        ui.AddRow(this, "settings.profile.brightness", "settings.brightness.desc",
-            ui.Toggle(cfg.RememberBrightness, act.SetRememberBrightness));
+        var remember = ui.Toggle(cfg.RememberBrightness, act.SetRememberBrightness);
+        remember.Enabled = !cfg.AutoBrightness; // кривая заменяет слоты — два хозяина не нужны
+        ui.AddRow(this, "settings.profile.brightness", "settings.brightness.desc", remember);
 
         // ---- Частота — только пока «управление частотой» включено во вкладке «Функции» ----
         if (!cfg.RefreshRateFeature) return;

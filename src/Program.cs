@@ -45,6 +45,11 @@ internal static class Program
         });
         services.AddSingleton<RefreshRateGuard>();
         services.AddSingleton<BrightnessCapGuard>(); // лимит яркости (XIC-29); события ему раздаёт PowerProfileGuard
+        services.AddSingleton<AlsWatcher>();         // датчик освещённости (XIC-30); стартует в AppController.Startup
+        // авто-яркость: кламп выхода — лимитом (кривая хранит намерение, лимит — фильтр)
+        services.AddSingleton(sp => new AutoBrightnessGuard(
+            sp.GetRequiredService<AppConfig>(), sp.GetRequiredService<IPowerEvents>(),
+            clamp: (level, online) => sp.GetRequiredService<BrightnessCapGuard>().ClampRestore(level, online)));
         services.AddSingleton<PowerProfileGuard>();
         services.AddSingleton<TravelChargeMonitor>();
         services.AddSingleton<TrayIconController>();

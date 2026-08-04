@@ -26,6 +26,7 @@ public sealed class PowerProfileGuard : IDisposable
     private readonly AppConfig _cfg;
     private readonly IPowerEvents _power;
     private readonly BrightnessCapGuard _cap;
+    private readonly AutoBrightnessGuard _auto;
     private readonly IAppTimer _debounce;
     private readonly BrightnessWatcher _brightness = new();
     private readonly System.Threading.Timer _save;
@@ -36,12 +37,13 @@ public sealed class PowerProfileGuard : IDisposable
     public Action? ModeApplied;
 
     public PowerProfileGuard(IMifsClient mifs, AppConfig cfg, IPowerEvents power,
-        BrightnessCapGuard cap, IAppTimer? debounce = null)
+        BrightnessCapGuard cap, AutoBrightnessGuard auto, IAppTimer? debounce = null)
     {
         _mifs = mifs;
         _cfg = cfg;
         _power = power;
         _cap = cap;
+        _auto = auto;
 
         _debounce = debounce ?? new UiTimer();
         _debounce.Interval = DebounceMs;
@@ -92,7 +94,9 @@ public sealed class PowerProfileGuard : IDisposable
         if (!_cfg.PowerProfiles && !_cfg.RememberBrightness && !_cfg.BrightnessCapEnabled) return;
         bool online = _power.IsOnline;
         PerfMode? wantMode = _cfg.PowerProfiles ? (online ? _cfg.AcPerfMode : _cfg.BatteryPerfMode) : null;
-        int? wantBright = _cfg.RememberBrightness ? (online ? _cfg.AcBrightness : _cfg.BatteryBrightness) : null;
+        // при включённой авто-яркости (XIC-30) слоты не восстанавливаем — яркостью владеет кривая
+        int? wantBright = _cfg.RememberBrightness && !_cfg.AutoBrightness
+            ? (online ? _cfg.AcBrightness : _cfg.BatteryBrightness) : null;
         // слот, запомненный при старом (высоком) лимите, не должен пробить новый; сам слот не трогаем
         if (wantBright is int b) wantBright = _cap.ClampRestore(b, online);
 
@@ -119,11 +123,13 @@ public sealed class PowerProfileGuard : IDisposable
     {
         bool own = Brightness.Own.IsOwn(level);
         bool settling = Environment.TickCount - _settleUntil < 0;
-        _cap.OnBrightness(level, own, settling); // лимиту — все события: свои шаги он не считает протестом
+        _cap.OnBrightness(level, own, settling);  // лимиту — все события: свои шаги он не считает протестом
+        _auto.OnBrightness(level, own, settling); // авто-яркости — тоже: правка человека учит кривую
 
         // дальше — запоминание пользовательского выбора в слот текущего питания
         if (own) return;                      // восстановление слота / шаг лимита — не выбор человека
         if (!_cfg.RememberBrightness) return; // яркость независима от «Профилей питания»
+        if (_cfg.AutoBrightness) return;      // кривая заменяет слоты — не пишем в них мусор
         if (settling) return;                 // ещё «затишье» после смены питания
         if (!_cap.AllowsRemember(level)) return; // выше лимита: намерение не запоминаем (и не обрезаем)
 
