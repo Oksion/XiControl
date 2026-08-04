@@ -105,8 +105,8 @@ public sealed class AlsWatcher : IDisposable
         {
             if (sensor.GetCurrentReading(out ILightSensorReading? reading) < 0 || reading is null) return;
             if (reading.GetIlluminanceInLux(out float lux) < 0 || lux < 0) return;
-            // дедуп: опрос видит одно и то же значение снова и снова — событие только на смену
-            if (!float.IsNaN(LastLux) && Math.Abs(lux - LastLux) < 0.5f) return;
+            // шлём КАЖДЫЙ сэмпл, без дедупа: медианному фильтру авто-яркости нужен равномерный
+            // поток (дедуп исказил бы взвешивание по времени); подписчикам события дёшевы
             LastLux = lux;
             if (!_disposed) LuxChanged?.Invoke(lux);
         }

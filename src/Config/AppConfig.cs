@@ -199,6 +199,10 @@ public sealed class AppConfig
     /// <summary>Гистерезис значимости света в лог-шкале (0.1 ≈ ±26% люксов).</summary>
     public double AutoBrightnessHysteresis { get; set; } = 0.1;
 
+    /// <summary>«Инерция» датчика, сек (есть в UI): решения принимаются по медиане люксов за это
+    /// окно — случайный блик её не сдвигает. 0 — фильтр выключен (мгновенные значения).</summary>
+    public int AutoBrightnessMedianSec { get; set; } = 10;
+
     /// <summary>Запомненная яркость экрана (0–100) от сети; null — ещё не запомнена.</summary>
     public int? AcBrightness { get; set; }
 
