@@ -68,11 +68,17 @@ public sealed class AlsWatcher : IDisposable
             }
             finally { _ = WindowsDeleteString(hstr); }
 
-            // Заявляем интервал отчётов — это и есть «клиент заинтересован»: без него сервис
-            // через пару минут усыпляет датчик, и GetCurrentReading вечно отдаёт последний кэш
-            // (поймано вживую: значение замерло на 815 лк после вспышки фонарика).
+            // Датчик СТРИМИТ, только пока у него есть событийный подписчик: одного опроса и
+            // заявленного ReportInterval мало — сервис усыпляет сенсор, и GetCurrentReading
+            // вечно отдаёт последний кэш (поймано вживую: 815 лк с застывшей меткой времени
+            // даже для свежих клиентов). Поэтому: интервал + подписка ReadingChanged; опрос
+            // остаётся страховкой на случай, если события в elevated-процессе не доедут.
             _ = sensor.GetMinimumReportInterval(out uint minMs);
             _ = sensor.PutReportInterval(Math.Max(minMs, 1000));
+            var sink = new ReadingSink(() => Poll(sensor));
+            long token = 0;
+            int hrSub = sensor.AddReadingChanged(sink, out token);
+            if (hrSub < 0) Log.Write($"AlsWatcher: подписка ReadingChanged не удалась (0x{hrSub:X8}) — остаёмся на опросе");
 
             _started = true;
             ready?.Invoke(true);
@@ -81,7 +87,10 @@ public sealed class AlsWatcher : IDisposable
             {
                 Poll(sensor);
             }
-            while (!_stop.Wait(PollMs)); // поток-хозяин: умрёт он — умрут квартира и RCW
+            while (!_stop.Wait(PollMs)); // поток-хозяин: умрёт он — умрут квартира, RCW и подписка
+
+            if (hrSub >= 0) _ = sensor.RemoveReadingChanged(token);
+            GC.KeepAlive(sink); // CCW должен жить, пока жива подписка
         }
         catch (Exception ex)
         {
@@ -149,7 +158,29 @@ public sealed class AlsWatcher : IDisposable
         [PreserveSig] int GetMinimumReportInterval(out uint value);      // get_MinimumReportInterval
         [PreserveSig] int PutReportInterval(uint value);                 // put_ReportInterval
         [PreserveSig] int GetReportInterval(out uint value);             // get_ReportInterval
-        // add_/remove_ReadingChanged дальше по vtable — не зовём (в elevated хватает опроса)
+        [PreserveSig] int AddReadingChanged(                             // add_ReadingChanged
+            [MarshalAs(UnmanagedType.Interface)] IReadingChangedHandler handler, out long token);
+        [PreserveSig] int RemoveReadingChanged(long token);              // remove_ReadingChanged
+    }
+
+    /// <summary>ITypedEventHandler&lt;LightSensor, LightSensorReadingChangedEventArgs&gt; —
+    /// параметризованный IID посчитан по алгоритму WinRT pinterface (UUID v5 от сигнатуры).
+    /// WinRT-делегат наследует IUnknown (не IInspectable) — слотов-паддингов нет.</summary>
+    [ComImport, Guid("1ECF183A-9F0A-5F73-9225-5A33EAB5594F"),
+     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IReadingChangedHandler
+    {
+        [PreserveSig] int Invoke(IntPtr sender, IntPtr args);
+    }
+
+    // Приёмник события: аргументы не разбираем — свежее значение возьмёт тот же Poll
+    private sealed class ReadingSink(Action onReading) : IReadingChangedHandler
+    {
+        public int Invoke(IntPtr sender, IntPtr args)
+        {
+            try { onReading(); } catch { /* колбэк в чужой поток — не роняем */ }
+            return 0;
+        }
     }
 
     [ComImport, Guid("FFDF6300-227C-4D2B-B302-FC0142485C68"),
