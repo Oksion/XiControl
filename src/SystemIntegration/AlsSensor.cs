@@ -3,25 +3,27 @@ using System.Runtime.InteropServices;
 namespace XiControl.SystemIntegration;
 
 /// <summary>
-/// Датчик освещённости через штатный Sensor API (COM, sensorsapi) — driver-free: тот же
-/// канал, которым пользуется адаптивная яркость самой Windows. WinRT-путь отвергнут
-/// осознанно: проекции тянут Microsoft.Windows.SDK.NET.dll (~25 МБ) — раздули бы лёгкий
-/// framework-dependent exe на порядок (XIC-30).
+/// Датчик освещённости через WinRT LightSensor, активированный РУКАМИ (RoGetActivationFactory)
+/// — без проекций Windows SDK: пакетный путь добавил бы Microsoft.Windows.SDK.NET.dll ~25 МБ
+/// к 2-МБ exe. IID и порядок методов сняты с системного Windows.Devices.winmd (XIC-30).
 ///
-/// Люксы приходят СОБЫТИЕМ (ISensorEvents.OnDataUpdated) — без опроса, как мы любим.
-/// Подписку держит ВЫДЕЛЕННЫЙ фоновый MTA-поток, живущий до Dispose: проверено на железе —
-/// та же инициализация из короткоживущего Task.Run молча глохла (available=true, событий
-/// ноль): квартира умирает вместе с потоком, и сенсорный сервис теряет наш приёмник.
-/// Колбэки приходят на RPC-потоках пула; STA главного потока не участвует.
-/// На машине без датчика (десктоп, другая модель) Start молча не взводится — фича скрыта.
+/// Почему WinRT, а не классический COM Sensor API: наш процесс ВСЕГДА elevated
+/// (requireAdministrator), а сенсорный сервис в high-integrity процессе не доставляет ни
+/// событий ISensorEvents, ни данных через ISensor.GetData — проверено пробами (без повышения
+/// работает, под админом available=true и вечная тишина). WinRT-канал под админом работает.
+///
+/// Люксы снимает лёгким опросом (GetCurrentReading раз в 1.5 с — локальный вызов, дёшево)
+/// выделенный фоновый MTA-поток, живущий до Dispose; дедуп по значению превращает опрос
+/// в события. На машине без датчика Start молча не взводится — фича скрыта.
 /// </summary>
 public sealed class AlsWatcher : IDisposable
 {
-    /// <summary>Свежие люксы с датчика (поток пула!). Отрицательных не бывает.</summary>
+    private const int PollMs = 1500;
+    private const string ClassName = "Windows.Devices.Sensors.LightSensor";
+
+    /// <summary>Освещённость изменилась (фоновый поток!). Отрицательных значений не бывает.</summary>
     public event Action<float>? LuxChanged;
 
-    private ISensor? _sensor;
-    private SensorSink? _sink;   // держим ссылку: COM видит только IUnknown, GC — только нас
     private Thread? _thread;
     private readonly ManualResetEventSlim _stop = new();
     private volatile bool _started;
@@ -30,11 +32,11 @@ public sealed class AlsWatcher : IDisposable
     /// <summary>Есть ли датчик (после Start; до — false).</summary>
     public bool Available => _started;
 
-    /// <summary>Последнее известное значение, лк; NaN — ещё не было события.</summary>
+    /// <summary>Последнее известное значение, лк; NaN — ещё не читалось.</summary>
     public float LastLux { get; private set; } = float.NaN;
 
-    /// <summary>Найти датчик и подписаться. Идёт в фон (CoCreateInstance + RPC не мгновенны,
-    /// а зовут нас со старта приложения); поток остаётся жить хозяином подписки.</summary>
+    /// <summary>Найти датчик и начать снимать люксы. Идёт в фон: активация и первый вызов
+    /// не мгновенны, а зовут нас со старта приложения.</summary>
     public void Start(Action<bool>? ready = null)
     {
         if (_thread is not null || _disposed) return;
@@ -47,205 +49,111 @@ public sealed class AlsWatcher : IDisposable
     {
         try
         {
-            var manager = (ISensorManager)new SensorManagerComObject();
-            int hr = manager.GetSensorsByType(SensorGuids.TypeAmbientLight, out ISensorCollection? sensors);
-            if (hr < 0 || sensors is null || sensors.GetCount(out uint n) < 0 || n == 0)
+            // S_FALSE/CHANGED_MODE не страшны — квартира уже инициализирована CLR
+            _ = RoInitialize(1 /* RO_INIT_MULTITHREADED */);
+
+            int hr = WindowsCreateString(ClassName, ClassName.Length, out IntPtr hstr);
+            if (hr < 0) { ready?.Invoke(false); return; }
+            ILightSensor? sensor;
+            try
             {
-                ready?.Invoke(false); // датчика нет — это не ошибка, просто другая машина
-                return;
+                var iid = new Guid("45DB8C84-C3A8-471E-9A53-6457FAD87C0E"); // ILightSensorStatics
+                hr = RoGetActivationFactory(hstr, ref iid, out ILightSensorStatics? statics);
+                if (hr < 0 || statics is null) { ready?.Invoke(false); return; }
+                if (statics.GetDefault(out sensor) < 0 || sensor is null)
+                {
+                    ready?.Invoke(false); // датчика нет — это не ошибка, просто другая машина
+                    return;
+                }
             }
-
-            // на TM2424 в коллекции ДВА ALS-датчика — берём первый в состоянии READY (0)
-            for (uint i = 0; i < n && _sensor is null; i++)
-                if (sensors.GetAt(i, out ISensor? s) >= 0 && s is not null &&
-                    s.GetState(out int state) >= 0 && state == 0)
-                    _sensor = s;
-            if (_sensor is null) { ready?.Invoke(false); return; }
-
-            // интерес только к данным — состояние/уход переживём без событий
-            var dataUpdated = SensorGuids.EventDataUpdated;
-            _sensor.SetEventInterest(new[] { dataUpdated }, 1);
-            _sink = new SensorSink(OnLux);
-            _sensor.SetEventSink(_sink);
-
-            // Стартовое значение придёт СОБЫТИЕМ: сервис пушит текущее при подписке (проверено
-            // на железе). GetData до раскрутки датчика отдаёт отчёт без поля люксов
-            // (ERROR_NOT_FOUND) — пробуем, но не рассчитываем.
-            if (_sensor.GetData(out ISensorDataReport? report) >= 0 && report is not null)
-                ReadLux(report);
+            finally { _ = WindowsDeleteString(hstr); }
 
             _started = true;
             ready?.Invoke(true);
 
-            _stop.Wait(); // живём: умрёт поток — умрёт квартира, и события перестанут приходить
-            try { _sensor?.SetEventSink(null); } catch { /* сервис мог уже уйти */ }
+            do
+            {
+                Poll(sensor);
+            }
+            while (!_stop.Wait(PollMs)); // поток-хозяин: умрёт он — умрут квартира и RCW
         }
         catch (Exception ex)
         {
-            Log.Ex("AlsWatcher.Start", ex); // сервис сенсоров мог быть выключен — деградируем мягко
+            Log.Ex("AlsWatcher", ex); // WinRT мог быть урезан (LTSC-сборки) — деградируем мягко
             ready?.Invoke(false);
         }
     }
 
-    private void ReadLux(ISensorDataReport report)
+    private void Poll(ILightSensor sensor)
     {
-        var key = SensorGuids.DataLightLevelLux;
-        if (report.GetSensorValue(ref key, out PropVariant v) < 0) return;
         try
         {
-            // датчик отдаёт VT_R4; чужая прошивка может прислать иначе — не падаем
-            if (v.TryGetFloat(out float lux) && lux >= 0)
-            {
-                LastLux = lux;
-                LuxChanged?.Invoke(lux);
-            }
+            if (sensor.GetCurrentReading(out ILightSensorReading? reading) < 0 || reading is null) return;
+            if (reading.GetIlluminanceInLux(out float lux) < 0 || lux < 0) return;
+            // дедуп: опрос видит одно и то же значение снова и снова — событие только на смену
+            if (!float.IsNaN(LastLux) && Math.Abs(lux - LastLux) < 0.5f) return;
+            LastLux = lux;
+            if (!_disposed) LuxChanged?.Invoke(lux);
         }
-        finally { v.Clear(); }
-    }
-
-    private void OnLux(ISensorDataReport report)
-    {
-        if (_disposed) return;
-        try { ReadLux(report); }
-        catch (Exception ex) { Log.Ex("AlsWatcher.OnLux", ex); }
+        catch (Exception ex) { Log.Ex("AlsWatcher.Poll", ex); }
     }
 
     public void Dispose()
     {
         _disposed = true;
-        _stop.Set(); // поток-хозяин снимет подписку и завершится
-        _sink = null;
-        _sensor = null;
+        _stop.Set(); // поток-хозяин завершится и отпустит датчик
     }
 
-    // ---- COM-интероп Sensor API (только то, что зовём; остальные слоты держат vtable) ----
+    // ---- Сырой WinRT-интероп (combase + три интерфейса; порядок методов = vtable из winmd) ----
 
-    [ComImport, Guid("77A1C827-FCD2-4689-8915-9D613CC5FA3E")]
-    internal class SensorManagerComObject { }
+    [DllImport("combase.dll")]
+    private static extern int RoInitialize(int initType);
 
-    [ComImport, Guid("BD77DB67-45A8-42DC-8D00-6DCF15F8377A"),
+    [DllImport("combase.dll", CharSet = CharSet.Unicode)]
+    private static extern int WindowsCreateString(string source, int length, out IntPtr hstring);
+
+    [DllImport("combase.dll")]
+    private static extern int WindowsDeleteString(IntPtr hstring);
+
+    [DllImport("combase.dll")]
+    private static extern int RoGetActivationFactory(IntPtr activatableClassId, ref Guid iid,
+        [MarshalAs(UnmanagedType.Interface)] out ILightSensorStatics? factory);
+
+    // InterfaceIsIInspectable рантайм .NET 5+ не поддерживает (проверено: кидает) — объявляем
+    // как IUnknown и падим три слота IInspectable (GetIids/GetRuntimeClassName/GetTrustLevel) руками.
+
+    [ComImport, Guid("45DB8C84-C3A8-471E-9A53-6457FAD87C0E"),
      InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ISensorManager
+    private interface ILightSensorStatics
     {
-        [PreserveSig] int GetSensorsByCategory(in Guid category, out ISensorCollection? sensors);
-        [PreserveSig] int GetSensorsByType(in Guid type, out ISensorCollection? sensors);
-        [PreserveSig] int GetSensorByID(in Guid id, out ISensor? sensor);
-        [PreserveSig] int SetEventSink(IntPtr events);
-        [PreserveSig] int RequestPermissions(IntPtr hwnd, ISensorCollection sensors, bool modal);
+        [PreserveSig] int GetIids(out int count, out IntPtr iids);       // IInspectable
+        [PreserveSig] int GetRuntimeClassName(out IntPtr name);          // IInspectable
+        [PreserveSig] int GetTrustLevel(out int level);                  // IInspectable
+        [PreserveSig] int GetDefault([MarshalAs(UnmanagedType.Interface)] out ILightSensor? sensor);
     }
 
-    [ComImport, Guid("23571E11-E545-4DD8-A337-B89BF44B10DF"),
+    [ComImport, Guid("F84C0718-0C54-47AE-922E-789F57FB03A0"),
      InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ISensorCollection
+    private interface ILightSensor
     {
-        [PreserveSig] int GetAt(uint index, out ISensor? sensor);
-        [PreserveSig] int GetCount(out uint count);
-        [PreserveSig] int Add(ISensor sensor);
-        [PreserveSig] int Remove(ISensor sensor);
-        [PreserveSig] int RemoveByID(in Guid id);
-        [PreserveSig] int Clear();
+        [PreserveSig] int GetIids(out int count, out IntPtr iids);       // IInspectable
+        [PreserveSig] int GetRuntimeClassName(out IntPtr name);          // IInspectable
+        [PreserveSig] int GetTrustLevel(out int level);                  // IInspectable
+        [PreserveSig] int GetCurrentReading([MarshalAs(UnmanagedType.Interface)] out ILightSensorReading? reading);
+        [PreserveSig] int GetMinimumReportInterval(out uint value);      // get_MinimumReportInterval
+        [PreserveSig] int PutReportInterval(uint value);                 // put_ReportInterval
+        [PreserveSig] int GetReportInterval(out uint value);             // get_ReportInterval
+        // add_/remove_ReadingChanged дальше по vtable — не зовём (в elevated хватает опроса)
     }
 
-    [ComImport, Guid("5FA08F80-2657-458E-AF75-46F73FA6AC5C"),
+    [ComImport, Guid("FFDF6300-227C-4D2B-B302-FC0142485C68"),
      InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ISensor
+    private interface ILightSensorReading
     {
-        [PreserveSig] int GetID(out Guid id);
-        [PreserveSig] int GetCategory(out Guid category);
-        [PreserveSig] int GetSensorType(out Guid type); // имя своё (слот тот же): GetType прятал бы object.GetType — CS0108
-        [PreserveSig] int GetFriendlyName([MarshalAs(UnmanagedType.BStr)] out string name);
-        [PreserveSig] int GetProperty(ref PropertyKey key, out PropVariant value);
-        [PreserveSig] int GetProperties(IntPtr keys, out IntPtr values);
-        [PreserveSig] int GetSupportedDataFields(out IntPtr keys);
-        [PreserveSig] int SetProperties(IntPtr values, out IntPtr results);
-        [PreserveSig] int SupportsDataField(ref PropertyKey key, out short supported);
-        [PreserveSig] int GetState(out int state);
-        [PreserveSig] int GetData(out ISensorDataReport? report);
-        [PreserveSig] int SupportsEvent(in Guid eventGuid, out short supported);
-        [PreserveSig] int GetEventInterest(out IntPtr values, out uint count);
-        [PreserveSig] int SetEventInterest([MarshalAs(UnmanagedType.LPArray)] Guid[]? values, uint count);
-        [PreserveSig] int SetEventSink(ISensorEvents? events);
-    }
-
-    [ComImport, Guid("0AB9DF9B-C4B5-4796-8898-0470706A2E1D"),
-     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ISensorDataReport
-    {
-        [PreserveSig] int GetTimestamp(out SystemTime time);
-        [PreserveSig] int GetSensorValue(ref PropertyKey key, out PropVariant value);
-        [PreserveSig] int GetSensorValues(IntPtr keys, out IntPtr values);
-    }
-
-    [ComImport, Guid("5D8DCC91-4641-47E7-B7C3-B74F48A6C391"),
-     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    internal interface ISensorEvents
-    {
-        [PreserveSig] int OnStateChanged(ISensor sensor, int state);
-        [PreserveSig] int OnDataUpdated(ISensor sensor, ISensorDataReport report);
-        [PreserveSig] int OnEvent(ISensor sensor, in Guid eventId, IntPtr values);
-        [PreserveSig] int OnLeave(in Guid sensorId);
-    }
-
-    // Приёмник событий: .NET-объект агилен для COM, колбэки приходят на RPC-потоках пула
-    private sealed class SensorSink(Action<ISensorDataReport> onData) : ISensorEvents
-    {
-        public int OnStateChanged(ISensor sensor, int state) => 0;
-        public int OnDataUpdated(ISensor sensor, ISensorDataReport report) { onData(report); return 0; }
-        public int OnEvent(ISensor sensor, in Guid eventId, IntPtr values) => 0;
-        public int OnLeave(in Guid sensorId) => 0;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct SystemTime
-    {
-        public ushort Year, Month, DayOfWeek, Day, Hour, Minute, Second, Milliseconds;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct PropertyKey(Guid fmtid, uint pid)
-    {
-        public Guid Fmtid = fmtid;
-        public uint Pid = pid;
-    }
-
-    /// <summary>Минимальный PROPVARIANT: нам нужен только float (VT_R4), остальное — Clear.</summary>
-    [StructLayout(LayoutKind.Explicit)]
-    internal struct PropVariant
-    {
-        [FieldOffset(0)] public ushort Vt;
-        [FieldOffset(8)] public float R4;
-        [FieldOffset(8)] public double R8;
-        [FieldOffset(8)] public uint U4;
-
-        private const ushort VtR4 = 4, VtR8 = 5, VtU4 = 19, VtI4 = 3;
-
-        public readonly bool TryGetFloat(out float value)
-        {
-            switch (Vt)
-            {
-                case VtR4: value = R4; return true;
-                case VtR8: value = (float)R8; return true;
-                case VtU4 or VtI4: value = U4; return true;
-                default: value = 0; return false;
-            }
-        }
-
-        public void Clear() => _ = PropVariantClear(ref this); // hr освобождения некритичен (CA1806)
-
-        [DllImport("ole32.dll")]
-        private static extern int PropVariantClear(ref PropVariant pvar);
-    }
-
-    internal static class SensorGuids
-    {
-        /// <summary>SENSOR_TYPE_AMBIENT_LIGHT — он же виден в DeviceId WinRT-датчика.</summary>
-        public static readonly Guid TypeAmbientLight = new("97F115C8-599A-4153-8894-D2D12899918A");
-
-        /// <summary>SENSOR_EVENT_DATA_UPDATED.</summary>
-        public static readonly Guid EventDataUpdated = new("2ED0F2A4-0087-41D3-87DB-67AA5ECAEF94");
-
-        /// <summary>SENSOR_DATA_TYPE_LIGHT_LEVEL_LUX (fmtid общий для light-данных, pid 2).</summary>
-        public static PropertyKey DataLightLevelLux =>
-            new(new Guid("E4C77CE2-DCB7-46E9-8439-4FEC548833A6"), 2);
+        [PreserveSig] int GetIids(out int count, out IntPtr iids);       // IInspectable
+        [PreserveSig] int GetRuntimeClassName(out IntPtr name);          // IInspectable
+        [PreserveSig] int GetTrustLevel(out int level);                  // IInspectable
+        [PreserveSig] int GetTimestamp(out long universalTime);          // get_Timestamp (DateTime.UniversalTime)
+        [PreserveSig] int GetIlluminanceInLux(out float lux);            // get_IlluminanceInLux
     }
 }
