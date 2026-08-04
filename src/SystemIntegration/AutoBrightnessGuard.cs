@@ -24,7 +24,8 @@ public sealed class AutoBrightnessGuard : IDisposable
     private readonly BrightnessCapGuard.RampFn _ramp;
     private readonly Func<bool, bool> _adaptive;
     private readonly Func<int, bool, int> _clamp;
-    private readonly BrightnessCurve _curve;
+    private readonly BrightnessCurve _curveAc;    // кривых две: комфорт у розетки и в дороге разный
+    private readonly BrightnessCurve _curveBatt;
     private readonly object _lock = new();
 
     private float _pendingLux = float.NaN; // последние люксы с датчика
@@ -32,6 +33,7 @@ public sealed class AutoBrightnessGuard : IDisposable
     private int _current = -1;             // последняя известная яркость (все события)
     private bool _learning;                // серия ручных правок идёт
     private float _learnLux = float.NaN;   // свет в момент НАЧАЛА серии (правка обдумывалась при нём)
+    private bool _learnOnline;             // источник питания в момент начала серии — чья кривая учится
     private int _learnPercent;
     private CancellationTokenSource? _rampCts;
 
@@ -48,7 +50,8 @@ public sealed class AutoBrightnessGuard : IDisposable
         _ramp = ramp ?? ((f, t, ct) => Brightness.Ramp(f, t, Math.Max(1000, cfg.BrightnessRampMs), ct));
         _adaptive = adaptive ?? AdaptiveBrightness.IsEnabled;
         _clamp = clamp ?? ((level, _) => level);
-        _curve = new BrightnessCurve(cfg.AutoBrightnessPoints);
+        _curveAc = new BrightnessCurve(cfg.AutoBrightnessPointsAc);
+        _curveBatt = new BrightnessCurve(cfg.AutoBrightnessPointsBattery);
 
         _settle.Tick += OnSettleTick;
         _learn.Tick += OnLearnTick;
@@ -84,6 +87,7 @@ public sealed class AutoBrightnessGuard : IDisposable
                 // условия фиксируем в момент НАЧАЛА серии: правка обдумывалась при этом свете
                 _learning = true;
                 _learnLux = _pendingLux;
+                _learnOnline = _power.IsOnline; // и при этом питании — учится его кривая
             }
             _learnPercent = level;
             _learn.Interval = Math.Max(1000, _cfg.AutoBrightnessLearnMs);
@@ -117,12 +121,14 @@ public sealed class AutoBrightnessGuard : IDisposable
 
         lock (_lock)
         {
-            int want = _clamp(_curve.Predict(lux), online);
+            int want = _clamp(CurveFor(online).Predict(lux), online);
             _actedLux = lux; // гистерезис отсчитываем от «на что смотрели», даже если не тронули
             if (Math.Abs(want - current) < Math.Max(1, _cfg.AutoBrightnessDeadband)) return;
             StartRampLocked(current, want);
         }
     }
+
+    private BrightnessCurve CurveFor(bool online) => online ? _curveAc : _curveBatt;
 
     private void OnSettleTick()
     {
@@ -134,6 +140,7 @@ public sealed class AutoBrightnessGuard : IDisposable
     {
         float lux;
         int percent;
+        bool online;
         lock (_lock)
         {
             _learn.Stop();
@@ -141,40 +148,44 @@ public sealed class AutoBrightnessGuard : IDisposable
             _learning = false;
             lux = _learnLux;
             percent = _learnPercent;
+            online = _learnOnline;
             if (!_cfg.AutoBrightness || float.IsNaN(lux)) return;
 
-            _curve.Learn(lux, percent);
+            CurveFor(online).Learn(lux, percent);
             // предсказание в этих условиях теперь равно выученному — не воюем с пользователем
             _actedLux = lux;
         }
-        Log.Write($"AutoBrightness: выучено {percent}% при {lux:0.#} лк (точек: {_curve.Count})");
+        Log.Write($"AutoBrightness: выучено {percent}% при {lux:0.#} лк ({(online ? "сеть" : "батарея")}, точек: {CurveFor(online).Count})");
         _cfg.Save(); // раз в правку (после раздумья) — SSD не страдает
     }
 
-    /// <summary>Принудительный сброс обучения (кнопка в настройках): выученные точки стираются,
-    /// сеется кривая по умолчанию. Выключение/включение фичи кривую НЕ трогает — забыть её
-    /// можно только этой явной командой.</summary>
+    /// <summary>Принудительный сброс обучения (кнопка в настройках): выученные точки ОБЕИХ
+    /// кривых стираются, сеются кривые по умолчанию. Выключение/включение фичи кривые НЕ
+    /// трогает — забыть их можно только этой явной командой.</summary>
     public void ResetCurve()
     {
         lock (_lock)
         {
-            _cfg.AutoBrightnessPoints.Clear();
-            _cfg.AutoBrightnessPoints.AddRange(BrightnessCurve.DefaultPoints());
+            _cfg.AutoBrightnessPointsAc.Clear();
+            _cfg.AutoBrightnessPointsAc.AddRange(BrightnessCurve.DefaultPoints());
+            _cfg.AutoBrightnessPointsBattery.Clear();
+            _cfg.AutoBrightnessPointsBattery.AddRange(BrightnessCurve.DefaultPoints());
             _learning = false;
             _learn.Stop();
             _actedLux = float.NaN; // следующие люксы значимы — пересчитаемся по свежей кривой
         }
-        Log.Write("AutoBrightness: кривая обучения сброшена к умолчанию");
+        Log.Write("AutoBrightness: кривые обучения сброшены к умолчанию");
         _cfg.Save();
         if (_cfg.AutoBrightness) Task.Run(Evaluate);
     }
 
-    /// <summary>Снимок точек кривой для отрисовки в настройках: копия под замком —
-    /// обучение может идти параллельно на пуле.</summary>
+    /// <summary>Снимок точек кривой ТЕКУЩЕГО источника питания для отрисовки в настройках:
+    /// копия под замком — обучение может идти параллельно на пуле.</summary>
     public BrightnessPoint[] CurveSnapshot()
     {
+        var points = _power.IsOnline ? _cfg.AutoBrightnessPointsAc : _cfg.AutoBrightnessPointsBattery;
         lock (_lock)
-            return [.. _cfg.AutoBrightnessPoints.Select(p => new BrightnessPoint { Lux = p.Lux, Percent = p.Percent })];
+            return [.. points.Select(p => new BrightnessPoint { Lux = p.Lux, Percent = p.Percent })];
     }
 
     private double Hysteresis() => Math.Max(0.01, _cfg.AutoBrightnessHysteresis);

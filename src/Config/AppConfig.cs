@@ -175,10 +175,14 @@ public sealed class AppConfig
     /// </summary>
     public bool AutoBrightness { get; set; }
 
-    /// <summary>Якорные точки кривой lux → % (обучаются правками пользователя; при первом
-    /// включении сеются дефолтом из BrightnessCurve.DefaultPoints). Не редактировать руками
-    /// без нужды — кривая держит монотонность сама.</summary>
-    public List<BrightnessPoint> AutoBrightnessPoints { get; set; } = [];
+    /// <summary>Якорные точки кривой lux → % при питании от сети (обучаются правками
+    /// пользователя; при первом включении сеются дефолтом из BrightnessCurve.DefaultPoints).
+    /// Кривых две — от сети и от батареи: комфортная яркость в одних и тех же люксах
+    /// у розетки и в дороге разная. Не редактировать руками без нужды.</summary>
+    public List<BrightnessPoint> AutoBrightnessPointsAc { get; set; } = [];
+
+    /// <summary>Якорные точки кривой lux → % при питании от батареи.</summary>
+    public List<BrightnessPoint> AutoBrightnessPointsBattery { get; set; } = [];
 
     // Тонкие настройки авто-яркости — только правкой config.json.
 
