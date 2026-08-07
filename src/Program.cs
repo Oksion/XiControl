@@ -59,6 +59,10 @@ internal static class Program
 
         var cfg = provider.GetRequiredService<AppConfig>();
         Log.Enabled = cfg.LogEnabled; // до этой строчки лог включён — ошибки старта не теряем
+        // портативный режим сам себя не логирует (AppPaths нельзя звать Log во время
+        // инициализации — рекурсия), поэтому докладываем здесь, когда каталог уже выбран
+        if (AppPaths.FallbackReason is { } why) Log.Write($"AppPaths: {why}");
+        else if (AppPaths.Portable) Log.Write($"AppPaths: портативный режим, данные в {AppPaths.DataDir}");
         provider.GetRequiredService<ILocalizer>().Current = cfg.Language ?? ""; // Loc нормализует пустую/неизвестную культуру
         Ui.FlyoutPalette.Apply(cfg.FlyoutTheme); // тема панелей/OSD — до создания форм
 

@@ -164,6 +164,26 @@ Or grab a prebuilt exe from the [releases page](../../releases):
 Run as administrator (a firmware WMI-interface requirement — even reading doesn't work
 without elevation).
 
+### Portable mode
+
+By default settings live in `%APPDATA%\XiControl\`. To keep everything **next to the app**, drop
+an empty file named **`portable.txt`** (or `.portable`, if you can create such names) into the
+folder with `XiControl.exe`. Then `config.json` and `log.txt` live there too: the folder can be
+moved to another drive or a flash stick, and survives a Windows reinstall with nothing lost.
+
+- Settings you already had are **migrated automatically** on the first launch with the marker —
+  no starting from scratch.
+- The marker isn't needed if you simply put an existing `config.json` next to the exe — the app
+  picks it up and writes there.
+- If the program folder is **not writable** (e.g. a winget install into `Program Files`), portable
+  mode does not engage: settings stay in `%APPDATA%` and the reason is written to the log — the
+  app will not lose them silently.
+- The current paths are always shown in **Settings → About**.
+- One exception: `api.json` (HTTP API settings) **stays in `%ProgramData%`** by design. It is
+  protected by "administrators only" permissions, and that's precisely why the API cannot be
+  enabled — or its token swapped — by editing the user config.
+- Autostart is a Windows Task Scheduler entry; by its nature it lives in the system, not in the folder.
+
 ### Antivirus false positives
 
 Xi Control is unsigned, runs as administrator and touches system things (the firmware charge
