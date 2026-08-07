@@ -212,6 +212,8 @@
   "settings.about.serial.show": "Click to reveal the serial number",
   "settings.about.iface": "Firmware interface",
   "settings.about.config": "Configuration",
+  "settings.about.portable": "Mode",
+  "settings.about.portable.on": "Portable (data next to the app)",
   "settings.about.log": "Log",
   "settings.about.note": "No kernel drivers, WinRing0 or direct EC access. Everything goes through the firmware’s WMI interface and Win32.",
   "panel.title": "Quick settings",

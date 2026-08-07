@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using XiControl.Config;
 using XiControl.Localization;
 using XiControl.SystemIntegration;
 
@@ -94,8 +95,10 @@ public sealed class AboutTab : SettingsPane
             sn.Click += (_, _) => { sn.Text = serial; sn.Cursor = Cursors.Default; tip.SetToolTip(sn, null); };
         }
         ui.AddKv(this, "settings.about.iface", "MiCommonInterface (MIFS)");
-        ui.AddKv(this, "settings.about.config", "%APPDATA%\\XiControl\\config.json");
-        ui.AddKv(this, "settings.about.log", "%APPDATA%\\XiControl\\log.txt");
+        // фактические пути, а не хардкод: в портативном режиме данные лежат рядом с exe (XIC-34)
+        ui.AddKv(this, "settings.about.config", Pretty(Path.Combine(AppPaths.DataDir, "config.json")));
+        ui.AddKv(this, "settings.about.log", Pretty(Path.Combine(AppPaths.DataDir, "log.txt")));
+        if (AppPaths.Portable) ui.AddKv(this, "settings.about.portable", Loc.T("settings.about.portable.on"));
         ui.AddNote(this, "settings.about.note");
 
         // Поддержка — отдельной строкой в самом низу: в ряду ссылок фирменная кнопка смотрелась
@@ -116,6 +119,16 @@ public sealed class AboutTab : SettingsPane
     {
         try { return FileVersionInfo.GetVersionInfo(Environment.ProcessPath!).ProductVersion?.Split('+')[0] ?? "—"; }
         catch { return "—"; }
+    }
+
+    // Стандартный каталог сворачиваем обратно в %APPDATA% — короче и привычнее для отчётов;
+    // портативный путь показываем как есть (он и так рядом с программой)
+    private static string Pretty(string path)
+    {
+        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        return path.StartsWith(appData, StringComparison.OrdinalIgnoreCase)
+            ? "%APPDATA%" + path[appData.Length..]
+            : path;
     }
 
     private static void Open(string url)

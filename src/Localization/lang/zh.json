@@ -212,6 +212,8 @@
   "settings.about.serial.show": "点击显示序列号",
   "settings.about.iface": "固件接口",
   "settings.about.config": "配置文件",
+  "settings.about.portable": "模式",
+  "settings.about.portable.on": "便携模式（数据保存在程序旁）",
   "settings.about.log": "日志",
   "settings.about.note": "无内核驱动、无 WinRing0、不直接访问 EC。全部通过固件 WMI 接口与 Win32 实现。",
   "panel.title": "快速设置",

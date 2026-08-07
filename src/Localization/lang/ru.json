@@ -212,6 +212,8 @@
   "settings.about.serial.show": "Нажмите, чтобы показать серийный номер",
   "settings.about.iface": "Интерфейс прошивки",
   "settings.about.config": "Конфигурация",
+  "settings.about.portable": "Режим",
+  "settings.about.portable.on": "Портативный (данные рядом с программой)",
   "settings.about.log": "Журнал",
   "settings.about.note": "Без kernel-драйверов, WinRing0 и прямого доступа к EC. Всё управление — через штатный WMI-интерфейс прошивки и Win32.",
   "panel.title": "Быстрые настройки",

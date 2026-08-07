@@ -3,17 +3,19 @@ using XiControl.Localization;
 
 namespace XiControl.Config;
 
-/// <summary>JSON-хранилище конфига: %APPDATA%\XiControl\config.json (или явная папка — для тестов).</summary>
+/// <summary>JSON-хранилище конфига: config.json в каталоге данных (<see cref="AppPaths"/> —
+/// %APPDATA%\XiControl либо папка программы в портативном режиме; явная папка — для тестов).</summary>
 public sealed class JsonConfigStore : IConfigStore
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
     private readonly string _dir;
-    private string FilePath => Path.Combine(_dir, "config.json");
 
-    /// <param name="dir">Папка хранения; null — стандартная %APPDATA%\XiControl.</param>
-    public JsonConfigStore(string? dir = null) => _dir = dir ?? Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XiControl");
+    /// <summary>Полный путь к файлу — показываем его на вкладке «О программе».</summary>
+    public string FilePath => Path.Combine(_dir, "config.json");
+
+    /// <param name="dir">Папка хранения; null — выбранная <see cref="AppPaths"/>.</param>
+    public JsonConfigStore(string? dir = null) => _dir = dir ?? AppPaths.DataDir;
 
     public AppConfig Load()
     {
