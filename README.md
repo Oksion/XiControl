@@ -469,6 +469,24 @@ the system's display-mode-changed event only.
 > the rate via Windows settings — we restore it faster than Windows asks "Keep these settings?".
 > To change it by hand, turn the toggle off.
 
+### Tray indicator
+
+An optional second icon next to the app's tray icon showing a number: power draw (W, from the
+battery sensor), CPU or GPU load, used memory or temperature (Intel DPTF). Enable it in
+**Settings → General**, where you also pick the metric and the update interval (1/2/5/10 s;
+editing `TrayMetricPeriodSec` in the config allows anything from 1 to 60). The exact value with
+units lives in the tooltip; clicking the icon opens the Monitor.
+
+Notes:
+
+- Windows may hide the new icon behind the overflow chevron — drag it onto the taskbar once and
+  the spot is remembered.
+- Power draw is honest only on battery or while charging: on AC with no charging there is no
+  sensor data and a dash is shown (same as in the Monitor). GPU load needs Intel graphics,
+  temperature needs DPTF; a metric unavailable on your hardware shows a dash too.
+- When off, the indicator costs nothing: no icon, no timer and no data sources are created —
+  zero extra load.
+
 ### Bottom dead zone on the touchpad
 
 If the bottom edge of the pad keeps catching your palm or thumb, turn on **Settings → Touchpad →
