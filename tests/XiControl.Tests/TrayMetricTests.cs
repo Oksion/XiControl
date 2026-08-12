@@ -1,0 +1,89 @@
+using FluentAssertions;
+using XiControl.SystemIntegration;
+using Xunit;
+
+namespace XiControl.Tests;
+
+/// <summary>Индикатор в трее (XIC-35): чистая логика форматирования и парсинга метрики.</summary>
+public class TrayMetricTests
+{
+    // ---- ParseKind: строка конфига → метрика ----
+
+    [Theory]
+    [InlineData("power", TrayMetric.Power)]
+    [InlineData("cpu", TrayMetric.Cpu)]
+    [InlineData("gpu", TrayMetric.Gpu)]
+    [InlineData("ram", TrayMetric.Ram)]
+    [InlineData("temp", TrayMetric.Temp)]
+    [InlineData("TEMP", TrayMetric.Temp)] // регистр не важен (руками правленный config.json)
+    public void ParseKind_понимает_все_метрики(string s, TrayMetric expected) =>
+        TrayMetricFormat.ParseKind(s).Should().Be(expected);
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("bogus")]
+    public void ParseKind_неизвестное_даёт_дефолт_power(string? s) =>
+        TrayMetricFormat.ParseKind(s).Should().Be(TrayMetric.Power);
+
+    [Theory]
+    [InlineData(TrayMetric.Power, "power")]
+    [InlineData(TrayMetric.Cpu, "cpu")]
+    [InlineData(TrayMetric.Gpu, "gpu")]
+    [InlineData(TrayMetric.Ram, "ram")]
+    [InlineData(TrayMetric.Temp, "temp")]
+    public void Key_обратен_ParseKind(TrayMetric m, string key)
+    {
+        TrayMetricFormat.Key(m).Should().Be(key);
+        TrayMetricFormat.ParseKind(key).Should().Be(m);
+    }
+
+    // ---- IconText: компактный текст на значке ----
+
+    [Fact]
+    public void IconText_NaN_это_прочерк() =>
+        TrayMetricFormat.IconText(TrayMetric.Power, float.NaN).Should().Be("—");
+
+    [Theory]
+    [InlineData(12.4f, "12")]
+    [InlineData(-8.6f, "9")]    // разряд: направление тока на значке не показываем — модуль
+    [InlineData(145f, "145")]   // мощные БП: три знака допустимы (шрифт мельче)
+    public void IconText_ватты_целое_по_модулю(float w, string expected) =>
+        TrayMetricFormat.IconText(TrayMetric.Power, w).Should().Be(expected);
+
+    [Theory]
+    [InlineData(0f, "0")]
+    [InlineData(37.4f, "37")]
+    [InlineData(99.5f, "100")]
+    [InlineData(120f, "100")] // кривые данные клэмпятся к шкале процентов
+    public void IconText_проценты_клэмпятся(float pct, string expected)
+    {
+        TrayMetricFormat.IconText(TrayMetric.Cpu, pct).Should().Be(expected);
+        TrayMetricFormat.IconText(TrayMetric.Gpu, pct).Should().Be(expected);
+        TrayMetricFormat.IconText(TrayMetric.Ram, pct).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(67.2f, "67°")]
+    [InlineData(104f, "104°")] // температура процентами не ограничена
+    public void IconText_температура_с_градусом(float c, string expected) =>
+        TrayMetricFormat.IconText(TrayMetric.Temp, c).Should().Be(expected);
+
+    // ---- CpuPct: математика GetSystemTimes ----
+
+    [Fact]
+    public void CpuPct_половина_времени_занято() =>
+        TrayMetricFormat.CpuPct(deltaIdle: 50, deltaBusy: 100).Should().Be(50f);
+
+    [Fact]
+    public void CpuPct_без_простоя_это_100() =>
+        TrayMetricFormat.CpuPct(deltaIdle: 0, deltaBusy: 100).Should().Be(100f);
+
+    [Fact]
+    public void CpuPct_простой_больше_занятого_клэмп_к_нулю() =>
+        TrayMetricFormat.CpuPct(deltaIdle: 150, deltaBusy: 100).Should().Be(0f);
+
+    [Fact]
+    public void CpuPct_нулевой_интервал_безопасен() =>
+        TrayMetricFormat.CpuPct(deltaIdle: 0, deltaBusy: 0).Should().Be(0f);
+}

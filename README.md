@@ -124,6 +124,10 @@ double-click; current direction is shown by color (charging green / discharging 
   ambient light along a curve that **learns from your corrections**: adjust the brightness once
   and that's what it will be in that light from now on. Two curves (AC and battery); the
   settings tab shows live lux and the learning graph. See "Auto-brightness by sensor" below.
+- 📟 **Tray indicator** *(optional, off by default)* — a second icon next to the app's tray icon
+  showing a number: power draw (W), CPU or GPU load, used memory or temperature. The exact value
+  with units lives in the tooltip, a click opens the Monitor, the update interval is configurable
+  (Settings → General). When off, no icon, no timer and no data sources are created: zero extra load.
 - 🌐 UI language: Russian / English / Chinese (中文).
 - 🚀 Autostart via Task Scheduler (no UAC prompt at logon, works on battery).
 - 🛰️ **HTTP API for the local network** (optional, **off by default**) — control it from a

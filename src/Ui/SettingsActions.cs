@@ -53,4 +53,5 @@ public sealed class SettingsActions
     public required Func<SystemIntegration.BatteryReport> GetBatteryReport; // здоровье батареи (WMI + SOH1)
     public required Func<SystemIntegration.ApiSettings> GetApiSettings;    // настройки HTTP API (api.json, XIC-13)
     public required Action ApiApplied; // вкладка изменила настройки API → сохранить + перезапустить хост/фаервол
+    public required Action TrayMetricApplied; // индикатор в трее (XIC-35): вкл/выкл/метрика/период изменились
 }

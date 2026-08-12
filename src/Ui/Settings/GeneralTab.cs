@@ -42,6 +42,35 @@ public sealed class GeneralTab : SettingsPane
                 if (on) { Log.Enabled = true; Log.Write("Логирование включено"); }
                 else { Log.Write("Логирование выключено"); Log.Enabled = false; } // прощальная строчка — видно, что тишина намеренная
             }));
+
+        // Индикатор-метрика в трее (XIC-35): второй значок с цифрой. Изменения применяются
+        // сразу колбэком TrayMetricApplied (вкл/выкл — создание/уничтожение, остальное — на лету)
+        ui.AddGroup(this, "settings.traymetric.group");
+        ui.AddRow(this, "settings.traymetric", "settings.traymetric.desc",
+            ui.Toggle(cfg.TrayMetricEnabled, on =>
+            {
+                cfg.TrayMetricEnabled = on;
+                cfg.Save();
+                act.TrayMetricApplied();
+            }));
+        string[] metricValues = ["power", "cpu", "gpu", "ram", "temp"];
+        int curMetric = Math.Max(0, Array.IndexOf(metricValues, cfg.TrayMetricKind ?? "power"));
+        ui.AddRow(this, "settings.traymetric.metric", "settings.traymetric.metric.desc",
+            ui.Combo([.. metricValues.Select(v => Loc.T("traymetric." + v))], curMetric, i =>
+            {
+                cfg.TrayMetricKind = metricValues[i];
+                cfg.Save();
+                act.TrayMetricApplied();
+            }, ui.Sc(150)));
+        int[] periods = [1, 2, 5, 10];
+        int curPeriod = Math.Max(0, Array.IndexOf(periods, cfg.TrayMetricPeriodSec));
+        ui.AddRow(this, "settings.traymetric.period", "settings.traymetric.period.desc",
+            ui.Combo([.. periods.Select(p => Loc.T("settings.traymetric.sec", p))], curPeriod, i =>
+            {
+                cfg.TrayMetricPeriodSec = periods[i];
+                cfg.Save();
+                act.TrayMetricApplied();
+            }, ui.Sc(150)));
     }
 
     // Индекс языка с данной культурой в списке (−1 — нет; вызывающий приведёт к 0).
