@@ -11,10 +11,12 @@ namespace XiControl.SystemIntegration;
 /// лимит яркости (XIC-29) клампит выход — «кривая хранит намерение, лимит — фильтр».
 ///
 /// <b>Обучение можно выключить (XIC-37)</b>: кривая замораживается и становится авторитетом,
-/// а ручная правка — временным отклонением. Поведение зеркалит вежливый торг лимита (XIC-29),
-/// но в обе стороны: раз в BrightnessConvergeMs разрыв «правка ↔ предсказание» сокращается в
-/// BrightnessGapDivisor раз; повторная правка после нашего шага — «мне сейчас надо иначе»:
-/// уступаем на BrightnessBackoffMin или до блокировки сеанса, после — возврат к выученному.
+/// а ручная правка — временным отклонением. Дальше работает «возврат к выученному» —
+/// мягкое схождение по механике лимита (XIC-29), но в обе стороны: раз в
+/// AutoBrightnessRevertMs разрыв «правка ↔ предсказание» сокращается в BrightnessGapDivisor
+/// раз; повторная правка после нашего шага — «мне сейчас надо иначе»: уступаем на
+/// AutoBrightnessRevertBackoffMin или до блокировки/смены питания. Сам возврат опционален
+/// (AutoBrightnessRevert): всегда / только на батарее / выключен (правка живёт до смены света).
 ///
 /// Люксы сюда отдаёт AlsWatcher (монтирует AppController), события яркости — PowerProfileGuard
 /// (единственный подписчик BrightnessWatcher, уже классифицировавший «наша запись/человек»).
@@ -136,18 +138,27 @@ public sealed class AutoBrightnessGuard : IDisposable
         }
     }
 
+    /// <summary>Включён ли возврат к выученному для этого источника питания.</summary>
+    private bool RevertEnabled(bool online) => _cfg.AutoBrightnessRevert?.ToLowerInvariant() switch
+    {
+        "off" => false,
+        "battery" => !online, // от сети правка живёт до смены света
+        _ => true,
+    };
+
     // Обучение выключено: кривая — авторитет, правка — временное отклонение. Судьба эпизода
     // (паттерн BrightnessCapGuard.OnBrightness): совпали с предсказанием — эпизод закрыт;
-    // правка после нашего шага (в любую сторону) — осознанный протест, уступаем; иначе торг.
+    // правка после нашего шага (в любую сторону) — осознанный протест, уступаем; иначе схождение.
     private void NegotiateLocked(int level)
     {
+        if (!RevertEnabled(_power.IsOnline)) return; // возврат выключен — правка просто остаётся
         if (float.IsNaN(_pendingLux)) return; // люксов ещё нет — сравнивать не с чем
         int want = _clamp(CurveFor(_power.IsOnline).Predict(_pendingLux), _power.IsOnline);
         if (Math.Abs(level - want) < Math.Max(1, _cfg.AutoBrightnessDeadband)) { EpisodeDoneLocked(); return; }
         if (_backoff) return;
         if (_stepped) { BackoffLocked(); return; }
         if (_converging) return;
-        _converge.Interval = Math.Max(5000, _cfg.BrightnessConvergeMs); // пол — защита от кривого config.json
+        _converge.Interval = Math.Max(5000, _cfg.AutoBrightnessRevertMs); // пол — защита от кривого config.json
         _converge.Start();
         _converging = true;
     }
@@ -209,12 +220,12 @@ public sealed class AutoBrightnessGuard : IDisposable
         return want + Math.Sign(current - want) * next;
     }
 
-    // Шаг торга (WorkerTimer, пул): яркость идёт к предсказанию кривой по текущему свету.
+    // Шаг схождения (WorkerTimer, пул): яркость идёт к предсказанию кривой по текущему свету.
     private void OnConvergeTick()
     {
         bool online = _power.IsOnline;
-        if (!_cfg.AutoBrightness || _cfg.AutoBrightnessLearning || _adaptive(online))
-        { HaltNegotiation(); return; } // настройки сменили на ходу — торг неактуален
+        if (!_cfg.AutoBrightness || _cfg.AutoBrightnessLearning || !RevertEnabled(online) || _adaptive(online))
+        { HaltNegotiation(); return; } // настройки/питание сменили на ходу — схождение неактуально
 
         float lux;
         int current;
@@ -244,7 +255,7 @@ public sealed class AutoBrightnessGuard : IDisposable
             (from, wantLog) = (current, want);
             StartRampLocked(from, to);
         }
-        Log.Write($"AutoBrightness: шаг торга {from}% → {to}% (к выученным {wantLog}%, обучение выключено)");
+        Log.Write($"AutoBrightness: шаг возврата {from}% → {to}% (к выученным {wantLog}%, обучение выключено)");
     }
 
     private void OnBackoffTick()
@@ -304,10 +315,10 @@ public sealed class AutoBrightnessGuard : IDisposable
 
     private void BackoffLocked()
     {
-        Log.Write($"AutoBrightness: пользователь настоял на своей яркости — пауза {_cfg.BrightnessBackoffMin} мин (или до блокировки)");
+        Log.Write($"AutoBrightness: пользователь настоял на своей яркости — пауза {_cfg.AutoBrightnessRevertBackoffMin} мин (или до блокировки)");
         EpisodeDoneLocked();
         _backoff = true;
-        _backoffTimer.Interval = Math.Clamp(_cfg.BrightnessBackoffMin, 1, 24 * 60) * 60_000;
+        _backoffTimer.Interval = Math.Clamp(_cfg.AutoBrightnessRevertBackoffMin, 1, 24 * 60) * 60_000;
         _backoffTimer.Start();
     }
 

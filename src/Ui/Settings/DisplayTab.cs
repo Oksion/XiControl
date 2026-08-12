@@ -58,9 +58,19 @@ public sealed class DisplayTab : SettingsPane
             Panel? graph = null;
             if (cfg.AutoBrightness)
             {
-                // обучение кривой (XIC-37): выкл — правки временные, кривая заморожена
+                // обучение кривой (XIC-37): выкл — правки временные, кривая заморожена;
+                // rebuild зажигает/гасит комбо возврата ниже
                 ui.AddRow(this, "settings.bright.learn", "settings.bright.learn.desc",
-                    ui.Toggle(cfg.AutoBrightnessLearning, act.SetAutoBrightnessLearning));
+                    ui.Toggle(cfg.AutoBrightnessLearning, on => { act.SetAutoBrightnessLearning(on); rebuild(); }));
+
+                // возврат к выученному: всегда / только на батарее / выключен
+                string?[] revertValues = [null, "battery", "off"];
+                int curRevert = Math.Max(0, Array.IndexOf(revertValues, cfg.AutoBrightnessRevert?.ToLowerInvariant()));
+                var revert = ui.Combo(
+                    [Loc.T("settings.bright.revert.always"), Loc.T("settings.bright.revert.battery"), Loc.T("settings.bright.revert.off")],
+                    curRevert, i => act.SetAutoBrightnessRevert(revertValues[i]), ui.Sc(170));
+                revert.Enabled = !cfg.AutoBrightnessLearning; // при включённом обучении возврат не участвует
+                ui.AddRow(this, "settings.bright.revert", "settings.bright.revert.desc", revert);
 
                 // «инерция»: медиана люксов за окно — случайные блики не дёргают яркость
                 ui.AddRow(this, "settings.bright.median", "settings.bright.median.desc",

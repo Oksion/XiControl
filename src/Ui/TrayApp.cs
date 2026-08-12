@@ -554,6 +554,7 @@ public sealed class TrayApp : IDisposable
                 IsAdaptiveBrightness = () => AdaptiveBrightness.IsEnabled(true) || AdaptiveBrightness.IsEnabled(false),
                 SetAutoBrightness = _controller.SetAutoBrightness,
                 SetAutoBrightnessLearning = _controller.SetAutoBrightnessLearning,
+                SetAutoBrightnessRevert = _controller.SetAutoBrightnessRevert,
                 IsAlsAvailable = () => _controller.AlsAvailable,
                 CurrentLux = () => _controller.CurrentLux,
                 SetBrightnessMedianSec = _controller.SetBrightnessMedianSec,
