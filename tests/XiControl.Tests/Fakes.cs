@@ -65,15 +65,18 @@ internal sealed class FakeDisplayEvents : IDisplayEvents
     public void RaiseDisplayChanged() => DisplaySettingsChanged?.Invoke();
 }
 
-/// <summary>Фейк таймера: Fire() тикает вручную (только если запущен — как настоящий).</summary>
+/// <summary>Фейк таймера: Fire() тикает вручную (только если запущен — как настоящий).
+/// Starts считает взводы: перевзвод настоящего таймера сдвигает срабатывание, и логика,
+/// перевзводящая его чаще интервала, никогда не дождалась бы тика (XIC-36).</summary>
 internal sealed class FakeTimer : IAppTimer
 {
     public bool Running { get; private set; }
     public int Interval { get; set; }
+    public int Starts { get; private set; }
 
     public event Action? Tick;
 
-    public void Start() => Running = true;
+    public void Start() { Running = true; Starts++; }
     public void Stop() => Running = false;
 
     public void Fire()
