@@ -258,10 +258,11 @@ public sealed class DisplayTab : SettingsPane
 
     // Комбо лимита яркости: та же механика — рукописное значение из config.json не подменяем
     // пресетом. 100% = «здесь не ограничивать»: типовой сценарий — от сети максимум,
-    // от батареи лимит (просьба пользователей).
+    // от батареи лимит (просьба пользователей). Шаг 5% — тоже просьба с форума (XIC-36);
+    // совсем тонкое (1%) остаётся правкой config.json.
     private ComboBox PercentCombo(int current, Action<int> apply)
     {
-        int[] presets = [100, 90, 80, 70, 60, 50, 40, 30];
+        int[] presets = [.. Enumerable.Range(0, 15).Select(i => 100 - i * 5)]; // 100..30 через 5
         int[] caps = presets.Contains(current) ? presets : [current, .. presets];
         return Ui.Combo([.. caps.Select(c => $"{c}%")],
             Array.IndexOf(caps, current), i => apply(caps[i]), Ui.Sc(110));

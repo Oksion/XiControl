@@ -387,8 +387,8 @@ and fine timings — `BrightnessRampMs` (smooth-slide duration, 10000), `Brightn
 (interval between bargain steps, 60000), `BrightnessBackoffMin` (pause after a repeated raise, 120),
 `BrightnessGapDivisor` (gap divisor, 2), `BrightnessSnapPercent` (close-out threshold, 2).
 
-The dropdowns in Settings offer 10% presets, but the limit accepts **any percentage**: put, say,
-`"BrightnessCapBattery": 47` into `config.json` (range 10–100) — the Settings window will show
+The dropdowns in Settings offer 5% presets (100–30), but the limit accepts **any percentage**: put,
+say, `"BrightnessCapBattery": 47` into `config.json` (range 10–100) — the Settings window will show
 your value as the first list item and won't overwrite it unless you pick another one yourself.
 
 ### Auto-brightness by sensor
