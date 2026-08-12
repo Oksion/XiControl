@@ -109,6 +109,8 @@ xi_control/
  ├─ src/
  │   ├─ Program.cs          — вход: single-instance mutex → DI (MS.DI, все синглтоны,
  │   │                         провайдер владеет Dispose) → TrayApp.Start → Application.Run
+ │   ├─ Config/             — AppConfig, IConfigStore/JsonConfigStore, AppPaths (портативный
+ │   │                         режим XIC-34: данные рядом с exe по метке .portable/portable.txt)
  │   ├─ Wmi/                — Mifs.cs (константы протокола), IMifsClient/MifsClient,
  │   │                         IKeyEventSource/MifsEventWatcher
  │   ├─ Input/              — MiButtonGesture (жесты Mi-кнопки), KeyRouter (клавиша → действие)

@@ -179,7 +179,7 @@
   "toast.update.title": "A new version is out",
   "toast.update.text": "{0} is available. Click to open the release page — or update with winget upgrade Oksion.XiControl.",
   "settings.log": "Log errors and issues",
-  "settings.log.desc": "The %APPDATA%\\XiControl\\log.txt journal — useful for bug reports. Off — nothing is written at all.",
+  "settings.log.desc": "The log.txt journal in the data folder (path shown on the About tab) — useful for bug reports. Off — nothing is written at all.",
   "settings.api.sub": "Web API for control over your local network (phone, Home Assistant). Off by default; settings live in %ProgramData%\\XiControl\\api.json and can only be changed by an administrator.",
   "settings.api.enable": "Enable HTTP API",
   "settings.api.enable.desc": "Local web server with a whitelisted set of commands; state is read via GET /status. When off, the server does not run at all.",

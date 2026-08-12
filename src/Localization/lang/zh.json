@@ -179,7 +179,7 @@
   "toast.update.title": "新版本已发布",
   "toast.update.text": "{0} 已可用。点击打开发布页面，或使用 winget upgrade Oksion.XiControl 更新。",
   "settings.log": "记录错误与问题",
-  "settings.log.desc": "日志位于 %APPDATA%\\XiControl\\log.txt，便于反馈问题。关闭后完全不写入。",
+  "settings.log.desc": "日志 log.txt 位于数据目录（路径见“关于”选项卡），便于反馈问题。关闭后完全不写入。",
   "settings.api.sub": "通过局域网控制的 Web API（手机、Home Assistant）。默认关闭；设置保存在 %ProgramData%\\XiControl\\api.json，仅管理员可修改。",
   "settings.api.enable": "启用 HTTP API",
   "settings.api.enable.desc": "本地 Web 服务器，仅提供白名单命令；状态通过 GET /status 读取。关闭时服务器完全不运行。",

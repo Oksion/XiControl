@@ -112,7 +112,10 @@ dotnet run --project tools/IconPreview -- svg             # лист иконо�
 dotnet run --project tools/IconPreview -- bench            # стоимость кадра анимации (GDI+, мкс)
 ```
 
-Диагностика в рантайме: ошибки — в `%APPDATA%\XiControl\log.txt`, конфиг — `%APPDATA%\XiControl\config.json`.
+Диагностика в рантайме: ошибки — в `log.txt`, конфиг — `config.json`; оба лежат в каталоге данных:
+по умолчанию `%APPDATA%\XiControl`, в портативном режиме (метка `.portable`/`portable.txt` или
+config.json рядом с exe, XIC-34) — папка программы. Фактические пути — `AppPaths.DataDir` и
+вкладка «О программе».
 
 ## Архитектура
 
@@ -223,7 +226,10 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   маршалятся в UI-поток; bind `127.0.0.1` по умолчанию, LAN — отдельным тумблером.
 - `src/Config/` — `AppConfig` (POCO: config.json + миграции в `MigrateKeyActions`; `Save()`
   остался на объекте, но persistence — за `IConfigStore`/`JsonConfigStore`; `LegacyLanguageConverter`
-  — миграция старого формата языка);
+  — миграция старого формата языка), `AppPaths` (каталог данных и портативный режим XIC-34:
+  чистая функция выбора под тестами; при read-only каталоге программы — откат в %APPDATA% с
+  причиной в `FallbackReason`, которую печатает Program — сам `AppPaths` логировать не может,
+  Log зовёт его при инициализации);
   `src/Localization/` — переводы лежат в `lang/{ru,en,zh}.json` (встроены как ресурсы), `Loc.cs` —
   только загрузчик и `Loc.T` (+ тонкий шов `ILocalizer`); `src/Log.cs` — журнал (`Log.Write`/`Log.Ex`).
 - `tests/XiControl.Tests` — юнит-тесты (xUnit + FluentAssertions 6.x, x64) чистой логики:
