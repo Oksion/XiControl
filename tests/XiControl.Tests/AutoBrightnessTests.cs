@@ -203,6 +203,8 @@ public sealed class AutoBrightnessTests
     private readonly FakePowerEvents _power = new();
     private readonly FakeTimer _settle = new();
     private readonly FakeTimer _learn = new();
+    private readonly FakeTimer _converge = new();
+    private readonly FakeTimer _backoff = new();
     private readonly List<(int From, int To)> _ramps = [];
     private int? _brightness = 50;
     private bool _adaptive;
@@ -214,7 +216,8 @@ public sealed class AutoBrightnessTests
         if (_cfg.AutoBrightnessPointsBattery.Count == 0)
             _cfg.AutoBrightnessPointsBattery.AddRange(BrightnessCurve.DefaultPoints());
         return new AutoBrightnessGuard(_cfg, _power, _settle, _learn,
-            () => _brightness, (f, t, _) => _ramps.Add((f, t)), _ => _adaptive, (l, _) => l, clock);
+            () => _brightness, (f, t, _) => _ramps.Add((f, t)), _ => _adaptive, (l, _) => l, clock,
+            _converge, _backoff);
     }
 
     [Fact]
@@ -358,6 +361,86 @@ public sealed class AutoBrightnessTests
         _ramps.Should().Equal(new[] { (90, 60) },
             "батарейная кривая не училась — предсказание по её якорям, не по выученным 90");
     }
+
+    // ---- Обучение выключено (XIC-37): кривая — авторитет, правки временные ----
+
+    // Подготовка эпизода: свет 200 лк, мы подъехали к предсказанию 60, пользователь ставит 80.
+    private AutoBrightnessGuard FrozenGuardWithTweak()
+    {
+        _cfg.AutoBrightnessLearning = false;
+        var g = NewGuard();
+        g.OnLux(200);
+        _settle.Fire();                                  // 50 → 60 (предсказание)
+        g.OnBrightness(60, own: true, settling: false);
+        g.OnBrightness(80, own: false, settling: false); // «временно поярче»
+        return g;
+    }
+
+    [Fact]
+    public void LearningOff_Tweak_KeepsCurve_AndBargainsBack()
+    {
+        using var g = FrozenGuardWithTweak();
+
+        _learn.Running.Should().BeFalse("кривая заморожена — период раздумья не взводится");
+        _cfg.AutoBrightnessPointsAc.Single(p => Math.Abs(p.Lux - 200) < 0.01).Percent
+            .Should().Be(60, "урок не записан — якорь остался дефолтным");
+        _converge.Running.Should().BeTrue("через минуту начнётся мягкий возврат к выученному");
+
+        _converge.Fire(); // первый шаг: разрыв 20 сокращается вдвое
+        _ramps[^1].Should().Be((80, 70));
+    }
+
+    [Fact]
+    public void LearningOff_SecondTweak_AfterOurStep_Yields()
+    {
+        using var g = FrozenGuardWithTweak();
+        _converge.Fire();                                // наш шаг 80 → 70...
+        g.OnBrightness(70, own: true, settling: false);  // ...доехал
+
+        int before = _ramps.Count;
+        g.OnBrightness(85, own: false, settling: false); // пользователь настоял
+
+        _converge.Running.Should().BeFalse("уступили — торг остановлен");
+        _backoff.Running.Should().BeTrue("пауза до таймера или блокировки");
+        _converge.Fire();
+        g.Evaluate();
+        _ramps.Count.Should().Be(before, "во время уступки яркость не трогаем вообще");
+    }
+
+    [Fact]
+    public void LearningOff_Unlock_ReturnsToLearned()
+    {
+        using var g = FrozenGuardWithTweak();
+        _converge.Fire();
+        g.OnBrightness(70, own: true, settling: false);
+        g.OnBrightness(85, own: false, settling: false); // уступка
+
+        g.ResetBackoff(); // разблокировка сеанса (проводка — PowerProfileGuard)
+        g.Evaluate();
+
+        _ramps[^1].Should().Be((85, 60), "после разблокировки датчик приводит к выученному");
+    }
+
+    [Fact]
+    public void LearningOff_BackoffExpiry_ReturnsToLearned()
+    {
+        using var g = FrozenGuardWithTweak();
+        _converge.Fire();
+        g.OnBrightness(70, own: true, settling: false);
+        g.OnBrightness(85, own: false, settling: false); // уступка
+
+        _backoff.Fire(); // пауза вышла
+
+        _ramps[^1].Should().Be((85, 60));
+    }
+
+    [Theory]
+    [InlineData(80, 60, 70)]  // вниз: как NextStep лимита
+    [InlineData(20, 60, 40)]  // вверх: симметрично
+    [InlineData(62, 60, 60)]  // остаток ≤ snap — доводим сразу
+    [InlineData(58, 60, 60)]
+    public void StepToward_Bidirectional(int current, int want, int expected) =>
+        AutoBrightnessGuard.StepToward(current, want, divisor: 2, snap: 2).Should().Be(expected);
 
     [Fact]
     public void OwnEvents_DoNotTriggerLearning()

@@ -442,6 +442,16 @@ public sealed class AppController
         if (on) Task.Run(_autoGuard.Evaluate); // сверка может читать WMI — не с UI-потока
     }
 
+    /// <summary>«Обучение кривой» (XIC-37): выкл — правки яркости временные, кривая заморожена
+    /// и торгуется обратно к предсказанию (механика лимита XIC-29).</summary>
+    public void SetAutoBrightnessLearning(bool on)
+    {
+        if (_cfg.AutoBrightnessLearning == on) return;
+        _cfg.AutoBrightnessLearning = on;
+        _cfg.Save();
+        _autoGuard.LearningModeChanged(); // недоигранный торг/уступка/серия обучения — в мусор
+    }
+
     // Пустые кривые (первое включение / ручная правка конфига) заполняем дефолтом — обеим:
     // кривых две, для сети и батареи (комфорт в одних люксах у розетки и в дороге разный).
     private void SeedCurves()

@@ -10,6 +10,12 @@ namespace XiControl.SystemIntegration;
 /// При включённой адаптивной яркости Windows молчим (двое не должны рулить одним ползунком),
 /// лимит яркости (XIC-29) клампит выход — «кривая хранит намерение, лимит — фильтр».
 ///
+/// <b>Обучение можно выключить (XIC-37)</b>: кривая замораживается и становится авторитетом,
+/// а ручная правка — временным отклонением. Поведение зеркалит вежливый торг лимита (XIC-29),
+/// но в обе стороны: раз в BrightnessConvergeMs разрыв «правка ↔ предсказание» сокращается в
+/// BrightnessGapDivisor раз; повторная правка после нашего шага — «мне сейчас надо иначе»:
+/// уступаем на BrightnessBackoffMin или до блокировки сеанса, после — возврат к выученному.
+///
 /// Люксы сюда отдаёт AlsWatcher (монтирует AppController), события яркости — PowerProfileGuard
 /// (единственный подписчик BrightnessWatcher, уже классифицировавший «наша запись/человек»).
 /// Всё на потоках пула, паттерн BrightnessCapGuard: WorkerTimer, общий замок, швы для тестов.
@@ -18,8 +24,10 @@ public sealed class AutoBrightnessGuard : IDisposable
 {
     private readonly AppConfig _cfg;
     private readonly IPowerEvents _power;
-    private readonly IAppTimer _settle;  // свет меняется — ждём стабилизации
-    private readonly IAppTimer _learn;   // «период раздумья»: пользователь докрутил и остановился
+    private readonly IAppTimer _settle;       // свет меняется — ждём стабилизации
+    private readonly IAppTimer _learn;        // «период раздумья»: пользователь докрутил и остановился
+    private readonly IAppTimer _converge;     // торг при выключенном обучении: шаги к предсказанию (XIC-37)
+    private readonly IAppTimer _backoffTimer; // одноразовый: конец уступки после «протеста»
     private readonly Func<int?> _read;
     private readonly BrightnessCapGuard.RampFn _ramp;
     private readonly Func<bool, bool> _adaptive;
@@ -41,19 +49,24 @@ public sealed class AutoBrightnessGuard : IDisposable
     private float _learnLux = float.NaN;   // свет в момент НАЧАЛА серии (правка обдумывалась при нём)
     private bool _learnOnline;             // источник питания в момент начала серии — чья кривая учится
     private int _learnPercent;
+    private bool _converging;              // эпизод торга: таймер шагов взведён (XIC-37)
+    private bool _stepped;                 // в эпизоде уже был наш шаг → новая правка = осознанный протест
+    private bool _backoff;                 // уступили: до конца паузы/разблокировки яркость не трогаем
     private CancellationTokenSource? _rampCts;
 
     public AutoBrightnessGuard(AppConfig cfg, IPowerEvents power,
         IAppTimer? settle = null, IAppTimer? learn = null,
         Func<int?>? read = null, BrightnessCapGuard.RampFn? ramp = null,
         Func<bool, bool>? adaptive = null, Func<int, bool, int>? clamp = null,
-        Func<long>? clock = null)
+        Func<long>? clock = null, IAppTimer? converge = null, IAppTimer? backoff = null)
     {
         _clock = clock ?? (static () => Environment.TickCount64);
         _cfg = cfg;
         _power = power;
         _settle = settle ?? new WorkerTimer();
         _learn = learn ?? new WorkerTimer();
+        _converge = converge ?? new WorkerTimer();
+        _backoffTimer = backoff ?? new WorkerTimer();
         _read = read ?? Brightness.Get;
         _ramp = ramp ?? ((f, t, ct) => Brightness.Ramp(f, t, Math.Max(1000, cfg.BrightnessRampMs), ct));
         _adaptive = adaptive ?? AdaptiveBrightness.IsEnabled;
@@ -63,6 +76,8 @@ public sealed class AutoBrightnessGuard : IDisposable
 
         _settle.Tick += OnSettleTick;
         _learn.Tick += OnLearnTick;
+        _converge.Tick += OnConvergeTick;
+        _backoffTimer.Tick += OnBackoffTick;
     }
 
     /// <summary>
@@ -94,7 +109,8 @@ public sealed class AutoBrightnessGuard : IDisposable
     }
 
     /// <summary>Событие яркости от PowerProfileGuard (уже классифицировано). Наши записи —
-    /// только трекинг; правка человека отменяет наш ход и взводит обучение.</summary>
+    /// только трекинг; правка человека отменяет наш ход и взводит обучение — либо, при
+    /// выключенном обучении (XIC-37), открывает эпизод торга к предсказанию кривой.</summary>
     public void OnBrightness(int level, bool own, bool settling)
     {
         lock (_lock)
@@ -103,6 +119,9 @@ public sealed class AutoBrightnessGuard : IDisposable
             if (own || settling || !_cfg.AutoBrightness) return;
 
             CancelRampLocked(); // человек взялся за ползунок — не тянем одеяло
+
+            if (!_cfg.AutoBrightnessLearning) { NegotiateLocked(level); return; }
+
             if (!_learning)
             {
                 // условия фиксируем в момент НАЧАЛА серии: правка обдумывалась при этом свете
@@ -117,6 +136,22 @@ public sealed class AutoBrightnessGuard : IDisposable
         }
     }
 
+    // Обучение выключено: кривая — авторитет, правка — временное отклонение. Судьба эпизода
+    // (паттерн BrightnessCapGuard.OnBrightness): совпали с предсказанием — эпизод закрыт;
+    // правка после нашего шага (в любую сторону) — осознанный протест, уступаем; иначе торг.
+    private void NegotiateLocked(int level)
+    {
+        if (float.IsNaN(_pendingLux)) return; // люксов ещё нет — сравнивать не с чем
+        int want = _clamp(CurveFor(_power.IsOnline).Predict(_pendingLux), _power.IsOnline);
+        if (Math.Abs(level - want) < Math.Max(1, _cfg.AutoBrightnessDeadband)) { EpisodeDoneLocked(); return; }
+        if (_backoff) return;
+        if (_stepped) { BackoffLocked(); return; }
+        if (_converging) return;
+        _converge.Interval = Math.Max(5000, _cfg.BrightnessConvergeMs); // пол — защита от кривого config.json
+        _converge.Start();
+        _converging = true;
+    }
+
     /// <summary>
     /// Свериться сейчас: включение фичи, старт с включённой, конец обучения. Синхронно
     /// (WMI-чтение при неизвестной яркости) — звать с фонового потока.
@@ -128,6 +163,7 @@ public sealed class AutoBrightnessGuard : IDisposable
         lock (_lock)
         {
             if (!_cfg.AutoBrightness || float.IsNaN(_pendingLux)) return;
+            if (_backoff) return; // уступили пользователю (XIC-37) — до конца паузы/разблокировки молчим
             lux = _pendingLux;
         }
         if (_adaptive(online)) return; // качели с датчиком Windows не устраиваем; причина — в UI
@@ -143,6 +179,7 @@ public sealed class AutoBrightnessGuard : IDisposable
         int from, to;
         lock (_lock)
         {
+            EpisodeDoneLocked(); // условия пересчитываются заново — прежний торг неактуален
             int want = _clamp(CurveFor(online).Predict(lux), online);
             _actedLux = lux; // гистерезис отсчитываем от «на что смотрели», даже если не тронули
             if (Math.Abs(want - current) < Math.Max(1, _cfg.AutoBrightnessDeadband)) return;
@@ -162,6 +199,118 @@ public sealed class AutoBrightnessGuard : IDisposable
         Evaluate();
     }
 
+    /// <summary>Двунаправленный шаг торга к предсказанию — NextStep лимита (XIC-29), но знаковый:
+    /// разрыв сокращается в divisor раз, остаток ≤ snap доводится сразу.</summary>
+    public static int StepToward(int current, int want, int divisor, int snap)
+    {
+        int gap = Math.Abs(current - want);
+        if (gap <= Math.Max(1, snap)) return want;
+        int next = (gap + Math.Max(2, divisor) - 1) / Math.Max(2, divisor); // ceil, ноль невозможен
+        return want + Math.Sign(current - want) * next;
+    }
+
+    // Шаг торга (WorkerTimer, пул): яркость идёт к предсказанию кривой по текущему свету.
+    private void OnConvergeTick()
+    {
+        bool online = _power.IsOnline;
+        if (!_cfg.AutoBrightness || _cfg.AutoBrightnessLearning || _adaptive(online))
+        { HaltNegotiation(); return; } // настройки сменили на ходу — торг неактуален
+
+        float lux;
+        int current;
+        lock (_lock)
+        {
+            if (_backoff || !_converging) return;
+            lux = _pendingLux;
+            current = _current;
+        }
+        if (float.IsNaN(lux)) return;
+        if (current < 0)
+        {
+            if (_read() is not int c) return;
+            lock (_lock) _current = current = c;
+        }
+
+        int from = -1, to = 0, wantLog = 0;
+        lock (_lock)
+        {
+            int want = _clamp(CurveFor(online).Predict(lux), online);
+            if (Math.Abs(current - want) < Math.Max(1, _cfg.AutoBrightnessDeadband)) { EpisodeDoneLocked(); return; }
+            to = StepToward(current, want, _cfg.BrightnessGapDivisor, _cfg.BrightnessSnapPercent);
+            _stepped = true;
+            // финальный шаг — эпизод закрыт: правка во время этого хода начнёт новый
+            // (снова вежливо, с минуты ожидания), а не протест
+            if (to == want) EpisodeDoneLocked();
+            (from, wantLog) = (current, want);
+            StartRampLocked(from, to);
+        }
+        Log.Write($"AutoBrightness: шаг торга {from}% → {to}% (к выученным {wantLog}%, обучение выключено)");
+    }
+
+    private void OnBackoffTick()
+    {
+        lock (_lock)
+        {
+            _backoffTimer.Stop(); // одноразовый
+            if (!_backoff) return;
+            _backoff = false;
+        }
+        Evaluate(); // пауза вышла — вернуться к выученному по текущему свету
+    }
+
+    /// <summary>Сброс уступки (разблокировка сеанса, смена питания): условия сменились,
+    /// после сброса Evaluate приводит яркость к выученному уровню. Паттерн капа (XIC-29).</summary>
+    public void ResetBackoff()
+    {
+        lock (_lock)
+        {
+            if (!_backoff) return;
+            _backoffTimer.Stop();
+            _backoff = false;
+        }
+    }
+
+    /// <summary>Переключили «обучение кривой» (XIC-37): недоигранный торг, уступка и
+    /// незаконченная серия обучения неактуальны — чистый лист в новом режиме.</summary>
+    public void LearningModeChanged()
+    {
+        lock (_lock)
+        {
+            _learning = false;
+            _learn.Stop();
+            EpisodeDoneLocked();
+            _backoffTimer.Stop();
+            _backoff = false;
+        }
+    }
+
+    // Полная остановка торга при смене режима/условий (звать под замком).
+    private void EpisodeDoneLocked()
+    {
+        _converge.Stop();
+        _converging = false;
+        _stepped = false;
+    }
+
+    private void HaltNegotiation()
+    {
+        lock (_lock)
+        {
+            EpisodeDoneLocked();
+            _backoffTimer.Stop();
+            _backoff = false;
+        }
+    }
+
+    private void BackoffLocked()
+    {
+        Log.Write($"AutoBrightness: пользователь настоял на своей яркости — пауза {_cfg.BrightnessBackoffMin} мин (или до блокировки)");
+        EpisodeDoneLocked();
+        _backoff = true;
+        _backoffTimer.Interval = Math.Clamp(_cfg.BrightnessBackoffMin, 1, 24 * 60) * 60_000;
+        _backoffTimer.Start();
+    }
+
     private void OnLearnTick()
     {
         float lux;
@@ -175,7 +324,8 @@ public sealed class AutoBrightnessGuard : IDisposable
             lux = _learnLux;
             percent = _learnPercent;
             online = _learnOnline;
-            if (!_cfg.AutoBrightness || float.IsNaN(lux)) return;
+            // выключили обучение, пока серия ждала раздумья — урок отменяется (XIC-37)
+            if (!_cfg.AutoBrightness || !_cfg.AutoBrightnessLearning || float.IsNaN(lux)) return;
 
             // порог склейки = гистерезис: неразличимые для триггера условия не копят мнения;
             // уточняющая правка (в пределах ступени клавиш) сглаживается, а не заменяет (XIC-32)
@@ -241,5 +391,7 @@ public sealed class AutoBrightnessGuard : IDisposable
         lock (_lock) CancelRampLocked();
         _settle.Dispose();
         _learn.Dispose();
+        _converge.Dispose();
+        _backoffTimer.Dispose();
     }
 }

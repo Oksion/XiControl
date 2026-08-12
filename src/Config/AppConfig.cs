@@ -211,6 +211,13 @@ public sealed class AppConfig
     /// осознанная смена, запоминается точно. Дефолт 10 = шаг клавиш яркости Windows.</summary>
     public int AutoBrightnessFineStep { get; set; } = 10;
 
+    /// <summary>Обучение кривой по правкам (XIC-37, тумблер на вкладке «Экран»). false —
+    /// кривая заморожена и становится авторитетом: правка яркости — временное отклонение,
+    /// утилита торгуется обратно к предсказанию (механика лимита XIC-29: шаги раз в
+    /// BrightnessConvergeMs, повторная правка — уступка на BrightnessBackoffMin или до
+    /// блокировки сеанса).</summary>
+    public bool AutoBrightnessLearning { get; set; } = true;
+
     /// <summary>Запомненная яркость экрана (0–100) от сети; null — ещё не запомнена.</summary>
     public int? AcBrightness { get; set; }
 

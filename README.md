@@ -406,6 +406,12 @@ adjust the brightness by hand and the app remembers "in this light I want that m
   your own `config.json`. "Why did the screen dim?" always has an exact answer.
 - **Learning is never reset** by turning the feature off — only the "Reset the learned curve"
   button forgets it.
+- **Learning can be switched off** (the "Curve learning" toggle) — for when the curve is already
+  tuned to your taste: brightness tweaks become *temporary*. The curve stays intact, and after a
+  minute the utility gently bargains brightness back to the learned level — same polite bargaining
+  as the limit (half the gap once a minute, in both directions). Insist with another tweak and it
+  yields for 2 hours or until the screen is locked; after unlocking, the screen is back at the
+  learned level.
 - **"Sensor inertia"** (0–60 s, 10 by default) — the app reacts to the *median* ambient light
   over that window: a stray glare, a headlight or your own shadow won't jerk the brightness.
 - **You can see it working**: the tab shows live lux and a graph of both curves (AC in the

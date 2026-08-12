@@ -553,6 +553,7 @@ public sealed class TrayApp : IDisposable
                 // лимит не сработает ровно тогда, когда питание переключится на него
                 IsAdaptiveBrightness = () => AdaptiveBrightness.IsEnabled(true) || AdaptiveBrightness.IsEnabled(false),
                 SetAutoBrightness = _controller.SetAutoBrightness,
+                SetAutoBrightnessLearning = _controller.SetAutoBrightnessLearning,
                 IsAlsAvailable = () => _controller.AlsAvailable,
                 CurrentLux = () => _controller.CurrentLux,
                 SetBrightnessMedianSec = _controller.SetBrightnessMedianSec,

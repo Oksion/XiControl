@@ -33,6 +33,7 @@ public sealed class SettingsActions
     public required Action<int, int> SetBrightnessCaps;  // лимиты яркости: ac, batt
     public required Func<bool> IsAdaptiveBrightness;     // адаптивная яркость в схеме питания → лимит не работает
     public required Action<bool> SetAutoBrightness;      // авто-яркость по датчику (XIC-30)
+    public required Action<bool> SetAutoBrightnessLearning; // обучение кривой вкл/выкл (XIC-37)
     public required Func<bool> IsAlsAvailable;           // есть ли датчик освещённости (видимость фичи)
     public required Func<float> CurrentLux;              // живые люксы для индикатора (NaN — ещё нет)
     public required Action<int> SetBrightnessMedianSec;  // «инерция» датчика: окно медианы, сек (0 — выкл)

@@ -58,6 +58,10 @@ public sealed class DisplayTab : SettingsPane
             Panel? graph = null;
             if (cfg.AutoBrightness)
             {
+                // обучение кривой (XIC-37): выкл — правки временные, кривая заморожена
+                ui.AddRow(this, "settings.bright.learn", "settings.bright.learn.desc",
+                    ui.Toggle(cfg.AutoBrightnessLearning, act.SetAutoBrightnessLearning));
+
                 // «инерция»: медиана люксов за окно — случайные блики не дёргают яркость
                 ui.AddRow(this, "settings.bright.median", "settings.bright.median.desc",
                     MedianCombo(cfg.AutoBrightnessMedianSec, act.SetBrightnessMedianSec));

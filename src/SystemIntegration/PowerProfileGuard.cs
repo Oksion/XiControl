@@ -65,7 +65,8 @@ public sealed class PowerProfileGuard : IDisposable
     {
         // Resume — выход из сна; StatusChange — смена питания AC↔батарея
         if (mode is not (PowerModes.Resume or PowerModes.StatusChange)) return;
-        _cap.ResetBackoff(); // сон/смена питания — условия сменились, торг лимита заново
+        _cap.ResetBackoff();  // сон/смена питания — условия сменились, торг лимита заново
+        _auto.ResetBackoff(); // и уступка авто-яркости тоже (кривая источника сменилась)
         // окно «затишья» ставим сразу: и переход яркости от Windows, и наше применение через
         // дебаунс не должны попасть в «пользовательскую» яркость (иначе слоты перезапишутся мусором)
         _settleUntil = Environment.TickCount + SettleMs;
@@ -77,7 +78,8 @@ public sealed class PowerProfileGuard : IDisposable
     {
         if (e.Reason is not (SessionSwitchReason.SessionLock or SessionSwitchReason.SessionUnlock)) return;
         _cap.ResetBackoff();
-        Task.Run(_cap.Evaluate); // WMI-чтение яркости — не на потоке SystemEvents
+        _auto.ResetBackoff(); // уступка торга авто-яркости (XIC-37) живёт до блокировки
+        Task.Run(() => { _cap.Evaluate(); _auto.Evaluate(); }); // WMI — не на потоке SystemEvents; после разблокировки — к выученному
     }
 
     /// <summary>Применить профиль текущего питания прямо сейчас (старт / включение опции).</summary>

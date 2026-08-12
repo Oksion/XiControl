@@ -78,6 +78,8 @@
   "settings.bright.lux": "Current ambient light",
   "settings.bright.lux.desc": "Live sensor reading — proof it is working.",
   "settings.bright.lux.val": "{0} lx",
+  "settings.bright.learn": "Curve learning",
+  "settings.bright.learn.desc": "On — a brightness tweak becomes a lesson for the curve after a few seconds. Off — tweaks are temporary: the curve stays intact, and after a minute brightness starts gently sliding back to the learned level (like the limit's bargaining). Insist with another tweak and it yields for 2 hours or until the screen is locked.",
   "settings.bright.median": "Sensor inertia",
   "settings.bright.median.desc": "React to the median ambient light over this window: a stray glare or shadow won't jerk the brightness. \"Instant\" — no filtering.",
   "settings.bright.median.off": "Instant",
