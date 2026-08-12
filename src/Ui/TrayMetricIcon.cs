@@ -29,8 +29,8 @@ public sealed class TrayMetricIcon : IDisposable
     private TrayMetricSource? _source;
     private TrayMetric _kind;
     private Icon? _icon;
-    private string? _lastText; // что сейчас на значке — без изменений Shell не дёргаем
-    private bool _light;       // светлая ли панель задач (цвет цифры)
+    private string? _text; // что сейчас на значке — без изменений Shell не дёргаем
+    private bool _light;   // светлая ли панель задач (цвет цифры)
     private int _busy;         // защёлка от реентрантности тика (WMI бывает медленным)
 
     public TrayMetricIcon(AppConfig cfg, Control ui, Action openMonitor, IAppTimer? timer = null)
@@ -68,7 +68,7 @@ public sealed class TrayMetricIcon : IDisposable
             _kind = kind;
             _source?.Dispose();
             _source = new TrayMetricSource(kind);
-            _lastText = null; // «12» ватт и «12» процентов — разные значения, перерисовать
+            _text = null; // «12» ватт и «12» процентов — разные значения, перерисовать
         }
         _timer.Stop();
         _timer.Interval = PeriodMs();
@@ -82,7 +82,7 @@ public sealed class TrayMetricIcon : IDisposable
         bool light = Theme.TaskbarIsLight();
         if (light == _light) return;
         _light = light;
-        if (_lastText is string t) { _lastText = null; Apply(t, null); }
+        if (_text is string t) { _text = null; Apply(t, null); }
     }
 
     private int PeriodMs() => Math.Clamp(_cfg.TrayMetricPeriodSec, 1, 60) * 1000;
@@ -110,8 +110,8 @@ public sealed class TrayMetricIcon : IDisposable
     {
         if (_tray is null) return; // индикатор выключили, отложенный BeginInvoke догнал
         if (tip is not null) _tray.Text = tip.Length <= 127 ? tip : tip[..127];
-        if (text == _lastText) return;
-        _lastText = text;
+        if (text == _text) return;
+        _text = text;
         var old = _icon;
         _icon = Render(text, _light);
         _tray.Icon = _icon;
@@ -132,7 +132,8 @@ public sealed class TrayMetricIcon : IDisposable
     }
 
     // Цифра во весь значок: рендер строго в фактический размер трея (системный даунскейл размывает),
-    // цвет — контраст к панели задач, как у основного значка (TrayIcons).
+    // цвет — контраст к панели задач, как у основного значка (TrayIcons). Единицы — в тултипе:
+    // двухэтажный вариант «число + единица» пробовали, на этом размере нижняя строка нечитаема.
     private static Icon Render(string text, bool lightTaskbar)
     {
         int size = Math.Max(16, GetSystemMetrics(SM_CXSMICON));
