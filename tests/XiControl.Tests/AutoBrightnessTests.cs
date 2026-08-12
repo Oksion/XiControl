@@ -231,6 +231,54 @@ public sealed class AutoBrightnessTests
     }
 
     [Fact]
+    public void SampleStream_SameLight_DoesNotRearmSettle()
+    {
+        // Датчик отдаёт сэмплы чаще (≈1.5 с), чем длится дебаунс стабилизации (2 с): если бы
+        // каждый сэмпл перевзводил таймер, тот не дотикивал бы НИКОГДА и фича была бы мертва
+        // с самого старта (база гистерезиса пуста → любой сэмпл «значим»). Живой баг XIC-36.
+        using var g = NewGuard();
+
+        g.OnLux(2000);
+        g.OnLux(2000);
+        g.OnLux(2000);
+
+        _settle.Starts.Should().Be(1, "тот же свет не перевзводит дебаунс — таймер должен дотикать");
+        _settle.Fire();
+        _ramps.Should().Equal(new[] { (50, 100) }, "после стабилизации яркость едет к предсказанию");
+    }
+
+    [Fact]
+    public void DriftingLight_RearmsSettle_UntilItSettles()
+    {
+        // Свет продолжает значимо меняться (рассвет) — вот ТУТ перевзвод оправдан: ждём финала
+        using var g = NewGuard();
+
+        g.OnLux(100);
+        g.OnLux(400);   // значимый сдвиг относительно взведённых 100
+
+        _settle.Starts.Should().Be(2, "продолжающееся изменение отодвигает стабилизацию");
+        _settle.Fire();
+        _ramps.Should().ContainSingle("реакция одна — на устоявшийся свет");
+    }
+
+    [Fact]
+    public void LightReturns_BeforeSettle_ArmClears()
+    {
+        // Свет скакнул и вернулся к исходному до стабилизации: взвод очищается, и следующий
+        // настоящий сдвиг взводит дебаунс заново (а не молчит из-за протухшей базы взвода)
+        using var g = NewGuard();
+        g.OnLux(100);
+        _settle.Fire();      // отработали сотню: acted = 100
+
+        g.OnLux(2000);       // скачок...
+        g.OnLux(100);        // ...и назад — незначимо относительно acted
+        int before = _settle.Starts;
+
+        g.OnLux(2000);       // настоящий сдвиг после отката
+        _settle.Starts.Should().Be(before + 1, "откат света очистил взвод — новый сдвиг взводит заново");
+    }
+
+    [Fact]
     public void SmallLuxFlutter_DoesNotArmSettle()
     {
         using var g = NewGuard();

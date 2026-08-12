@@ -32,6 +32,10 @@ public sealed class AutoBrightnessGuard : IDisposable
 
     private float _pendingLux = float.NaN; // последние люксы с датчика
     private float _actedLux = float.NaN;   // люксы, на которые уже среагировали (база гистерезиса)
+    private float _armedLux = float.NaN;   // люксы, на которых взведён settle: сэмплы без нового
+                                           // значимого сдвига таймер НЕ перевзводят — иначе поток
+                                           // датчика (1.5 с) чаще дебаунса (2 с) отодвигал бы
+                                           // Evaluate бесконечно, и фича не работала бы вовсе
     private int _current = -1;             // последняя известная яркость (все события)
     private bool _learning;                // серия ручных правок идёт
     private float _learnLux = float.NaN;   // свет в момент НАЧАЛА серии (правка обдумывалась при нём)
@@ -78,7 +82,11 @@ public sealed class AutoBrightnessGuard : IDisposable
             float filtered = windowMs <= 0 ? lux : _filter.Median(now, windowMs);
             _pendingLux = filtered;
             if (!_cfg.AutoBrightness) return;
-            if (!BrightnessCurve.Significant(_actedLux, filtered, Hysteresis())) return;
+            if (!BrightnessCurve.Significant(_actedLux, filtered, Hysteresis())) { _armedLux = float.NaN; return; }
+            // settle уже взведён на этот же (по гистерезису) свет → пусть дотикает; перевзвод —
+            // только по НОВОМУ значимому сдвигу (свет продолжает меняться — ждём стабилизации)
+            if (!float.IsNaN(_armedLux) && !BrightnessCurve.Significant(_armedLux, filtered, Hysteresis())) return;
+            _armedLux = filtered;
             _settle.Interval = Math.Max(500, _cfg.AutoBrightnessSettleMs);
             _settle.Stop();
             _settle.Start();
@@ -132,13 +140,17 @@ public sealed class AutoBrightnessGuard : IDisposable
             lock (_lock) _current = current = c;
         }
 
+        int from, to;
         lock (_lock)
         {
             int want = _clamp(CurveFor(online).Predict(lux), online);
             _actedLux = lux; // гистерезис отсчитываем от «на что смотрели», даже если не тронули
             if (Math.Abs(want - current) < Math.Max(1, _cfg.AutoBrightnessDeadband)) return;
-            StartRampLocked(current, want);
+            (from, to) = (current, want);
+            StartRampLocked(from, to);
         }
+        // полевая диагностика (XIC-36): по этой строке видно, что цепочка датчик → решение жива
+        Log.Write($"AutoBrightness: {from}% → {to}% ({lux:0.#} лк, {(online ? "сеть" : "батарея")})");
     }
 
     private BrightnessCurve CurveFor(bool online) => online ? _curveAc : _curveBatt;
@@ -146,6 +158,7 @@ public sealed class AutoBrightnessGuard : IDisposable
     private void OnSettleTick()
     {
         _settle.Stop();
+        lock (_lock) _armedLux = float.NaN; // взвод отработал — следующий сдвиг взводит заново
         Evaluate();
     }
 
