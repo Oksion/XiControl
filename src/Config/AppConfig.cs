@@ -213,10 +213,21 @@ public sealed class AppConfig
 
     /// <summary>Обучение кривой по правкам (XIC-37, тумблер на вкладке «Экран»). false —
     /// кривая заморожена и становится авторитетом: правка яркости — временное отклонение,
-    /// утилита торгуется обратно к предсказанию (механика лимита XIC-29: шаги раз в
-    /// BrightnessConvergeMs, повторная правка — уступка на BrightnessBackoffMin или до
-    /// блокировки сеанса).</summary>
+    /// дальше действует «возврат к выученному» (см. AutoBrightnessRevert).</summary>
     public bool AutoBrightnessLearning { get; set; } = true;
+
+    /// <summary>Возврат к выученному при выключенном обучении (комбо на вкладке «Экран»):
+    /// null — всегда (мягкое схождение к кривой, механика лимита XIC-29), "battery" — только
+    /// на батарее (от сети правка живёт до смены света), "off" — не возвращать вовсе.</summary>
+    public string? AutoBrightnessRevert { get; set; }
+
+    /// <summary>Интервал шагов схождения к выученному, мс (только config.json). За шаг разрыв
+    /// сокращается в BrightnessGapDivisor раз (делитель и порог доводки — общие с лимитом).</summary>
+    public int AutoBrightnessRevertMs { get; set; } = 60_000;
+
+    /// <summary>Пауза после «пользователь настоял» (повторная правка после нашего шага), минут
+    /// (только config.json). Сбрасывается блокировкой, сном и сменой питания.</summary>
+    public int AutoBrightnessRevertBackoffMin { get; set; } = 120;
 
     /// <summary>Запомненная яркость экрана (0–100) от сети; null — ещё не запомнена.</summary>
     public int? AcBrightness { get; set; }

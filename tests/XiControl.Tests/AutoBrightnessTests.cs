@@ -443,6 +443,42 @@ public sealed class AutoBrightnessTests
         AutoBrightnessGuard.StepToward(current, want, divisor: 2, snap: 2).Should().Be(expected);
 
     [Fact]
+    public void RevertOff_TweakJustStays()
+    {
+        _cfg.AutoBrightnessRevert = "off";
+        using var g = FrozenGuardWithTweak();
+
+        _converge.Running.Should().BeFalse("возврат выключен — правка живёт до смены света");
+        _cfg.AutoBrightnessPointsAc.Single(p => Math.Abs(p.Lux - 200) < 0.01).Percent
+            .Should().Be(60, "и кривая по-прежнему не тронута");
+    }
+
+    [Fact]
+    public void RevertBatteryOnly_SilentOnAc_ActiveOnBattery()
+    {
+        _cfg.AutoBrightnessRevert = "battery";
+        _power.IsOnline = true;
+        using var g = FrozenGuardWithTweak();
+        _converge.Running.Should().BeFalse("от сети правка не возвращается");
+
+        _power.IsOnline = false;                          // на батарее — возврат работает
+        g.OnBrightness(80, own: false, settling: false);
+        _converge.Running.Should().BeTrue("на батарее схождение взводится");
+    }
+
+    [Fact]
+    public void RevertModeSwitch_MidEpisode_HaltsConverge()
+    {
+        using var g = FrozenGuardWithTweak();             // эпизод открыт (режим «всегда»)
+        _cfg.AutoBrightnessRevert = "off";                // выключили возврат на ходу
+
+        int before = _ramps.Count;
+        _converge.Fire();
+
+        _ramps.Count.Should().Be(before, "тик при выключенном возврате гасит эпизод, а не шагает");
+    }
+
+    [Fact]
     public void OwnEvents_DoNotTriggerLearning()
     {
         using var g = NewGuard();
