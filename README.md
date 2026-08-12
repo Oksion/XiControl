@@ -412,7 +412,9 @@ adjust the brightness by hand and the app remembers "in this light I want that m
   slides back to the curve (same polite bargaining as the limit: half the gap once a minute, in
   both directions; insist with another tweak and it yields for 2 hours or until the screen is
   locked), *On battery only* — on AC the tweak lives until the light changes, *Off* — never
-  return. Timings — `AutoBrightnessRevertMs`/`AutoBrightnessRevertBackoffMin` in config.json.
+  return. In any mode a light change, a power switch or locking the screen recalculates
+  brightness from the curve — a temporary tweak does not survive Win+L. Timings —
+  `AutoBrightnessRevertMs`/`AutoBrightnessRevertBackoffMin` in config.json.
 - **"Sensor inertia"** (0–60 s, 10 by default) — the app reacts to the *median* ambient light
   over that window: a stray glare, a headlight or your own shadow won't jerk the brightness.
 - **You can see it working**: the tab shows live lux and a graph of both curves (AC in the

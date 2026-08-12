@@ -81,7 +81,7 @@
   "settings.bright.learn": "曲线学习",
   "settings.bright.learn.desc": "开——几秒后手动调节会成为曲线的“一课”。关——调节只是临时的：曲线保持不变，由下方“回到学习值”接管。",
   "settings.bright.revert": "回到学习值",
-  "settings.bright.revert.desc": "学习关闭时：一分钟后亮度温和地回到曲线（再次坚持调节则让步 2 小时或直到锁屏）。“仅用电池时”——接电源时调节保持到光线变化为止。时间参数见 config.json。",
+  "settings.bright.revert.desc": "学习关闭时：一分钟后亮度温和地回到曲线（再次坚持调节则让步 2 小时或直到锁屏）。“仅用电池时”——接电源时调节保持到光线变化为止。任何模式下，光线变化、电源切换或锁屏都会按曲线重新计算亮度。时间参数见 config.json。",
   "settings.bright.revert.always": "始终",
   "settings.bright.revert.battery": "仅用电池时",
   "settings.bright.revert.off": "关闭",
