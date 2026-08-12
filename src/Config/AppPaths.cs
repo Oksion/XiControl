@@ -81,7 +81,7 @@ public static class AppPaths
             var r = Resolve(ExeDir, AppDataDir, File.Exists, CanWrite);
             // метка есть, конфига рядом ещё нет — переносим накопленные настройки, чтобы
             // включение портативного режима не выглядело как «сбросились все настройки»
-            if (r.Portable) SeedFromAppData(r.Dir);
+            if (r.Portable) SeedConfig(AppDataDir, r.Dir);
             return r;
         }
         catch (Exception ex)
@@ -91,8 +91,9 @@ public static class AppPaths
         }
     }
 
-    // Проба записи надёжнее разбора ACL: интересует факт, а не теоретические права
-    private static bool CanWrite(string dir)
+    // Проба записи надёжнее разбора ACL: интересует факт, а не теоретические права.
+    // internal — тестируется на временных каталогах (реальная ФС, но без состояния машины).
+    internal static bool CanWrite(string dir)
     {
         try
         {
@@ -104,12 +105,14 @@ public static class AppPaths
         catch { return false; }
     }
 
-    private static void SeedFromAppData(string portableDir)
+    // Разовая пересадка config.json при первом старте портативного режима; источник
+    // параметром — тесты подставляют временный каталог вместо реального %APPDATA%.
+    internal static void SeedConfig(string sourceDir, string portableDir)
     {
         try
         {
             string target = Path.Combine(portableDir, "config.json");
-            string source = Path.Combine(AppDataDir, "config.json");
+            string source = Path.Combine(sourceDir, "config.json");
             if (!File.Exists(target) && File.Exists(source)) File.Copy(source, target);
         }
         catch { /* не скопировалось — стартуем с дефолтов, это не повод падать */ }

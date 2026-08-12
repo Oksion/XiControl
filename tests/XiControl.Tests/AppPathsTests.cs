@@ -80,4 +80,76 @@ public sealed class AppPathsTests
 
         probed.Should().BeFalse();
     }
+
+    // ---- Живые края на временных каталогах (реальная ФС, но без состояния машины) ----
+
+    private static string TempDir()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "XiControl.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    [Fact]
+    public void CanWrite_TempDir_True_AndLeavesNoProbe()
+    {
+        string dir = TempDir();
+        try
+        {
+            AppPaths.CanWrite(dir).Should().BeTrue();
+            Directory.EnumerateFileSystemEntries(dir).Should().BeEmpty("проба записи удаляет за собой");
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void CanWrite_MissingDir_False() =>
+        AppPaths.CanWrite(Path.Combine(Path.GetTempPath(), "XiControl.Tests", "нет-такого-каталога"))
+            .Should().BeFalse();
+
+    [Fact]
+    public void SeedConfig_CopiesOnFirstPortableStart()
+    {
+        string source = TempDir(); string target = TempDir();
+        try
+        {
+            File.WriteAllText(Path.Combine(source, "config.json"), """{"Language":"ru"}""");
+
+            AppPaths.SeedConfig(source, target);
+
+            File.ReadAllText(Path.Combine(target, "config.json")).Should().Contain("ru",
+                "накопленные настройки переезжают в портативную папку");
+        }
+        finally { Directory.Delete(source, true); Directory.Delete(target, true); }
+    }
+
+    [Fact]
+    public void SeedConfig_NeverOverwritesExistingPortableConfig()
+    {
+        string source = TempDir(); string target = TempDir();
+        try
+        {
+            File.WriteAllText(Path.Combine(source, "config.json"), "appdata");
+            File.WriteAllText(Path.Combine(target, "config.json"), "portable");
+
+            AppPaths.SeedConfig(source, target);
+
+            File.ReadAllText(Path.Combine(target, "config.json")).Should().Be("portable",
+                "портативный конфиг главнее — пересадка только при его отсутствии");
+        }
+        finally { Directory.Delete(source, true); Directory.Delete(target, true); }
+    }
+
+    [Fact]
+    public void SeedConfig_NothingToCopy_IsSilent()
+    {
+        string source = TempDir(); string target = TempDir();
+        try
+        {
+            AppPaths.SeedConfig(source, target); // ни исключения, ни файла
+
+            Directory.EnumerateFileSystemEntries(target).Should().BeEmpty();
+        }
+        finally { Directory.Delete(source, true); Directory.Delete(target, true); }
+    }
 }
