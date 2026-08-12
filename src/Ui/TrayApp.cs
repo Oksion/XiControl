@@ -42,6 +42,10 @@ public sealed class TrayApp : IDisposable
     // политика обновления значка (опрос/кэш/тема) — вынесена в TrayIconController
     private readonly TrayIconController _icon;
 
+    // Индикатор-метрика в трее (XIC-35): существует только при включённой опции —
+    // выключено значит не создан вовсе (ни значка, ни таймера, ни источников)
+    private TrayMetricIcon? _metric;
+
     // «В дорогу»: наблюдение за 100% вынесено в TravelChargeMonitor
     private readonly TravelChargeMonitor _travel;
 
@@ -251,6 +255,9 @@ public sealed class TrayApp : IDisposable
         _events.Start();
         _icon.Start();
 
+        // индикатор-метрика (XIC-35): только при включённой опции
+        if (_cfg.TrayMetricEnabled) StartMetric();
+
         // HTTP API: поднять хост, если фича включена (api.json); firewall на старте не трогаем —
         // правило создаётся/удаляется только явным тумблером во вкладке (как schtasks у автозапуска)
         if (_api.Enabled) StartApiHost();
@@ -312,6 +319,7 @@ public sealed class TrayApp : IDisposable
         if (e.Category != UserPreferenceCategory.General) return;
         _menu.ThemeChanged(); // перекрасить меню, если тема реально сменилась
         _icon.ThemeChanged(); // перечитать цвет панели задач и перерисовать значок
+        _metric?.ThemeChanged(); // цифра индикатора — тем же контрастом к панели
         // флайауты в режиме «как в Windows» следуют теме тоже; в остальных Apply — no-op
         FlyoutPalette.Apply(_cfg.FlyoutTheme);
         RepaintFlyouts();
@@ -570,6 +578,7 @@ public sealed class TrayApp : IDisposable
                 GetBatteryReport = BatteryReportCached,
                 GetApiSettings = () => _api,
                 ApiApplied = ApiApplied,
+                TrayMetricApplied = TrayMetricApplied,
             };
             _settings = new SettingsForm(_cfg, act);
         }
@@ -582,6 +591,24 @@ public sealed class TrayApp : IDisposable
     {
         _monitor ??= new MonitorForm(_cfg, _mifs);
         _monitor.Popup();
+    }
+
+    // ---- Индикатор-метрика в трее (XIC-35) ----
+
+    // Маршал-контрол — OSD-форма (её хэндл форсирован в ctor); клик по индикатору открывает «Монитор»
+    private void StartMetric()
+    {
+        _metric = new TrayMetricIcon(_cfg, _osd, ShowMonitor);
+        _metric.Start();
+    }
+
+    // Вкладка настроек изменила индикатор: вкл/выкл — создание/уничтожение целиком
+    // (выключено = объекта не существует, ноль нагрузки), метрика/период — на лету
+    private void TrayMetricApplied()
+    {
+        if (!_cfg.TrayMetricEnabled) { _metric?.Dispose(); _metric = null; return; }
+        if (_metric is null) StartMetric();
+        else _metric.SettingsChanged();
     }
 
     // Для действия клавиши "monitor": повторное нажатие прячет виджет
@@ -611,6 +638,7 @@ public sealed class TrayApp : IDisposable
         _mi.Dispose();
         // _events / guard-ы / IPowerEvents / IMifsClient диспоузит DI-провайдер
         // (в обратном порядке создания), TrayApp ими не владеет
+        _metric?.Dispose(); // значок индикатора гасится до основного (Visible=false внутри)
         _osd.Dispose();
         _panel.Dispose();
         _settings?.Dispose();

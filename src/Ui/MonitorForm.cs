@@ -1,6 +1,5 @@
 ﻿using System.Drawing.Drawing2D;
 using System.Management;
-using System.Runtime.InteropServices;
 using XiControl.Config;
 using XiControl.Localization;
 using XiControl.Wmi;
@@ -43,16 +42,15 @@ public sealed class MonitorForm : FlyoutForm
     private const float TempMax = 100f; // верх шкалы графика температуры, °C (троттлинг ~95–100)
 
     private ManagementObjectSearcher? _battery;
-    private ManagementObjectSearcher? _thermal;
     private readonly SystemIntegration.PowerDraw _powerDraw = new(); // живая мощность через Battery IOCTL
     private readonly SystemIntegration.GpuTelemetry _gpuTel = new(); // iGPU через Intel IGCL (ленивая инициализация)
-    private long _prevIdle, _prevKernel, _prevUser;
+    private readonly SystemIntegration.CpuLoad _cpuLoad = new();          // GetSystemTimes (общий с индикатором трея)
+    private readonly SystemIntegration.DptfTemperature _dptf = new();     // температуры DPTF (общий с индикатором трея)
     private float _ramUsedGb, _ramTotalGb;
     private int _adapterWatts; // ватты подключённого PD-БП (0 — нет/не PD); MIFS, driver-free
     private float _gpuMhz, _gpuWatts; // текущая частота и мощность GPU — в подстроку ряда
     private bool _hasGpu;      // IGCL поднялся → резервируем ряд GPU (иначе виджет как раньше)
     private bool _hasTemp;     // на этой модели DPTF отдаёт температуры → резервируем строку/высоту
-    private bool _tempOff;     // класс DPTF отсутствует — больше не опрашиваем
     private float _critC;      // критический порог, °C (0 = неизвестен); из ACPI-термозоны, best-effort
     private bool _critTried;   // порог уже пробовали прочитать (ACPI капризна — не долбим повторно)
 
@@ -95,7 +93,7 @@ public sealed class MonitorForm : FlyoutForm
         if (Visible) { Hide(); return; }
 
         _power.Clear(); _cpu.Clear(); _gpu.Clear(); _ram.Clear(); _temp.Clear();
-        _prevIdle = _prevKernel = _prevUser = 0;
+        _cpuLoad.Reset(); // база времён CPU протухла, пока виджет был закрыт
         _gpuTel.Reset(); // иначе первая загрузка GPU размажется по времени, что виджет был закрыт
         Sample(); // первая точка сразу (заодно определит наличие DPTF-температур и IGCL до ApplyView)
 
@@ -274,32 +272,15 @@ public sealed class MonitorForm : FlyoutForm
     }
 
     /// <summary>
-    /// Температура «горячей точки» через Intel DPTF (WMI EsifDeviceInformation) — driver-free:
-    /// провайдер идёт со штатными драйверами Intel. Берём максимум среди активных доменов — это
-    /// честная температура самого горячего узла, без догадок «где CPU, где GPU». Значение уже в °C.
-    /// Класса нет на модели → тихо выключаемся (_tempOff), строку температуры не показываем.
+    /// Температура «горячей точки» через Intel DPTF — сам опрос вынесен в общий
+    /// <see cref="SystemIntegration.DptfTemperature"/> (его же использует индикатор трея XIC-35).
+    /// Здесь остаётся только резервирование строки и чтение крит-порога при первом успехе.
     /// </summary>
     private float SampleTempC()
     {
-        if (_tempOff) return float.NaN;
-        try
-        {
-            _thermal ??= new ManagementObjectSearcher(@"root\wmi",
-                "SELECT Temperature FROM EsifDeviceInformation");
-            int max = 0; bool any = false;
-            foreach (ManagementObject o in _thermal.Get())
-            {
-                any = true;
-                object? t = o["Temperature"];
-                o.Dispose();
-                if (t is null) continue;
-                int c = Convert.ToInt32(t, System.Globalization.CultureInfo.InvariantCulture);
-                if (c > max && c < 130) max = c; // >130 °C — неинициализированный домен, отбрасываем
-            }
-            if (any) { _hasTemp = true; ReadCriticalOnce(); } else _tempOff = true; // класс есть → строка + крит-порог
-            return max > 0 ? max : float.NaN;
-        }
-        catch (Exception ex) { Log.Ex("Monitor.Temp", ex); _thermal = null; _tempOff = true; return float.NaN; }
+        float c = _dptf.ReadMaxC();
+        if (_dptf.Present && !_hasTemp) { _hasTemp = true; ReadCriticalOnce(); } // класс есть → строка + крит-порог
+        return c;
     }
 
     /// <summary>
@@ -333,35 +314,12 @@ public sealed class MonitorForm : FlyoutForm
         if (list.Count > Capacity) list.RemoveAt(0);
     }
 
-    [DllImport("kernel32.dll")] private static extern bool GetSystemTimes(out long idle, out long kernel, out long user);
+    // CPU и RAM — через общие классы SystemIntegration (их же использует индикатор трея XIC-35):
+    // первая выборка CPU лишь набирает базу времён — даёт NaN, график начинается со второй точки.
+    private float SampleCpu() => _cpuLoad.TryRead(out float pct) ? pct : float.NaN;
 
-    private float SampleCpu()
-    {
-        if (!GetSystemTimes(out long idle, out long kernel, out long user)) return float.NaN;
-        float cpu = 0f;
-        long dIdle = idle - _prevIdle, dBusy = (kernel - _prevKernel) + (user - _prevUser);
-        if (_prevKernel != 0 && dBusy > 0)
-            cpu = Math.Clamp(100f * (dBusy - dIdle) / dBusy, 0f, 100f);
-        (_prevIdle, _prevKernel, _prevUser) = (idle, kernel, user);
-        return _prevKernel == kernel && cpu == 0f && _cpu.Count == 0 ? float.NaN : cpu;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MemoryStatusEx
-    {
-        public uint Length, MemoryLoad;
-        public ulong TotalPhys, AvailPhys, TotalPageFile, AvailPageFile, TotalVirtual, AvailVirtual, AvailExtendedVirtual;
-    }
-    [DllImport("kernel32.dll")] private static extern bool GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
-
-    private float SampleRam()
-    {
-        var m = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
-        if (!GlobalMemoryStatusEx(ref m)) return float.NaN;
-        _ramTotalGb = m.TotalPhys / 1073741824f;
-        _ramUsedGb = (m.TotalPhys - m.AvailPhys) / 1073741824f;
-        return m.MemoryLoad;
-    }
+    private float SampleRam() =>
+        SystemIntegration.MemoryLoad.TryRead(out float pct, out _ramUsedGb, out _ramTotalGb) ? pct : float.NaN;
 
     /// <summary>Вт с датчика батареи со знаком: заряд в батарею +, разряд −, от сети без заряда — NaN.</summary>
     private float SamplePowerWatts()
@@ -583,7 +541,7 @@ public sealed class MonitorForm : FlyoutForm
             _tick.Dispose();
             _tip.Dispose();
             _battery?.Dispose();
-            _thermal?.Dispose();
+            _dptf.Dispose();
             _powerDraw.Dispose();
             _gpuTel.Dispose();
         }

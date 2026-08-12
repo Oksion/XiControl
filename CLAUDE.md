@@ -166,7 +166,9 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   разрешения текст расходится с геометрией Sc), `SvgIcons` (рендер встроенных SVG через
   Svg.NET + кэш битмапов; `RenderByHeight` — для неквадратных картинок `assets/svg/ui/`),
   `FlyoutTip` (всплывающая подсказка флайаутов), `Draw` (общие примитивы), `TrayIcons`,
-  `DarkMenu` (тёмное меню).
+  `DarkMenu` (тёмное меню), `TrayMetricIcon` (индикатор-метрика в трее XIC-35: второй NotifyIcon
+  с цифрой — существует только при включённой опции, замер на пуле, иконки PNG-ICO в памяти
+  без GDI-хэндлов).
 - `src/Ui/Settings/` — начинка окна настроек: `SettingsToolkit` (фабрика виджетов: карточки,
   тумблеры, комбо; раздаёт `AccessibleName`), `SettingsTheme` (палитра под системную тему),
   `NavStrip` (левая навигация, доступна с клавиатуры), вкладки-контролы `GeneralTab` /
@@ -216,7 +218,10 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   `MicControl`, `KeyActions`, `Sound` (WAV-джинглы), `BatteryInfo`, `PowerDraw`,
   `GpuTelemetry` (загрузка/ватты/частота iGPU через **Intel IGCL** — user-mode API драйвера Intel,
   `ControlLib.dll` из System32; driver-free, без админа, ленивая инициализация; не Intel → ряд GPU
-  в «Мониторе» просто не появляется, см. `docs/09`);
+  в «Мониторе» просто не появляется, см. `docs/09`),
+  `TrayMetrics` (XIC-35: `TrayMetricFormat` — чистое форматирование под тестами, `CpuLoad`/
+  `MemoryLoad`/`DptfTemperature` — источники, общие с «Монитором», `TrayMetricSource` —
+  ленивый фасад по выбранной метрике);
   **HTTP API (XIC-13, opt-in)** — `HttpApi` (хост на `HttpListener`/http.sys, без ASP.NET Core;
   создаётся только при включённой фиче → выключено = 0 CPU), `ApiRouter` (авторизация Bearer+SHA-256
   constant-time и белый список маршрутов — тестируется на фейках), `ApiSettings`/`ApiSettingsStore`

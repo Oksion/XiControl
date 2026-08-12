@@ -291,6 +291,21 @@ public sealed class AppConfig
     /// </summary>
     public string? MonitorView { get; set; }
 
+    // ---- Индикатор в трее (XIC-35) ----
+
+    /// <summary>Второй значок в трее с числом выбранной метрики (как TrafficMonitor).
+    /// По умолчанию выключено; выключено = не создаётся ни значок, ни таймер, ни
+    /// источники данных — ноль дополнительной нагрузки на систему.</summary>
+    public bool TrayMetricEnabled { get; set; }
+
+    /// <summary>Метрика на значке: "power" (Вт с датчика батареи), "cpu", "gpu", "ram",
+    /// "temp". null/неизвестное → power. Одновременно показывается одна.</summary>
+    public string? TrayMetricKind { get; set; }
+
+    /// <summary>Период обновления значка, сек (в UI пресеты 1/2/5/10; правкой config.json —
+    /// любое, приводится к 1..60).</summary>
+    public int TrayMetricPeriodSec { get; set; } = 2;
+
     // ---- Тайминги (мс) ----
     // Правятся только в config.json (UI нет); применяются при следующем запуске.
     // Дефолты = историческим константам; при чтении клэмпятся снизу, чтобы кривое
