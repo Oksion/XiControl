@@ -81,7 +81,7 @@
   "settings.bright.learn": "Curve learning",
   "settings.bright.learn.desc": "On — a brightness tweak becomes a lesson for the curve after a few seconds. Off — tweaks are temporary: the curve stays intact, and \"Return to learned\" below takes over.",
   "settings.bright.revert": "Return to learned",
-  "settings.bright.revert.desc": "With learning off: after a minute brightness gently slides back to the curve (insist with another tweak and it yields for 2 hours or until the screen is locked). \"On battery only\" — on AC the tweak lives until the light changes. In any mode a light change, a power switch or locking the screen recalculates brightness from the curve. Timings — in config.json.",
+  "settings.bright.revert.desc": "What to do with a temporary tweak while learning is off: after a minute, gently slide brightness back to the curve — half the gap per step; insist with another tweak and it yields for 2 hours or until the screen is locked. A light change, power switch or screen lock recalculates brightness from the curve in any mode. Timings — in config.json.",
   "settings.bright.revert.always": "Always",
   "settings.bright.revert.battery": "On battery only",
   "settings.bright.revert.off": "Off",
