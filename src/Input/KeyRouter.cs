@@ -13,6 +13,7 @@ public sealed class KeyRouter
 {
     private readonly AppConfig _cfg;
     private readonly MiButtonGesture _mi;
+    private readonly KeyMap _keys;
 
     // --- исполнители настраиваемых действий (AppConfig.*Action) ---
     public Action? CycleModes;
@@ -41,29 +42,33 @@ public sealed class KeyRouter
     /// <summary>Открыта ли быстрая панель: клавиша «настройки» при открытой панели — всегда заряд.</summary>
     public Func<bool> PanelVisible = () => false;
 
-    public KeyRouter(AppConfig cfg, MiButtonGesture mi)
+    /// <param name="keys">Карта «код → смысл»; null — из конфига (дефолты TM2424 +
+    /// переопределения <see cref="AppConfig.KeyCodes"/> для других моделей, XIC-38).</param>
+    public KeyRouter(AppConfig cfg, MiButtonGesture mi, KeyMap? keys = null)
     {
         _cfg = cfg;
         _mi = mi;
+        _keys = keys ?? KeyMap.FromConfig(cfg);
     }
 
     /// <summary>Событие клавиши прошивки (code, value) → обработчик.</summary>
     public void Handle(byte code, byte value)
     {
-        switch (code)
+        switch (_keys.Kind(code))
         {
-            case Mifs.KeyMiDown: _mi.Down(); break;
-            case Mifs.KeyMiUp: _mi.Up(); break;
-            case Mifs.KeyProjection when value == 0:                                 // value 2 = слабый зарядник — пока пропуск
+            case KeyKind.MiDown: _mi.Down(); break;
+            case KeyKind.MiUp: _mi.Up(); break;
+            case KeyKind.Projection when value == 0:                                 // value 2 = слабый зарядник — пока пропуск
                 Run(_cfg.ProjKeyAction, _cfg.ProjKeyCommand); break;
-            case Mifs.KeySettings: OnSettingsKey(); break; // одиночное событие, удержание не ловится
-            case Mifs.KeyAiDown:                                                     // 0x24 (отпускание) игнорируем
+            case KeyKind.Settings: OnSettingsKey(); break; // одиночное событие, удержание не ловится
+            case KeyKind.Ai:                                                         // 0x24 (отпускание) игнорируем
                 Run(_cfg.AiKeyAction, _cfg.AiKeyCommand); break;
-            case Mifs.KeyMic: MicKey?.Invoke(value); break;
-            case Mifs.KeyKbdBacklight: BacklightKey?.Invoke(value); break;
-            case Mifs.KeyFnLock: FnLockKey?.Invoke(value); break;
+            case KeyKind.Mic: MicKey?.Invoke(value); break;
+            case KeyKind.Backlight: BacklightKey?.Invoke(value); break;
+            case KeyKind.FnLock: FnLockKey?.Invoke(value); break;
             default:
-                // другие модели шлют другие коды/value — лог помогает разбирать отчёты тестеров
+                // другие модели шлют другие коды/value — лог помогает разбирать отчёты тестеров,
+                // а сам человек может прописать свой код в KeyCodes (config.json)
                 Log.Write($"Key: необработанное событие code=0x{code:X2} value=0x{value:X2}");
                 break;
         }

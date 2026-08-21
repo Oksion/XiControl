@@ -365,6 +365,18 @@ public sealed class AppConfig
     /// <summary>Клавиша «проекция» (дефолт "projection").</summary>
     public string? ProjKeyAction { get; set; }
 
+    /// <summary>
+    /// Переопределение кодов клавиш прошивки (XIC-38) — для моделей, где они отличаются от
+    /// TM2424. Слоты: <c>miDown</c>, <c>miUp</c>, <c>projection</c>, <c>settings</c>, <c>ai</c>,
+    /// <c>mic</c>, <c>backlight</c>, <c>fnLock</c>; значение — код в виде <c>"0x18"</c> (как в
+    /// журнале: «Key: необработанное событие code=0x18») или десятичное число. Пример:
+    /// <code>"KeyCodes": { "miDown": "0x18", "miUp": "0x19" }</code>
+    /// Применяется при следующем запуске. Незнакомый слот и неразборчивый код игнорируются
+    /// молча — кривая правка не должна отбирать рабочие клавиши. Подробности — docs/07-keymap.md.
+    /// </summary>
+    [JsonConverter(typeof(LenientStringMapConverter))]
+    public Dictionary<string, string>? KeyCodes { get; set; }
+
     /// <summary>Команды для действия "launch": путь к exe/файлу/URL + аргументы
     /// (поддерживаются %ПЕРЕМЕННЫЕ%; путь с пробелами — в кавычках).</summary>
     public string? MiClickCommand { get; set; }
