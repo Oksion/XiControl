@@ -49,11 +49,19 @@ public sealed class KeyMap
 
     private KeyMap(Dictionary<byte, KeyKind> byCode) => _byCode = byCode;
 
-    /// <summary>Заводская карта (TM2424, см. docs/07-keymap.md).</summary>
+    /// <summary>
+    /// Заводская карта: TM2424 (см. docs/07-keymap.md) + подтверждённые коды других моделей.
+    /// Один и тот же смысл может иметь несколько кодов — модели не пересекаются по значениям,
+    /// поэтому лишние записи безвредны, а владельцу подтверждённой модели не нужен config.
+    /// </summary>
     public static KeyMap Default() => new(new Dictionary<byte, KeyKind>
     {
         [Mifs.KeyMiDown] = KeyKind.MiDown,
         [Mifs.KeyMiUp] = KeyKind.MiUp,
+        // TM2113 (Redmi Book Pro 15 2022, Ryzen): Mi-кнопка шлёт свою пару — подтверждено
+        // отчётом пользователя, GitHub issue #37. Клавиша «настройки» там 0x1B, как у нас.
+        [0x18] = KeyKind.MiDown,
+        [0x19] = KeyKind.MiUp,
         [Mifs.KeyProjection] = KeyKind.Projection,
         [Mifs.KeySettings] = KeyKind.Settings,
         [Mifs.KeyAiDown] = KeyKind.Ai,

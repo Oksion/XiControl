@@ -44,7 +44,19 @@ public class KeyMapTests
         map.Kind(Mifs.KeyMiDown).Should().Be(KeyKind.MiDown);
         map.Kind(Mifs.KeyMiUp).Should().Be(KeyKind.MiUp);
         map.Kind(Mifs.KeyFnLock).Should().Be(KeyKind.FnLock);
-        map.Kind(0x18).Should().Be(KeyKind.Unknown, "код чужой модели без настройки нам незнаком");
+        map.Kind(0x55).Should().Be(KeyKind.Unknown, "неизвестный код так и остаётся неизвестным");
+    }
+
+    [Fact]
+    public void Default_ПодтверждённыеКодыДругихМоделей()
+    {
+        // TM2113: пара Mi-кнопки подтверждена отчётом пользователя (issue #37) — владельцу
+        // такой модели править config.json уже не нужно
+        var map = KeyMap.Default();
+
+        map.Kind(0x18).Should().Be(KeyKind.MiDown);
+        map.Kind(0x19).Should().Be(KeyKind.MiUp);
+        map.Kind(Mifs.KeyMiDown).Should().Be(KeyKind.MiDown, "коды TM2424 при этом остаются");
     }
 
     [Fact]
@@ -53,7 +65,7 @@ public class KeyMapTests
         var map = KeyMap.FromConfig(new AppConfig());
 
         map.Kind(Mifs.KeyMiDown).Should().Be(KeyKind.MiDown);
-        map.Kind(0x18).Should().Be(KeyKind.Unknown);
+        map.Kind(0x18).Should().Be(KeyKind.MiDown);
     }
 
     // ---- Переопределение ----

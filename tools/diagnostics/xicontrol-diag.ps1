@@ -101,9 +101,16 @@ function MifsGet {
         $in = [byte[]]::new(32)
         $in[1] = 0xFA; $in[3] = $Cmd; $in[4] = $Arg; $in[6] = $Arg2
         $out = (Invoke-CimMethod -InputObject $inst -MethodName MiInterface -Arguments @{ InData = [byte[]]$in }).OutData
-        $hex = ($out[0..9] | ForEach-Object { '{0:X2}' -f $_ }) -join ' '
-        $status = switch ($out[1]) { 0x80 { 'OK' } 0xE0 { 'NOT SUPPORTED' } default { ('0x{0:X2}' -f $out[1]) } }
-        Say ("  {0,-22} cmd=0x{1:X2}/{2:X2} -> status {3,-14} OUT[0..9]: {4}" -f $Label, $Cmd, $Arg, $status, $hex)
+        # WHOLE buffer: on some models the answer sits at different offsets than on TM2424,
+        # and a 10-byte dump hides it (learned from issue #37)
+        $hex = ($out | ForEach-Object { '{0:X2}' -f $_ }) -join ' '
+        $status = switch ($out[1]) {
+            0x80 { 'OK' }
+            0xE0 { 'NOT SUPPORTED' }
+            default { '0x{0:X2} - not a known status, different response layout' -f $out[1] }
+        }
+        Say ("  {0,-22} cmd=0x{1:X2}/{2:X2} -> status {3}" -f $Label, $Cmd, $Arg, $status)
+        Say ("  {0,-22} OUT: {1}" -f '', $hex)
     } catch {
         Say ("  {0,-22} cmd=0x{1:X2}/{2:X2} -> CALL FAILED: {3}" -f $Label, $Cmd, $Arg, $_.Exception.Message) 'Red'
     }
