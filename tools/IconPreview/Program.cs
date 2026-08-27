@@ -1,3 +1,5 @@
+using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Drawing.Text;
 using XiControl.Ui;
@@ -22,6 +24,109 @@ string Out(params string[] parts)                       // как Repo, но с�
     string p = Repo(parts);
     Directory.CreateDirectory(Path.GetDirectoryName(p)!);
     return p;
+}
+
+// Режим "menu": эскиз WinUI-меню без запуска приложения и зависимости от UI-фреймворка.
+if (args.Length > 0 && args[0] == "menu")
+{
+    Bitmap RenderMenu(bool dark, bool modes = false)
+    {
+        (string text, string? icon, bool active, bool enabled, string? value)[] rows = modes
+            ?
+            [
+                ("节能", SvgIcons.MenuPerfEco, false, true, null),
+                ("安静", SvgIcons.MenuPerfQuiet, false, true, null),
+                ("智能", SvgIcons.MenuPerfAuto, true, true, null),
+                ("均衡", SvgIcons.MenuPerfBalance, false, true, null),
+                ("极速", SvgIcons.MenuPerfTurbo, false, true, null),
+                ("狂暴", SvgIcons.MenuPerfFull, false, true, null),
+            ]
+            :
+            [
+                ("电池保护 (80%)", SvgIcons.MenuBattery, true, true, null),
+                ("出行充电 (100%)", SvgIcons.MenuTravel, false, true, null),
+                ("猫头鹰模式（保持唤醒）", SvgIcons.MenuOwl, false, true, null),
+                ("自动刷新率（120/60 Hz）", SvgIcons.MenuRefreshRate, true, true, null),
+                ("监视器", SvgIcons.MenuMonitor, false, true, null),
+                ("性能模式", SvgIcons.MenuPerformance, false, true, "智能  ›"),
+                (string.Empty, null, false, true, null),
+                ("设置…", SvgIcons.MenuSettings, false, true, null),
+                (string.Empty, null, false, true, null),
+                ("退出", SvgIcons.MenuExit, false, true, null),
+            ];
+
+        int width = modes ? 236 : 324;
+        const int rowHeight = 44, separatorHeight = 12, pad = 8;
+        int height = pad * 2 + rows.Sum(row => row.icon is null ? separatorHeight : rowHeight);
+        var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+        Color card = dark ? Color.FromArgb(28, 28, 30) : Color.FromArgb(243, 243, 245);
+        Color border = dark ? Color.FromArgb(70, 70, 74) : Color.FromArgb(200, 200, 205);
+        Color text = dark ? Color.FromArgb(240, 240, 240) : Color.FromArgb(26, 26, 26);
+        Color dim = dark ? Color.FromArgb(170, 170, 175) : Color.FromArgb(95, 95, 95);
+        Color selected = dark ? Color.FromArgb(48, 74, 163, 255) : Color.FromArgb(35, 0, 95, 184);
+        using (var background = Icons.Rounded(new RectangleF(0.5f, 0.5f, width - 1, height - 1), 14))
+        using (var brush = new SolidBrush(card))
+        using (var pen = new Pen(border))
+        {
+            graphics.FillPath(brush, background);
+            graphics.DrawPath(pen, background);
+        }
+
+        using var font = new Font("Segoe UI", 10f);
+        using var valueFont = new Font("Segoe UI Semibold", 9.5f);
+        using var textBrush = new SolidBrush(text);
+        using var dimBrush = new SolidBrush(dim);
+        using var selectedBrush = new SolidBrush(selected);
+        using var linePen = new Pen(border);
+        using var left = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
+        using var right = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center };
+        int y = pad;
+        foreach (var row in rows)
+        {
+            if (row.icon is null)
+            {
+                graphics.DrawLine(linePen, 46, y + separatorHeight / 2f, width - 12, y + separatorHeight / 2f);
+                y += separatorHeight;
+                continue;
+            }
+            var bounds = new RectangleF(6, y + 2, width - 12, rowHeight - 4);
+            if (row.active)
+            {
+                using var selectedPath = Icons.Rounded(bounds, 8);
+                graphics.FillPath(selectedBrush, selectedPath);
+            }
+            Color iconColor = row.enabled ? text : dim;
+            graphics.DrawImage(SvgIcons.Render(row.icon, 18, iconColor), 16, y + (rowHeight - 18) / 2);
+            graphics.DrawString(row.text, font, row.enabled ? textBrush : dimBrush,
+                new RectangleF(48, y, width - 96, rowHeight), left);
+            string? accessory = row.value ?? (row.active ? "✓" : null);
+            if (accessory is not null)
+                graphics.DrawString(accessory, valueFont, textBrush, new RectangleF(width - 90, y, 72, rowHeight), right);
+            y += rowHeight;
+        }
+        return bitmap;
+    }
+
+    using var darkPreview = RenderMenu(true);
+    using var lightPreview = RenderMenu(false);
+    using var modePreview = RenderMenu(true, true);
+    int gap = 28, pad = 24;
+    using var preview = new Bitmap(darkPreview.Width + lightPreview.Width + modePreview.Width + gap * 2 + pad * 2,
+        Math.Max(Math.Max(darkPreview.Height, lightPreview.Height), modePreview.Height) + pad * 2);
+    using (var g = Graphics.FromImage(preview))
+    {
+        g.Clear(Color.FromArgb(210, 213, 220));
+        g.DrawImage(darkPreview, pad, pad);
+        g.DrawImage(lightPreview, pad + darkPreview.Width + gap, pad);
+        g.DrawImage(modePreview, pad + darkPreview.Width + gap + lightPreview.Width + gap, pad);
+    }
+    string menuOut = Out("reference", "tray-menu-preview.png");
+    preview.Save(menuOut, ImageFormat.Png);
+    Console.WriteLine("saved: " + menuOut);
+    return;
 }
 
 // Режим "svg": сгенерировать SVG-лист иконок и отрендерить его для сверки.
@@ -103,10 +208,12 @@ if (args.Length > 0 && args[0] == "bench")
         g2.DrawImage(needle40, new Rectangle(-20, -20, 40, 40));
         g2.Restore(st);
     });
-    double text = Bench("6 надписей TextRenderer", 2000, () =>
+    using var centered = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+    double text = Bench("6 надписей DrawString", 2000, () =>
     {
         for (int i = 0; i < 6; i++)
-            TextRenderer.DrawText(g2, "Полная мощность", cachedFont, new Rectangle(10 + i * 75, 150, 80, 40), Color.White, TextFormatFlags.HorizontalCenter);
+            g2.DrawString("Полная мощность", cachedFont, Brushes.White,
+                new RectangleF(10 + i * 75, 150, 80, 40), centered);
     });
     double osdIcon = Bench("иконка OSD 64px + поворот", 2000, () =>
     {

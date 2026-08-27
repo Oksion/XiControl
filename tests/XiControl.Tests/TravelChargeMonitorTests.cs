@@ -7,7 +7,7 @@ namespace XiControl.Tests;
 
 /// <summary>
 /// TravelChargeMonitor — опрос «В дорогу» до 100% на фейках (план 2.1).
-/// BatteryLifePercent: 0..1 — заряд, вне диапазона (2.55) — «неизвестно» (WinForms).
+/// BatteryLifePercent: 0..1 — заряд, вне диапазона (2.55) — «неизвестно».
 /// </summary>
 public sealed class TravelChargeMonitorTests
 {
@@ -57,7 +57,7 @@ public sealed class TravelChargeMonitorTests
 
     [Theory]
     [InlineData(0.97f)]  // ещё заряжается
-    [InlineData(2.55f)]  // «неизвестно» (255 у WinForms)
+    [InlineData(2.55f)]  // «неизвестно» (системный sentinel 255%)
     public void NotFullOrUnknown_KeepsWaiting(float level)
     {
         _power.BatteryLifePercent = level;

@@ -1,9 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using XiControl.Config;
-using XiControl.Localization;
-using XiControl.SystemIntegration;
-using XiControl.Ui;
-using XiControl.Wmi;
+using System.Runtime.InteropServices;
 
 namespace XiControl;
 
@@ -12,74 +7,73 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
-        // единственный экземпляр
-        using var mutex = new Mutex(true, @"Global\XiControlMutex", out bool created);
-        if (!created) return;
-
-        ApplicationConfiguration.Initialize();
-
-        // Граф объектов: все singleton, провайдер владеет Dispose (в обратном порядке создания).
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfigStore>(new JsonConfigStore());
-        services.AddSingleton(sp => sp.GetRequiredService<IConfigStore>().Load());
-        // настройки HTTP API — отдельный файл с ACL (ProgramData), НЕ config.json: включить API
-        // или подменить токен правкой пользовательского конфига невозможно (XIC-13)
-        services.AddSingleton(ApiSettingsStore.Load());
-        services.AddSingleton<ILocalizer, Localizer>();
-        services.AddSingleton<IMifsClient, MifsClient>();
-        services.AddSingleton<IKeyEventSource, MifsEventWatcher>();
-        // один источник системных событий под двумя узкими швами (питание + экран):
-        // окно-маршалер внутри нужно ровно одно
-        services.AddSingleton<SystemEventsSource>();
-        services.AddSingleton<IPowerEvents>(sp => sp.GetRequiredService<SystemEventsSource>());
-        services.AddSingleton<IDisplayEvents>(sp => sp.GetRequiredService<SystemEventsSource>());
-        services.AddSingleton<TouchpadControl>();
-        services.AddSingleton<TouchscreenControl>();
-        services.AddSingleton<TouchpadDeadZone>();
-        // «В дорогу» временно снимает защиту (заряд до 100%) — гард бережёт 80% только когда travel выключен
-        services.AddSingleton(sp =>
-        {
-            var c = sp.GetRequiredService<AppConfig>();
-            return new ChargeGuard(sp.GetRequiredService<IMifsClient>(), sp.GetRequiredService<IPowerEvents>(),
-                () => c.ChargeCare && !c.TravelMode ? c.CarePercent() : 100);
-        });
-        services.AddSingleton<RefreshRateGuard>();
-        services.AddSingleton<BrightnessCapGuard>(); // лимит яркости (XIC-29); события ему раздаёт PowerProfileGuard
-        services.AddSingleton<AlsWatcher>();         // датчик освещённости (XIC-30); стартует в AppController.Startup
-        // авто-яркость: кламп выхода — лимитом (кривая хранит намерение, лимит — фильтр)
-        services.AddSingleton(sp => new AutoBrightnessGuard(
-            sp.GetRequiredService<AppConfig>(), sp.GetRequiredService<IPowerEvents>(),
-            clamp: (level, online) => sp.GetRequiredService<BrightnessCapGuard>().ClampRestore(level, online)));
-        services.AddSingleton<PowerProfileGuard>();
-        services.AddSingleton<TravelChargeMonitor>();
-        services.AddSingleton<TrayIconController>();
-        services.AddSingleton<AppController>();
-        services.AddSingleton<TrayApp>();
-        using var provider = services.BuildServiceProvider();
-
-        var cfg = provider.GetRequiredService<AppConfig>();
-        Log.Enabled = cfg.LogEnabled; // до этой строчки лог включён — ошибки старта не теряем
-        // портативный режим сам себя не логирует (AppPaths нельзя звать Log во время
-        // инициализации — рекурсия), поэтому докладываем здесь, когда каталог уже выбран
-        if (AppPaths.FallbackReason is { } why) Log.Write($"AppPaths: {why}");
-        else if (AppPaths.Portable) Log.Write($"AppPaths: портативный режим, данные в {AppPaths.DataDir}");
-        provider.GetRequiredService<ILocalizer>().Current = cfg.Language ?? ""; // Loc нормализует пустую/неизвестную культуру
-        Ui.FlyoutPalette.Apply(cfg.FlyoutTheme); // тема панелей/OSD — до создания форм
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+            StartupDiagnostics.Write("AppDomain.UnhandledException", args.ExceptionObject);
 
         try
         {
-            _ = provider.GetRequiredService<IMifsClient>(); // ранняя проверка железа (ctor бросает без MIFS)
+            InitializeWindowsAppRuntimeForSingleFile();
+            XamlGeneratedProgram.XamlGeneratedMain();
         }
         catch (Exception ex)
         {
-            Log.Ex("Startup", ex);
-            MessageBox.Show(
-                Loc.T("err.noiface") + "\n\n" + ex.Message,
-                Loc.T("err.title"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return;
+            StartupDiagnostics.Write("Application.Start", ex);
+            throw;
         }
-
-        provider.GetRequiredService<TrayApp>().Start();
-        Application.Run();
     }
+
+    /// <summary>
+    /// Windows App SDK self-contained registration resolves native/WinRT classes relative to
+    /// this directory. Version 2.3 also validates the owner PID so inherited environment from a
+    /// parent process cannot redirect a child to foreign PRI/DLL files. Keep this before the first
+    /// Microsoft.UI.Xaml access; it is required by the SDK's SingleFile target.
+    /// </summary>
+    private static void InitializeWindowsAppRuntimeForSingleFile()
+    {
+        Environment.SetEnvironmentVariable(
+            "MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY", AppContext.BaseDirectory);
+        Environment.SetEnvironmentVariable(
+            "MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY_PID",
+            Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        _ = WindowsAppRuntimeEnsureIsLoaded();
+    }
+
+    [DllImport("Microsoft.WindowsAppRuntime.dll", EntryPoint = "WindowsAppRuntime_EnsureIsLoaded",
+        ExactSpelling = true)]
+    private static extern int WindowsAppRuntimeEnsureIsLoaded();
+}
+
+internal static class StartupDiagnostics
+{
+    private static readonly object Sync = new();
+
+    internal static void Write(string stage, object failure)
+    {
+        try
+        {
+            string directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XiControl");
+            Directory.CreateDirectory(directory);
+
+            string details = failure is Exception exception ? exception.ToString() : failure.ToString() ?? "<null>";
+            string entry = $"""
+                {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {stage}
+                Process: {Environment.ProcessPath}
+                Runtime: {RuntimeInformation.FrameworkDescription}
+                OS: {RuntimeInformation.OSDescription}
+                {details}
+
+                """;
+
+            lock (Sync)
+            {
+                File.AppendAllText(Path.Combine(directory, "startup-crash.txt"), entry);
+            }
+        }
+        catch
+        {
+            // Diagnostics must never replace the original startup failure.
+        }
+    }
+
 }

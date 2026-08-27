@@ -56,7 +56,7 @@ Get-Event -SourceIdentifier mifs | ForEach-Object { $_.SourceEventArgs.NewEvent.
 - Телеметрия **через MIFS**: сенсоров нет, кроме `0x10/01` (SOH) и `0x10/06` (ватты адаптера).
   ⚠️ Вывод «телеметрии нет» верен только про этот канал: позже нашлись другие driver-free
   источники — Intel DPTF (температуры), Intel IGCL (iGPU), Battery API (мощность), см. [09](09-power-monitoring.md).
-- Архитектура: **одно трей-приложение** (C#/.NET 8/WinForms, admin, автозапуск).
+- Архитектура: **одно трей-приложение** (C#/.NET 8/WinUI 3 + Win32 tray, admin, автозапуск).
 - Остаточное — всё закрыто позже: ярлыки клавиш → [07-keymap.md](07-keymap.md);
   ChargeGuard реализован (v0.1); `0x0C` — **статус-канал IoT-модуля удалённого включения** (не TPLock,
   переопределено 2026-07-28), см. [11-iot-remote-wake.md](11-iot-remote-wake.md).

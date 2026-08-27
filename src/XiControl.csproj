@@ -2,11 +2,19 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- Keep the deployment self-contained, but compress managed/native bundle entries. -->
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <!-- Nullable / ImplicitUsings / LangVersion — в Directory.Build.props -->
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- Own the entry point so failures that occur before App.OnLaunched are persisted. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <AssemblyName>XiControl</AssemblyName>
     <RootNamespace>XiControl</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -18,13 +26,31 @@
     <Version>0.0.0-dev</Version>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <!-- Release users need only XiControl.exe; CI artifacts keep no external symbol sidecar. -->
+    <DebugType>None</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <!-- Keep this in project evaluation, not only on `dotnet publish`: Windows App SDK builds a
+         different WinRT activation manifest for single-file extraction, and that target can
+         otherwise reuse a non-redirected manifest produced earlier by build/test. -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- тестовый проект видит internal-швы (напр. KeyActions.ParseCommand) -->
     <InternalsVisibleTo Include="XiControl.Tests" />
   </ItemGroup>
 
   <ItemGroup>
+    <!-- XiControl uses WinUI/Windowing only. Referencing the aggregate WindowsAppSDK package
+         also ships unused AI/ML, ONNX, DirectML, Search and Widgets workloads. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.6" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" Version="2.1.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    <PackageReference Include="System.Windows.Extensions" Version="8.0.0" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="Svg" Version="3.4.7" />
   </ItemGroup>
@@ -32,6 +58,9 @@
   <ItemGroup>
     <!-- SVG-иконки (OSD + трей) встраиваются в сборку; имена файлов уникальны -->
     <EmbeddedResource Include="..\assets\svg\**\*.svg" LogicalName="svg.%(Filename).svg" />
+    <!-- Полный набор штатных OSD Xiaomi PC Manager 5.8.1.121: тема/DPI/язык. -->
+    <EmbeddedResource Include="..\assets\oem\xiaomi\osd\*.png"
+                      LogicalName="oem.osd.%(Filename)%(Extension)" />
     <!-- Звуки (WAV) встраиваются в сборку -->
     <EmbeddedResource Include="..\assets\sound\**\*.wav" LogicalName="sound.%(Filename).wav" />
     <!-- Переводы (JSON, по файлу на язык) встраиваются в сборку: lang.<культура>.json -->

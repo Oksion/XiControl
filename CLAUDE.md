@@ -17,7 +17,7 @@ Mi-кнопка и «мёртвые» клавиши (включая мульт�
 То, что делается чистым Win32 (частота экрана, яркость, тачпад, электропитание), делается
 чистым Win32.
 
-C# / .NET 8 / WinForms, x64, манифест `requireAdministrator`, GPLv3.
+C# / .NET 8 / Windows App SDK / WinUI 3, x64, манифест `requireAdministrator`, GPLv3.
 
 ## Философия проекта (это не обсуждается)
 
@@ -67,9 +67,6 @@ MSR.** Это не техническое ограничение, а осозн�
   `dotnet test XiControl.sln` — все зелёные; чистую логику покрывай тестом (образцы — в
   `tests/XiControl.Tests`, фейки в `Fakes.cs`), UI и железо — глазами.
   Иконки — глазами (см. ниже). Группируй изменения, не перезапускай приложение по мелочи.
-- **`dotnet format` не гонять по `OsdForm.cs`** — там намеренное колоночное выравнивание
-  (маппинг иконок), формат его схлопывает. (`Loc.cs` больше не в этом списке: строки уехали
-  в JSON, сам файл — обычный загрузчик.)
 
 Внешние PR (в т.ч. от других вайб-кодеров с нейронками) — приветствуются, но проходят через тот
 же фильтр: driver-free, не усложняем, локализация на месте, собирается чисто. Ветки ребейзим на
@@ -91,7 +88,7 @@ MSR.** Это не техническое ограничение, а осозн�
 Stop-Process -Name XiControl -Force -ErrorAction SilentlyContinue
 dotnet build XiControl.sln -c Release              # 0 ошибок / 0 предупреждений
 dotnet test XiControl.sln -c Release --no-build    # все тесты зелёные
-Start-Process src/bin/x64/Release/net8.0-windows/XiControl.exe
+Start-Process src/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/XiControl.exe
 ```
 
 Запуск показывает UAC — пользователь должен подтвердить. «Операция была отменена пользователем»
@@ -120,10 +117,11 @@ config.json рядом с exe, XIC-34) — папка программы. Фак
 
 ## Архитектура
 
-Одно трей-приложение, **без службы** (проверено: admin-процесса достаточно и для SET/GET, и для
-WMI-событий). `Program.cs`: single-instance mutex → DI-контейнер
+Одно unpackaged WinUI 3 трей-приложение, **без службы** (проверено: admin-процесса достаточно и для
+SET/GET, и для WMI-событий). `App.xaml.cs`: single-instance mutex → DI-контейнер
 (`Microsoft.Extensions.DependencyInjection`, все синглтоны; провайдер владеет Dispose в обратном
-порядке создания — компоненты инжектированное не диспоузят) → `TrayApp.Start()` → `Application.Run()`.
+порядке создания — компоненты инжектированное не диспоузят) → `TrayApp.Start()`. Жизненным циклом
+управляет `Microsoft.UI.Xaml.Application`; окна — WinUI, трей и popup-menu — тонкий Win32 interop.
 
 Швы-интерфейсы (`IMifsClient`, `IConfigStore`, `IKeyEventSource`, `IPowerEvents`, `IDisplayEvents`,
 `IAppTimer`, `ILocalizer`) существуют ради тестов на фейках и задела под другие модели; `IAppTimer`
@@ -148,39 +146,22 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   спрашивает прошивку: отказ → конфиг не трогается, зовётся `FirmwareFailed` (честный
   error-OSD). Результаты сообщаются именованными колбэками («что случилось»); что показать —
   решает TrayApp.
-- `src/Ui/TrayApp.cs` — тонкий монтажник: NotifyIcon, подписки на системные события,
+- `src/Ui/WinUI/TrayApp.cs` — тонкий монтажник: native `Shell_NotifyIcon`, подписки на системные события,
   связывание колбэков контроллера с OSD/панелью/значком, first-run toast, живой тултип.
-  Меню трея — `TrayMenuBuilder`; политика обновления значка — `TrayIconController` (кэш
+  Меню трея — `TrayMenuWindow`; политика обновления значка — `TrayIconController` (кэш
   «без изменений — не трогаем», редкий опрос, `Polled` для тултипа); наблюдение «в дорогу» —
   `TravelChargeMonitor` (SystemIntegration).
-- `src/Ui/` остальное: `QuickPanelForm` (панель по удержанию Mi / клику по трею — чистый view
-  над контроллером, навигация с клавиатуры; ширина фиксированная — при скрытых режимах
-  растягиваются ячейки), `OsdForm` (всплывашки), `MonitorForm` (виджет Вт/CPU/GPU/RAM/°C),
-  `FlyoutForm` + `FlyoutPalette` (общая база флайаутов: borderless tool-window, Region, Esc;
-  палитра — единственный источник тёмных цветов флайаутов), `FormChrome` (DWM-тёмный
-  заголовок + WM_SETREDRAW), `ModeUi` (режим → ключ локализации / вид OSD / акцент),
+- `src/Ui/WinUI/` остальное: `QuickPanelWindow` (панель по удержанию Mi / клику по трею — чистый
+  view над контроллером), `OsdWindow`/`OemOsdWindow` (всплывашки), `MonitorWindow`
+  (виджет Вт/CPU/GPU/RAM/°C), `FlyoutWindow` (общая база borderless topmost tool-window),
+  `SettingsWindow` + `SettingsBuilder` (NavigationView и нативные WinUI-контролы),
+  `NativeWindow`/`NativeTrayIcon` (минимальный Win32 interop) и `TrayMenuWindow` (WinUI), `ModeUi`
+  (режим → ключ локализации / вид OSD / акцент),
   `UiNav` (чистая арифметика навигации: порядок обхода ячеек панели, циклический фокус,
   клэмп вкладки — вынесена из форм ради юнит-тестов, XIC-9),
-  `SettingsForm` (хост окна настроек: хром, навигация, пересборка на каждый показ — а также на
-  смену темы, DPI и разрешения экрана: шрифты и `Sc()` снимаются в момент постройки),
   `SettingsActions` (сумка колбэков в контроллер; поля `required` — забытый mount ловится
-  компилятором, CS9035), `ToggleSwitch` (рисованный Win11-тумблер),
-  `ScaledFonts` (**шрифты только отсюда** — пиксельные под DeviceDpi, иначе после смены
-  разрешения текст расходится с геометрией Sc), `SvgIcons` (рендер встроенных SVG через
-  Svg.NET + кэш битмапов; `RenderByHeight` — для неквадратных картинок `assets/svg/ui/`),
-  `FlyoutTip` (всплывающая подсказка флайаутов), `Draw` (общие примитивы), `TrayIcons`,
-  `DarkMenu` (тёмное меню), `TrayMetricIcon` (индикатор-метрика в трее XIC-35: второй NotifyIcon
-  с цифрой — существует только при включённой опции, замер на пуле, иконки PNG-ICO в памяти
-  без GDI-хэндлов).
-- `src/Ui/Settings/` — начинка окна настроек: `SettingsToolkit` (фабрика виджетов: карточки,
-  тумблеры, комбо; раздаёт `AccessibleName`), `SettingsTheme` (палитра под системную тему),
-  `NavStrip` (левая навигация, доступна с клавиатуры), вкладки-контролы `GeneralTab` /
-  `FeaturesTab` (доступность фич: сова/тачпад/тачскрин/`RefreshRateFeature`) / `BatteryTab` /
-  `DisplayTab` (яркость: лимит + запоминание, и частота; видна всегда — `RefreshRateFeature=false`
-  скрывает только раздел частоты, XIC-29) / `TouchpadTab` (поведение панели:
-  мёртвая зона снизу — в отличие от «Функций», где только видимость) / `PerfTab` / `KeysTab` /
-  `ApiTab` (HTTP API: тумблеры, порт, токен, пер-командные разрешения) / `AboutTab`
-  (собирают себя в ctor).
+  компилятором, CS9035), `TrayMetricIcon` (второй native tray icon с цифрой — существует только
+  при включённой опции, замер на пуле, иконки PNG-ICO в памяти без GDI-хэндлов).
 - `src/SystemIntegration/` — `ChargeGuard` (переустанавливает лимит заряда после сна/смены
   питания И перед уходом в сон/shutdown — EC теряет его на переходах), `RefreshRateGuard`/
   `RefreshRate` (авто-герцовка, чистый `ChangeDisplaySettingsEx` по ВСТРОЕННОЙ панели — она ищется
@@ -200,8 +181,7 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   `ReadingChanged` — математика и грабли в `docs/13-auto-brightness.md`),
   `TravelChargeMonitor` (ожидание 100%), `IPowerEvents`+`IDisplayEvents`/`SystemEventsSource`
   (события питания и экрана за швами, одно скрытое окно-маршалер), `IAppTimer`/`UiTimer`/
-  `WorkerTimer` (пул-таймер для логики вне UI-потока: WinForms-таймер, стартованный с потока
-  WMI-событий, не тикает никогда),
+  `WorkerTimer` (пул-таймер для логики вне UI-потока) и `DispatcherQueueTimer`-based `UiTimer`,
   `Brightness` (WMI ACPI-подсветка: `Get`/`Apply`/`Ramp`-плавный ход; `Own` — метки своих записей
   по TTL, НЕ одноразовые — WMI-события дублируются; `AdaptiveBrightness` — детект ADAPTBRIGHT
   через powrprof.dll), `TouchpadControl`/`TouchscreenControl` (вкл/выкл через
@@ -276,7 +256,7 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
 
 ## Релизы и CI
 
-- `git tag v0.X.Y && git push` → GitHub Release с двумя exe (self-contained + framework-dependent),
+- `git tag v0.X.Y && git push` → GitHub Release с одним self-contained WinUI exe,
   плюс триггерит winget-workflow.
 - Тег с суффиксом через дефис (`v0.7.0-pre`) помечается pre-release и winget **не** трогает.
 - Каждый push в `main` собирает скользящий pre-release под тегом `pre` — всегда свежий билд из main;
@@ -285,7 +265,7 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   встроенный Quality Gate «Sonar way» — свой не завести (Team/Enterprise), а он требует **≥80%
   покрытия нового кода**. Поэтому из ИЗМЕРЕНИЯ покрытия (`sonar.coverage.exclusions`) исключены
   края, которые мы намеренно не покрываем юнитами: `src/Ui/**`, `src/SystemIntegration/**`,
-  `Program.cs`, `tools/**` и живой WMI — `MifsClient.cs`/`MifsEventWatcher.cs`. Чистая логика
+  `App.xaml.cs`, `tools/**` и живой WMI — `MifsClient.cs`/`MifsEventWatcher.cs`. Чистая логика
   (`Mifs.cs`, конфиг, guard-ы, роутер) измеряется и должна оставаться покрытой. Добавляешь новый
   файл с живым железом — впиши его в исключения, иначе гейт покраснеет на ровном месте.
 - Локальная сборка помечается версией `0.0.0-dev` (дев-дефолт в `XiControl.csproj`, суффикс виден

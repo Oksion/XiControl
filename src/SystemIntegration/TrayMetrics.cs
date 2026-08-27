@@ -8,6 +8,16 @@ namespace XiControl.SystemIntegration;
 public enum TrayMetric { Power, Cpu, Gpu, Ram, Temp }
 
 /// <summary>
+/// One monitor sample. Value is the headline metric; Secondary/Tertiary carry optional details
+/// such as GPU watts/frequency and used/total memory without making the tray icon API complex.
+/// </summary>
+public readonly record struct TrayMetricReading(float Value, float Secondary, float Tertiary)
+{
+    public TrayMetricReading(float value) : this(value, float.NaN, float.NaN) { }
+    public static TrayMetricReading Missing => new(float.NaN, float.NaN, float.NaN);
+}
+
+/// <summary>
 /// Чистая логика индикатора: парсинг метрики из конфига и компактный текст для значка
 /// (в 16 px влезает 2–3 знака — только число, без единиц; единицы — в тултипе).
 /// Вынесена из UI ради юнит-тестов.
@@ -154,6 +164,50 @@ public sealed class DptfTemperature : IDisposable
 }
 
 /// <summary>
+/// CPU package power exposed by the Windows Energy Meter provider. Xiaomi firmware on some
+/// models reports neither adapter watts nor battery rate while connected to AC, but Intel RAPL
+/// remains available through this inbox performance provider. The returned value is negative to
+/// preserve the existing convention: negative means consumption, positive means battery charge.
+/// </summary>
+public sealed class EnergyMeterPower : IDisposable
+{
+    private ManagementObjectSearcher? _query;
+    private bool _off;
+
+    public float ReadWatts()
+    {
+        if (_off) return float.NaN;
+        try
+        {
+            _query ??= new ManagementObjectSearcher(@"root\cimv2",
+                "SELECT Power FROM Win32_PerfFormattedData_PowerMeterCounter_EnergyMeter " +
+                "WHERE Name = 'RAPL_Package0_PKG'");
+            foreach (ManagementObject item in _query.Get())
+            {
+                object? raw = item["Power"];
+                item.Dispose();
+                if (raw is null) continue;
+                return ToConsumptionWatts(Convert.ToUInt64(raw, CultureInfo.InvariantCulture));
+            }
+            return float.NaN;
+        }
+        catch (Exception ex)
+        {
+            Log.Ex("EnergyMeter", ex);
+            _query?.Dispose();
+            _query = null;
+            _off = true;
+            return float.NaN;
+        }
+    }
+
+    internal static float ToConsumptionWatts(ulong milliwatts) =>
+        milliwatts > 0 ? -(milliwatts / 1000f) : float.NaN;
+
+    public void Dispose() => _query?.Dispose();
+}
+
+/// <summary>
 /// Источник значения для индикатора: фасад над PowerDraw/CpuLoad/GpuTelemetry/MemoryLoad/DPTF.
 /// Всё лениво: создаётся только внутренность выбранной метрики, остальные не трогаются.
 /// NaN = данных нет (значок показывает «—»): от сети без заряда, не-Intel GPU, нет DPTF.
@@ -162,36 +216,46 @@ public sealed class TrayMetricSource : IDisposable
 {
     private readonly TrayMetric _kind;
     private PowerDraw? _power;
+    private EnergyMeterPower? _energyMeter;
     private CpuLoad? _cpu;
     private GpuTelemetry? _gpu;
     private DptfTemperature? _temp;
 
     public TrayMetricSource(TrayMetric kind) => _kind = kind;
 
-    public float Read() => _kind switch
+    public float Read() => ReadDetailed().Value;
+
+    public TrayMetricReading ReadDetailed() => _kind switch
     {
-        TrayMetric.Cpu => (_cpu ??= new CpuLoad()).TryRead(out float c) ? c : float.NaN,
-        TrayMetric.Gpu => ReadGpu(),
-        TrayMetric.Ram => MemoryLoad.TryRead(out float r, out _, out _) ? r : float.NaN,
-        TrayMetric.Temp => (_temp ??= new DptfTemperature()).ReadMaxC(),
-        _ => ReadPower(),
+        TrayMetric.Cpu => (_cpu ??= new CpuLoad()).TryRead(out float c)
+            ? new TrayMetricReading(c) : TrayMetricReading.Missing,
+        TrayMetric.Gpu => ReadGpuDetailed(),
+        TrayMetric.Ram => MemoryLoad.TryRead(out float r, out float used, out float total)
+            ? new TrayMetricReading(r, used, total) : TrayMetricReading.Missing,
+        TrayMetric.Temp => new TrayMetricReading((_temp ??= new DptfTemperature()).ReadMaxC()),
+        _ => new TrayMetricReading(ReadPower()),
     };
 
     private float ReadPower()
     {
         _power ??= new PowerDraw();
-        return _power.TryReadWatts(out float w) ? w : float.NaN;
+        if (_power.TryReadWatts(out float watts) && !float.IsNaN(watts)) return watts;
+        _energyMeter ??= new EnergyMeterPower();
+        return _energyMeter.ReadWatts();
     }
 
-    private float ReadGpu()
+    private TrayMetricReading ReadGpuDetailed()
     {
         _gpu ??= new GpuTelemetry();
-        return _gpu.TryRead(out float load, out _, out _) ? load : float.NaN;
+        return _gpu.TryRead(out float load, out float watts, out float mhz)
+            ? new TrayMetricReading(load, watts, mhz)
+            : TrayMetricReading.Missing;
     }
 
     public void Dispose()
     {
         _power?.Dispose();
+        _energyMeter?.Dispose();
         _gpu?.Dispose();
         _temp?.Dispose();
     }

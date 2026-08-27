@@ -1,11 +1,8 @@
+﻿using Microsoft.UI.Dispatching;
+
 namespace XiControl.SystemIntegration;
 
-/// <summary>
-/// Таймер за интерфейсом: дебаунс guard-ов (а позже — жесты Mi-кнопки) тестируется
-/// без цикла сообщений WinForms — фейк дёргает Tick вручную.
-/// В DI-контейнер НЕ регистрировать: каждому потребителю нужен свой экземпляр
-/// (guard-ы независимо стартуют/стопят), singleton сломал бы дебаунс.
-/// </summary>
+/// <summary>Подменяемый таймер приложения: тесты используют ручной fake, production выбирает реализацию по семантике потока.</summary>
 public interface IAppTimer : IDisposable
 {
     int Interval { get; set; }
@@ -14,38 +11,52 @@ public interface IAppTimer : IDisposable
     void Stop();
 }
 
-/// <summary>Прод-реализация на System.Threading.Timer: тикает в пуле потоков, Start/Stop
-/// потокобезопасны и работают с любого потока. Для логики, живущей вне UI-потока
-/// (BrightnessCapGuard: события яркости приходят с пула, WinForms-таймер оттуда не тикает
-/// никогда — см. UiTimer ниже). Подписчик Tick сам отвечает за свою потокобезопасность.</summary>
+/// <summary>Таймер пула потоков для аппаратных guard-ов и фонового семплирования.</summary>
 public sealed class WorkerTimer : IAppTimer
 {
-    private readonly System.Threading.Timer _t;
+    private readonly System.Threading.Timer _timer;
 
-    public event Action? Tick;
-
-    public WorkerTimer() => _t = new System.Threading.Timer(_ => Tick?.Invoke());
+    public WorkerTimer() => _timer = new System.Threading.Timer(_ => Tick?.Invoke());
 
     public int Interval { get; set; } = 100;
-    public void Start() => _t.Change(Interval, Interval);
-    public void Stop() => _t.Change(Timeout.Infinite, Timeout.Infinite);
-    public void Dispose() => _t.Dispose();
+    public event Action? Tick;
+
+    public void Start() => _timer.Change(Interval, Interval);
+    public void Stop() => _timer.Change(Timeout.Infinite, Timeout.Infinite);
+    public void Dispose() => _timer.Dispose();
 }
 
-/// <summary>Прод-реализация поверх System.Windows.Forms.Timer (тикает в UI-потоке).
-/// Start — только с потока с насосом сообщений: WinForms-таймер, стартованный с фонового
-/// потока (напр. SystemEvents), не тикает никогда. Событийные источники это учитывают —
-/// SystemEventsSource маршалит события питания и экрана, TrayApp — клавиши прошивки.</summary>
+/// <summary>WinUI DispatcherQueue-таймер; callback всегда выполняется в создавшем его UI-потоке.</summary>
 public sealed class UiTimer : IAppTimer
 {
-    private readonly System.Windows.Forms.Timer _t = new();
+    private readonly DispatcherQueueTimer _timer;
+    private int _interval = 100;
+
+    public UiTimer()
+    {
+        var queue = DispatcherQueue.GetForCurrentThread()
+            ?? throw new InvalidOperationException("UiTimer должен создаваться в WinUI-потоке.");
+        _timer = queue.CreateTimer();
+        _timer.Tick += (_, _) => Tick?.Invoke();
+        ApplyInterval();
+    }
+
+    public int Interval
+    {
+        get => _interval;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value);
+            _interval = value;
+            ApplyInterval();
+        }
+    }
 
     public event Action? Tick;
 
-    public UiTimer() => _t.Tick += (_, _) => Tick?.Invoke();
+    public void Start() => _timer.Start();
+    public void Stop() => _timer.Stop();
+    public void Dispose() => _timer.Stop();
 
-    public int Interval { get => _t.Interval; set => _t.Interval = value; }
-    public void Start() => _t.Start();
-    public void Stop() => _t.Stop();
-    public void Dispose() => _t.Dispose();
+    private void ApplyInterval() => _timer.Interval = TimeSpan.FromMilliseconds(_interval);
 }

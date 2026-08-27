@@ -15,8 +15,11 @@ public sealed class RefreshRateGuardTests
     private readonly FakePowerEvents _power = new();
     private readonly FakeDisplayEvents _display = new();
     private readonly FakeTimer _timer = new();
+    private readonly FakeTimer _watchdog = new();
+    private int _applies;
 
-    private RefreshRateGuard Guard(AppConfig cfg) => new(cfg, _power, _display, _timer);
+    private RefreshRateGuard Guard(AppConfig cfg) =>
+        new(cfg, _power, _display, _timer, _watchdog, () => _applies++);
 
     [Theory]
     [InlineData(PowerModes.StatusChange)]
@@ -42,6 +45,32 @@ public sealed class RefreshRateGuardTests
         _power.RaisePower(PowerModes.Suspend);
 
         _timer.Running.Should().BeFalse();
+    }
+
+    [Fact]
+    public void MissingSystemEvent_IsRecoveredByPowerWatchdog()
+    {
+        var cfg = new AppConfig { RefreshRateFeature = true, AutoRefreshRate = true };
+        using var guard = Guard(cfg);
+
+        _power.IsOnline = false;
+        _watchdog.Fire();
+
+        _timer.Running.Should().BeTrue("Modern Standby machines may omit PowerModeChanged");
+        _timer.Fire();
+        _applies.Should().Be(1);
+    }
+
+    [Fact]
+    public void PowerWatchdog_DoesNotReapplyWithoutAStateChange()
+    {
+        using var guard = Guard(new AppConfig { RefreshRateFeature = true, AutoRefreshRate = true });
+
+        _watchdog.Fire();
+        _watchdog.Fire();
+
+        _timer.Running.Should().BeFalse();
+        _applies.Should().Be(0);
     }
 
     // XIC-22: реакция на чужую смену режима экрана — только при включённой опции,
@@ -86,5 +115,9 @@ public sealed class RefreshRateGuardTests
 
         _display.RaiseDisplayChanged();
         _timer.Running.Should().BeFalse("подписка на события экрана тоже снимается");
+
+        _power.IsOnline = false;
+        _watchdog.Fire();
+        _timer.Running.Should().BeFalse("watchdog тоже остановлен и отписан");
     }
 }

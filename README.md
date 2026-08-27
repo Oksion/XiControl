@@ -161,9 +161,8 @@ winget install Oksion.XiControl
 
 Or grab a prebuilt exe from the [releases page](../../releases):
 
-- `XiControl-vX.X.X-win-x64.exe` — self-contained, nothing to install (~70 MB);
-- `XiControl-vX.X.X-win-x64-net8.exe` — lightweight (~2 MB), requires the
-  [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
+- `XiControl-vX.X.X-win-x64.exe` — self-contained WinUI build, nothing to install
+  (about 110 MB; includes .NET 8 and the Windows App SDK runtime).
 
 Run as administrator (a firmware WMI-interface requirement — even reading doesn't work
 without elevation).
@@ -215,7 +214,7 @@ Build from source:
 
 ```powershell
 dotnet build XiControl.sln -c Release
-# → src/bin/x64/Release/net8.0-windows/XiControl.exe
+# → src/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/XiControl.exe
 dotnet test XiControl.sln -c Release --no-build   # unit tests (no hardware required)
 ```
 
@@ -522,6 +521,13 @@ disappears for a second). Turning the option off **removes** the value rather th
 
 ### Key remapping
 
+XiControl also carries the complete Xiaomi PC Manager 5.8.1.121 hotkey OSD pack: 1,758 original
+PNG resources (56 families, Light/Dark, 100–500% DPI and available English variants). Firmware
+events use the same `HID_EVENT20` transport as the OEM utility and display the original
+per-pixel-alpha cards for keyboard backlight, Fn/Caps/Num Lock, microphone, touchpad, Win Lock,
+refresh rate, performance modes and power warnings. The full reverse-engineered 0x01–0x26
+dispatcher is documented in [docs/14-xiaomi-hotkey-osd.md](docs/14-xiaomi-hotkey-osd.md).
+
 Each key gets its own action: **Settings → Keys**. The slots are the single click, double click and
 hold of the Mi button, plus the "Settings" (gear), AI and "Projection" keys. Any slot can be bound
 to: cycle modes, charge limit on/off, quick panel, owl mode, Monitor, "travel", touchpad and
@@ -637,8 +643,8 @@ licenses: [docs/04-references.md](docs/04-references.md).
 ## Development
 
 ```
-src/            the app (C# / .NET 8 / WinForms): Wmi/ — the MIFS protocol, Input/ — keys
-                and gestures, Ui/ — tray, panel, OSD, monitor, settings (Ui/Settings/ — tabs),
+src/            the app (C# / .NET 8 / WinUI 3): Wmi/ — the MIFS protocol, Input/ — keys
+                and gestures, Ui/WinUI/ — tray, panel, OSD, monitor and settings,
                 SystemIntegration/ — guards, power, touchpad/screen, Config/, Localization/
 tests/          unit tests (xUnit) of pure logic on fakes — run without Xiaomi hardware
 assets/svg/     icons: osd/ — color 128×128, tray/ — monochrome 24×24 (currentColor),

@@ -76,6 +76,18 @@ public sealed class TrayIconControllerTests
     }
 
     [Fact]
+    public void Poll_Reapplies_WhenTaskbarThemeChanged_EvenIfWindowsEventWasMissed()
+    {
+        _mifs.Mode = PerfMode.Auto;
+        _icon.Start();
+
+        _light = true;
+        _timer.Fire();
+
+        _applied.Should().Equal((PerfMode.Auto, false), (PerfMode.Auto, true));
+    }
+
+    [Fact]
     public void HardwareUnavailable_DegradesToNeutralIcon()
     {
         _mifs.Mode = PerfMode.Turbo;

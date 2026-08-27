@@ -9,10 +9,10 @@
 ## ✅ Стек зафиксирован
 
 - **Язык/платформа:** C# / .NET 8
-- **UI:** WinForms (трей `NotifyIcon` + `ContextMenuStrip`)
+- **UI:** Windows App SDK / WinUI 3; tray transport — `Shell_NotifyIcon`, popup-menu — WinUI `Window`
 - **WMI:** `System.Management` (`ManagementObjectSearcher` / `InvokeMethod`, события — `ManagementEventWatcher`)
 - **Питание/сон:** `Microsoft.Win32.SystemEvents.PowerModeChanged`
-- **Сборка/раздача:** `dotnet publish -r win-x64 --self-contained` → один .exe (~15 МБ), без установки рантайма
+- **Сборка/раздача:** unpackaged WinUI self-contained single-file → один .exe (~110 МБ), без установки runtime
 - **Лицензия:** GPLv3
 - **Разрядность:** x64, манифест `requireAdministrator`
 
@@ -24,7 +24,7 @@
 - **Привилегии:** обычного admin достаточно для SET/GET (заряд и режимы переключаются). ✓
 - **События:** `HID_EVENT20` ловятся из пользовательской admin-сессии (`ManagementEventWatcher`). ✓
 
-⇒ **Одно трей-приложение** (WinForms, admin, автозапуск при логине). Никакой службы, пайпов, protobuf.
+⇒ **Одно unpackaged WinUI 3 трей-приложение** (admin, автозапуск при логине). Никакой службы, пайпов, protobuf.
 
 ---
 
@@ -87,10 +87,11 @@
 | Язык | C# / .NET 8 | WMI из коробки, комфортно после TS, отличный тулинг |
 | WMI вызовы | `System.Management` → `ManagementObject.InvokeMethod("MiInterface", …)` | вместо C++ SafeArray/VARIANT — 5 строк |
 | WMI события | `ManagementEventWatcher` на `SELECT * FROM HID_EVENT20` | простая подписка |
-| UI трея | WinForms `NotifyIcon` + `ContextMenuStrip` | пара строк, без фреймворков |
-| OSD | borderless `Form`, `TransparencyKey`/layered, GDI+ (`System.Drawing`) | идея из CoreCharge |
-| Питание | `SystemEvents.PowerModeChanged` + `SessionEnding` (маршалятся в UI-поток `SystemEventsSource`) | для ChargeGuard; `RegisterSuspendResumeNotification` не понадобился |
-| Сборка | `dotnet publish -r win-x64 --self-contained -p:PublishSingleFile=true` | один .exe, без рантайма |
+| UI окон | Windows App SDK / WinUI 3 (`Window`, `NavigationView`, WinUI controls) | единый современный UI-стек Windows 10/11 |
+| UI трея | Win32 `Shell_NotifyIcon` transport + WinUI `TrayMenuWindow` | у WinUI 3 нет собственного tray API, но всё видимое меню остаётся WinUI |
+| OSD | borderless topmost WinUI `Window` через `AppWindow` | одна XAML/composition-модель с остальными окнами |
+| Питание | `SystemEvents.PowerModeChanged` + `SessionEnding`, маршалинг через `DispatcherQueue` | для ChargeGuard; `RegisterSuspendResumeNotification` не понадобился |
+| Сборка | unpackaged Windows App SDK self-contained + `PublishSingleFile` | один exe, без установленного .NET/Windows App SDK runtime |
 
 > Native AOT пока **не** закладываем: `System.Management` использует COM-interop/reflection и с AOT капризен. Self-contained single-file — надёжный вариант.
 
@@ -98,31 +99,26 @@
 
 Планировали компактно; разрослось (панель, «Монитор», окно настроек, гарды, тачпад/экран,
 здоровье батареи), но структура та же: WMI-обёртка + UI + системная интеграция, **без службы**.
-В 2026-07 проведён рефакторинг (ветка `refactor`): DI-контейнер в Program, командный слой
-`AppController`, god-классы TrayApp/SettingsForm разобраны по швам, добавлены юнит-тесты и
-жёсткие анализаторы (`TreatWarningsAsErrors`). Полное описание модулей — в CLAUDE.md
+В 2026-07 проведён рефакторинг (ветка `refactor`): DI-контейнер, командный слой `AppController`,
+god-классы разобраны по швам, добавлены юнит-тесты и жёсткие анализаторы
+(`TreatWarningsAsErrors`). В 2026-08 продуктовый UI полностью переведён на WinUI 3.
+Полное описание модулей — в CLAUDE.md
 «Архитектура»; коротко:
 
 ```
 xi_control/
  ├─ XiControl.sln           — src + tests + tools; сборка: dotnet build XiControl.sln -c Release
  ├─ src/
- │   ├─ Program.cs          — вход: single-instance mutex → DI (MS.DI, все синглтоны,
- │   │                         провайдер владеет Dispose) → TrayApp.Start → Application.Run
+ │   ├─ App.xaml[.cs]       — WinUI entry point: mutex → DI (MS.DI, все синглтоны) → TrayApp.Start
  │   ├─ Config/             — AppConfig, IConfigStore/JsonConfigStore, AppPaths (портативный
  │   │                         режим XIC-34: данные рядом с exe по метке .portable/portable.txt)
  │   ├─ Wmi/                — Mifs.cs (константы протокола), IMifsClient/MifsClient,
  │   │                         IKeyEventSource/MifsEventWatcher
  │   ├─ Input/              — MiButtonGesture (жесты Mi-кнопки), KeyRouter (клавиша → действие)
- │   ├─ Ui/                 — AppController (командный слой — все Set*/Toggle*, честные ошибки),
- │   │                         TrayApp (тонкий монтажник), TrayMenuBuilder, TrayIconController,
- │   │                         QuickPanelForm, OsdForm, MonitorForm, FlyoutForm(+FlyoutPalette),
- │   │                         FormChrome, ModeUi, UiNav (чистая навигация — под тестами),
- │   │                         SettingsForm, SettingsActions, ToggleSwitch,
- │   │                         ScaledFonts, SvgIcons, FlyoutTip, Draw, TrayIcons, DarkMenu
- │   ├─ Ui/Settings/        — SettingsToolkit (фабрика виджетов), SettingsTheme, NavStrip,
- │   │                         SettingsPane (база вкладок), вкладки-контролы
- │   │                         General/Features/Battery/Display/Touchpad/Perf/Keys/Api/AboutTab
+ │   ├─ Ui/                 — AppController, SettingsActions, ModeUi, UiNav, tray icon logic
+ │   ├─ Ui/WinUI/           — TrayApp, NativeTrayIcon/TrayMenuWindow, QuickPanelWindow,
+ │   │                         OsdWindow/OemOsdWindow, MonitorWindow, SettingsWindow,
+ │   │                         FlyoutWindow, SettingsBuilder, WinUI theme helpers
  │   ├─ SystemIntegration/  — ChargeGuard, RefreshRate(+Guard), PowerProfileGuard,
  │   │                         BrightnessCapGuard (лимит яркости, XIC-29),
  │   │                         AutoBrightnessGuard + BrightnessCurve/MedianWindow +

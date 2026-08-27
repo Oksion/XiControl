@@ -50,7 +50,7 @@ jobs:
           "name=$name" >> $env:GITHUB_OUTPUT
           "ver=$ver" >> $env:GITHUB_OUTPUT
 
-      # Самодостаточный single-file: не требует установленного .NET (~70 МБ)
+      # Самодостаточный WinUI single-file: не требует установленного .NET/Windows App SDK (~110 МБ)
       - name: Publish self-contained
         run: |
           dotnet publish src/XiControl.csproj -c Release -r win-x64 --self-contained `
@@ -58,14 +58,6 @@ jobs:
             -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=${{ steps.ver.outputs.ver }} `
             -o publish/standalone
           Copy-Item publish/standalone/XiControl.exe "XiControl-${{ steps.ver.outputs.name }}-win-x64.exe"
-
-      # Лёгкий вариант: требует .NET 8 Desktop Runtime (~2 МБ)
-      - name: Publish framework-dependent
-        run: |
-          dotnet publish src/XiControl.csproj -c Release -r win-x64 --no-self-contained `
-            -p:PublishSingleFile=true -p:Version=${{ steps.ver.outputs.ver }} `
-            -o publish/framework
-          Copy-Item publish/framework/XiControl.exe "XiControl-${{ steps.ver.outputs.name }}-win-x64-net8.exe"
 
       - name: Create release
         if: startsWith(github.ref, 'refs/tags/')

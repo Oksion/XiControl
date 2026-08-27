@@ -1,0 +1,20 @@
+<Application
+    x:Class="XiControl.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+            <FontFamily x:Key="XiTextFont">Segoe UI Variable Text</FontFamily>
+            <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
+            <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
+            <CornerRadius x:Key="XiCardCornerRadius">8</CornerRadius>
+            <Thickness x:Key="XiCardPadding">18,14</Thickness>
+            <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource XiTextFont}" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

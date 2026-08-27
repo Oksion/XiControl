@@ -35,10 +35,8 @@ jobs:
       - name: Test
         run: dotnet test XiControl.sln -c Release --no-build --nologo
 
-      # Информационный шаг: показывает дрейф стиля, но НЕ роняет CI — и это
-      # осознанно навсегда (решение Фазы 4): в Loc.cs и OsdForm.cs намеренное
-      # колоночное выравнивание, которое dotnet format схлопывает. Правила же
-      # анализаторов и так жёсткие — они входят в Build через TreatWarningsAsErrors.
+      # Информационный шаг: показывает дрейф стиля; анализаторы уже жёстко входят
+      # в Build через TreatWarningsAsErrors.
       - name: Format check (non-blocking)
         continue-on-error: true
         run: dotnet format XiControl.sln --verify-no-changes --severity info

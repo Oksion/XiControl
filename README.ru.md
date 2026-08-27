@@ -165,9 +165,8 @@ winget install Oksion.XiControl
 
 Или готовый exe — на [странице релизов](../../releases):
 
-- `XiControl-vX.X.X-win-x64.exe` — самодостаточный, ничего ставить не нужно (~70 МБ);
-- `XiControl-vX.X.X-win-x64-net8.exe` — лёгкий (~2 МБ), требует
-  [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
+- `XiControl-vX.X.X-win-x64.exe` — самодостаточная WinUI-сборка, ничего ставить не нужно
+  (~110 МБ; внутри .NET 8 и runtime Windows App SDK).
 
 Запуск — от администратора (это требование WMI-интерфейса прошивки — даже чтение
 без elevation не работает).
@@ -220,7 +219,7 @@ Xi Control не подписан сертификатом, работает от
 
 ```powershell
 dotnet build XiControl.sln -c Release
-# → src/bin/x64/Release/net8.0-windows/XiControl.exe
+# → src/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/XiControl.exe
 dotnet test XiControl.sln -c Release --no-build   # юнит-тесты (железо не требуется)
 ```
 
@@ -637,8 +636,8 @@ curl -X POST http://192.168.1.50:58125/travel \
 ## Разработка
 
 ```
-src/            приложение (C# / .NET 8 / WinForms): Wmi/ — протокол MIFS, Input/ — клавиши
-                и жесты, Ui/ — трей, панель, OSD, монитор, настройки (Ui/Settings/ — вкладки),
+src/            приложение (C# / .NET 8 / WinUI 3): Wmi/ — протокол MIFS, Input/ — клавиши
+                и жесты, Ui/WinUI/ — трей, панель, OSD, монитор и настройки,
                 SystemIntegration/ — guard-ы, питание, тачпад/экран, Config/, Localization/
 tests/          юнит-тесты (xUnit) чистой логики на фейках — гоняются без железа Xiaomi
 assets/svg/     иконки: osd/ — цветные 128×128, tray/ — монохром 24×24 (currentColor),

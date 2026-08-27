@@ -6,7 +6,8 @@ namespace XiControl.SystemIntegration;
 /// <summary>Действия для «оживления» спец-клавиш: проекция, настройки, Copilot, мультимедиа.</summary>
 public static class KeyActions
 {
-    private const byte VK_LWIN = 0x5B, VK_P = 0x50, VK_C = 0x43;
+    private const byte VK_LWIN = 0x5B, VK_SHIFT = 0x10, VK_P = 0x50, VK_C = 0x43,
+                       VK_S = 0x53, VK_TAB = 0x09;
     // Мультимедиа и «калькулятор» — стандартные VK, их ловит шелл, а не конкретное окно
     private const byte VK_MEDIA_NEXT = 0xB0, VK_MEDIA_PREV = 0xB1, VK_MEDIA_STOP = 0xB2,
                        VK_MEDIA_PLAY_PAUSE = 0xB3, VK_LAUNCH_APP2 = 0xB7;
@@ -34,6 +35,12 @@ public static class KeyActions
 
     /// <summary>Нейропомощник — открыть Windows Copilot (Win+C).</summary>
     public static void Copilot() => WinCombo(VK_C);
+
+    /// <summary>Ножницы Windows — системный экранный фрагмент (Win+Shift+S).</summary>
+    public static void Screenshot() => Combo([VK_LWIN, VK_SHIFT], VK_S);
+
+    /// <summary>Представление задач Windows (Win+Tab).</summary>
+    public static void TaskView() => WinCombo(VK_TAB);
 
     /// <summary>Открыть Параметры Windows (опция "SettingsKey": "settings").</summary>
     public static void OpenSettings()
@@ -124,10 +131,15 @@ public static class KeyActions
     }
 
     private static void WinCombo(byte vk)
+        => Combo([VK_LWIN], vk);
+
+    private static void Combo(ReadOnlySpan<byte> modifiers, byte vk)
     {
-        keybd_event(VK_LWIN, 0, 0, UIntPtr.Zero);
+        foreach (byte modifier in modifiers)
+            keybd_event(modifier, 0, 0, UIntPtr.Zero);
         keybd_event(vk, 0, 0, UIntPtr.Zero);
         keybd_event(vk, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        for (int i = modifiers.Length - 1; i >= 0; i--)
+            keybd_event(modifiers[i], 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
     }
 }

@@ -34,6 +34,8 @@ public sealed class KeyRouterTests
             ToggleTouchpad = () => _hits.Add("touchpad"),
             ToggleTouchscreen = () => _hits.Add("touchscreen"),
             Projection = () => _hits.Add("projection"),
+            Screenshot = () => _hits.Add("screenshot"),
+            TaskView = () => _hits.Add("taskview"),
             OpenSettings = () => _hits.Add("settings"),
             Copilot = () => _hits.Add("copilot"),
             MediaPlayPause = () => _hits.Add("play"),
@@ -44,7 +46,16 @@ public sealed class KeyRouterTests
             Launch = cmd => _hits.Add("launch:" + cmd),
             MicKey = v => _hits.Add("mic:" + v),
             BacklightKey = v => _hits.Add("backlight:" + v),
+            ProjectionWarningKey = v => _hits.Add("charger:" + v),
+            TouchpadStateKey = v => _hits.Add("touchpadstate:" + v),
+            LowPowerKey = v => _hits.Add("lowpower:" + v),
+            NumLockKey = v => _hits.Add("numlock:" + v),
+            RefreshRateKey = v => _hits.Add("refresh:" + v),
+            WinKeyLockKey = v => _hits.Add("winkey:" + v),
+            CameraPrivacyKey = v => _hits.Add("camera:" + v),
             FnLockKey = v => _hits.Add("fnlock:" + v),
+            CapsLockKey = v => _hits.Add("capslock:" + v),
+            PerformanceKey = v => _hits.Add("performance:" + v),
         };
         mi.Click = () => _router.Run(_cfg.MiClickAction, _cfg.MiClickCommand);
     }
@@ -75,15 +86,15 @@ public sealed class KeyRouterTests
     }
 
     [Fact]
-    public void ProjectionKey_OnlyValueZero_Fires()
+    public void ProjectionKey_RoutesActionAndWarningValues()
     {
         _cfg.ProjKeyAction = "projection";
 
-        _router.Handle(Mifs.KeyProjection, 2); // слабый зарядник — пропуск
-        _hits.Should().BeEmpty();
+        _router.Handle(Mifs.KeyProjection, 2);
+        _hits.Should().Equal("charger:2");
 
         _router.Handle(Mifs.KeyProjection, 0);
-        _hits.Should().Equal("projection");
+        _hits.Should().Equal("charger:2", "projection");
     }
 
     [Fact]
@@ -133,8 +144,61 @@ public sealed class KeyRouterTests
     {
         _router.Handle(Mifs.KeyKbdBacklight, 0x80);
         _router.Handle(Mifs.KeyFnLock, 1);
+        _router.Handle(Mifs.KeyCapsLock, 1);
+        _router.Handle(Mifs.KeyPerformance, (byte)PerfMode.FullSpeed);
 
-        _hits.Should().Equal("backlight:128", "fnlock:1");
+        _hits.Should().Equal("backlight:128", "fnlock:1", "capslock:1", "performance:4");
+    }
+
+    [Fact]
+    public void FullOemHotkeySet_RoutesActionsAndValues()
+    {
+        _router.Handle(Mifs.KeyScreenshot, 0);
+        _router.Handle(Mifs.KeyTaskView, 0);
+        _router.Handle(Mifs.KeyTouchpadState, 1);
+        _router.Handle(Mifs.KeyCalculator, 0);
+        _router.Handle(Mifs.KeyLowPower, 2);
+        _router.Handle(Mifs.KeyNumLock, 1);
+        _router.Handle(Mifs.KeyRefreshRate, 1);
+        _router.Handle(Mifs.KeyWinLock, 1);
+        _router.Handle(Mifs.KeyCameraPrivacy, 0);
+
+        _hits.Should().Equal("screenshot", "taskview", "touchpadstate:1",
+            "calc", "lowpower:2", "numlock:1",
+            "refresh:1", "winkey:1", "camera:0");
+    }
+
+    [Fact]
+    public void XiaomiCompanionAndOemDriverCodes_AreKnownNoOps()
+    {
+        _router.Handle(Mifs.KeyOemDevice, 1);
+        _router.Handle(Mifs.KeyGameCenter, 0);
+        _router.Handle(Mifs.KeyOemToggle, 1);
+        _router.Handle(Mifs.KeySupportAssistant, 0);
+
+        _hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TouchpadCompatibilityKey_UsesFeatureGate()
+    {
+        _cfg.TouchpadFeature = true;
+        _router.Handle(Mifs.KeyTouchpadToggle, 0);
+        _hits.Should().Equal("touchpad");
+
+        _hits.Clear();
+        _cfg.TouchpadFeature = false;
+        _router.Handle(Mifs.KeyTouchpadToggle, 0);
+        _hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ReleaseAndReservedCodes_AreRecognizedNoOps()
+    {
+        _router.Handle(Mifs.KeyAiUp, 0);
+        _router.Handle(0x08, 0);
+
+        _hits.Should().BeEmpty();
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 using FluentAssertions;
 using XiControl.Localization;
-using XiControl.Ui.Settings;
+using XiControl.Ui;
 using XiControl.Wmi;
 using Xunit;
 
@@ -8,7 +8,7 @@ namespace XiControl.Tests;
 
 /// <summary>
 /// Пояснение к порогу «беречь батарею» (XIC-25): группировка уровней по сценарию.
-/// Сама вкладка — WinForms, её глазами; здесь только выбор ключа и наличие переводов.
+/// Сама страница WinUI проверяется визуально; здесь тестируются только группа подсказки и полнота переводов.
 /// </summary>
 public sealed class CareHintTests
 {
@@ -20,7 +20,7 @@ public sealed class CareHintTests
     [InlineData(80, "settings.battery.care.hint.high")]
     public void CareHintKey_GroupsLevelsByScenario(int percent, string expected)
     {
-        BatteryTab.CareHintKey(percent).Should().Be(expected);
+        SettingsWindow.CareHintKey(percent).Should().Be(expected);
     }
 
     [Theory]
@@ -30,7 +30,7 @@ public sealed class CareHintTests
     [InlineData(255)]
     public void CareHintKey_NeverThrows_OnValuesOutsidePresets(int percent)
     {
-        BatteryTab.CareHintKey(percent).Should().StartWith("settings.battery.care.hint.");
+        SettingsWindow.CareHintKey(percent).Should().StartWith("settings.battery.care.hint.");
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public sealed class CareHintTests
         // набор уровней зависит от модели — добавится новый, а текста к нему не будет
         foreach (int p in Mifs.ChargeCarePresets)
         {
-            string key = BatteryTab.CareHintKey(p);
+            string key = SettingsWindow.CareHintKey(p);
             Loc.T(key).Should().NotBe(key, $"уровню {p}% нужен переведённый текст, а не голый ключ");
         }
     }

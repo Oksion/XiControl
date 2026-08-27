@@ -1,5 +1,6 @@
 using FluentAssertions;
 using XiControl.SystemIntegration;
+using XiControl.Ui;
 using Xunit;
 
 namespace XiControl.Tests;
@@ -86,4 +87,45 @@ public class TrayMetricTests
     [Fact]
     public void CpuPct_нулевой_интервал_безопасен() =>
         TrayMetricFormat.CpuPct(deltaIdle: 0, deltaBusy: 0).Should().Be(0f);
+
+    [Theory]
+    [InlineData(18_750UL, -18.75f)]
+    [InlineData(30_000UL, -30f)]
+    public void EnergyMeter_MilliwattsBecomeConsumptionWatts(ulong milliwatts, float expected) =>
+        EnergyMeterPower.ToConsumptionWatts(milliwatts).Should().Be(expected);
+
+    [Fact]
+    public void EnergyMeter_ZeroMeansUnavailable() =>
+        EnergyMeterPower.ToConsumptionWatts(0).Should().Be(float.NaN);
+
+    [Fact]
+    public void Monitor_GpuDetail_IncludesFrequencyAndPower()
+    {
+        string detail = MonitorMetricFormat.Detail(TrayMetric.Gpu,
+            new TrayMetricReading(8f, 2.4f, 900f));
+
+        detail.Should().Contain("900 MHz").And.Contain("2.4 W");
+    }
+
+    [Fact]
+    public void Monitor_RamDetail_IncludesUsedAndTotalMemory()
+    {
+        string detail = MonitorMetricFormat.Detail(TrayMetric.Ram,
+            new TrayMetricReading(54f, 17.3f, 31.5f));
+
+        detail.Should().Contain("17.3").And.Contain("31.5 GB");
+    }
+
+    [Theory]
+    [InlineData(12f, 25f)]
+    [InlineData(25.1f, 30f)]
+    [InlineData(47f, 50f)]
+    public void Monitor_PowerGraphScale_IsReadableAndNeverBelow25Watts(float sample, float expected) =>
+        MonitorMetricFormat.GraphMaximum(TrayMetric.Power, [sample]).Should().Be(expected);
+
+    [Theory]
+    [InlineData(-7.6f, "8 W")]
+    [InlineData(12.4f, "12 W")]
+    public void Monitor_PowerWidget_UsesTheSingleLargeRoundedValue(float watts, string expected) =>
+        MonitorMetricFormat.PowerWidgetValue(watts).Should().Be(expected);
 }

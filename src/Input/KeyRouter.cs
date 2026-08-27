@@ -25,6 +25,8 @@ public sealed class KeyRouter
     public Action? ToggleTouchpad;
     public Action? ToggleTouchscreen;
     public Action? Projection;
+    public Action? Screenshot;
+    public Action? TaskView;
     public Action? OpenSettings;
     public Action? Copilot;
     public Action? MediaPlayPause;
@@ -37,11 +39,21 @@ public sealed class KeyRouter
     // --- клавиши-уведомления (прошивка уже всё сделала — показать OSD) ---
     public Action<byte>? MicKey;
     public Action<byte>? BacklightKey;
+    public Action<byte>? ProjectionWarningKey;
+    public Action<byte>? TouchpadStateKey;
+    public Action<byte>? LowPowerKey;
+    public Action<byte>? NumLockKey;
+    public Action<byte>? RefreshRateKey;
+    public Action<byte>? WinKeyLockKey;
+    public Action<byte>? CameraPrivacyKey;
     public Action<byte>? FnLockKey;
+    public Action<byte>? CapsLockKey;
+    public Action<byte>? PerformanceKey;
 
     /// <summary>Открыта ли быстрая панель: клавиша «настройки» при открытой панели — всегда заряд.</summary>
     public Func<bool> PanelVisible = () => false;
 
+    /// <summary>Создать роутер полного OEM-диспетчера.</summary>
     /// <param name="keys">Карта «код → смысл»; null — из конфига (дефолты TM2424 +
     /// переопределения <see cref="AppConfig.KeyCodes"/> для других моделей, XIC-38).</param>
     public KeyRouter(AppConfig cfg, MiButtonGesture mi, KeyMap? keys = null)
@@ -58,14 +70,32 @@ public sealed class KeyRouter
         {
             case KeyKind.MiDown: _mi.Down(); break;
             case KeyKind.MiUp: _mi.Up(); break;
-            case KeyKind.Projection when value == 0:                                 // value 2 = слабый зарядник — пока пропуск
+            case KeyKind.Projection when value == 0:
                 Run(_cfg.ProjKeyAction, _cfg.ProjKeyCommand); break;
+            case KeyKind.Projection: ProjectionWarningKey?.Invoke(value); break;
+            case KeyKind.Screenshot: Screenshot?.Invoke(); break;
+            case KeyKind.TaskView: TaskView?.Invoke(); break;
             case KeyKind.Settings: OnSettingsKey(); break; // одиночное событие, удержание не ловится
             case KeyKind.Ai:                                                         // 0x24 (отпускание) игнорируем
                 Run(_cfg.AiKeyAction, _cfg.AiKeyCommand); break;
             case KeyKind.Mic: MicKey?.Invoke(value); break;
             case KeyKind.Backlight: BacklightKey?.Invoke(value); break;
+            case KeyKind.TouchpadState: TouchpadStateKey?.Invoke(value); break;
+            case KeyKind.TouchpadToggle:
+                if (_cfg.TouchpadFeature) ToggleTouchpad?.Invoke();
+                break;
             case KeyKind.FnLock: FnLockKey?.Invoke(value); break;
+            case KeyKind.CapsLock: CapsLockKey?.Invoke(value); break;
+            case KeyKind.Performance: PerformanceKey?.Invoke(value); break;
+            case KeyKind.Calculator: Calculator?.Invoke(); break;
+            case KeyKind.LowPower: LowPowerKey?.Invoke(value); break;
+            case KeyKind.NumLock: NumLockKey?.Invoke(value); break;
+            case KeyKind.RefreshRate: RefreshRateKey?.Invoke(value); break;
+            case KeyKind.WinKeyLock: WinKeyLockKey?.Invoke(value); break;
+            case KeyKind.CameraPrivacy: CameraPrivacyKey?.Invoke(value); break;
+            case KeyKind.AiUp:
+            case KeyKind.Reserved:
+                break;
             default:
                 // другие модели шлют другие коды/value — лог помогает разбирать отчёты тестеров,
                 // а сам человек может прописать свой код в KeyCodes (config.json)

@@ -42,10 +42,27 @@ public static class Mifs
     public const byte KeyMic = 0x21;         // микрофон: value 0=mute(лампа горит), 1=unmute
     public const byte KeyKbdBacklight = 0x05; // подсветка: value = уровень (0/5/10/0x80=Авто)
     public const byte KeyProjection = 0x01;   // проекция экрана (value 0)
+    public const byte KeyScreenshot = 0x02;   // Ножницы / Win+Shift+S
+    public const byte KeyTaskView = 0x03;     // представление задач / Win+Tab
+    public const byte KeyOemDevice = 0x04;    // OEM Airplane/RadioControl; в XiControl известный no-op
+    public const byte KeyTouchpadState = 0x06;// состояние тачпада: value 0/1
     public const byte KeySettings = 0x1B;     // клавиша «Настройки»
+    public const byte KeyGameCenter = 0x0A;   // Xiaomi G Command Center; известный no-op
+    public const byte KeyCalculator = 0x0B;   // калькулятор
+    public const byte KeyLowPower = 0x0C;     // предупреждение слабого питания
+    public const byte KeyNumLock = 0x0D;      // Num Lock: value 0/1
+    public const byte KeyOemToggle = 0x0E;    // OEM toggle без независимого действия; известный no-op
+    public const byte KeyTouchpadToggle = 0x10; // MIControl-совместимая карта: тачпад
+    public const byte KeySupportAssistant = 0x12; // Xiaomi Support/Meeting Assistant; известный no-op
+    public const byte KeyRefreshRateCompat = 0x13; // MIControl-совместимая карта герцовки
+    public const byte KeyWinLock = 0x17;      // блокировка Windows-клавиши
+    public const byte KeyRefreshRate = 0x1A;  // цикл частоты встроенной панели
     public const byte KeyAiDown = 0x23;       // нейропомощник (нажатие)
     public const byte KeyAiUp = 0x24;         // нейропомощник (отпускание)
     public const byte KeyFnLock = 0x07;       // Fn-Lock (Fn+Esc): value = новое состояние 0/1
+    public const byte KeyCapsLock = 0x09;     // Caps Lock: value = новое состояние 0/1
+    public const byte KeyPerformance = 0x16;  // смена режима: value = PerfMode; legacy 0 = Turbo
+    public const byte KeyCameraPrivacy = 0xA0;// камера/приватность: value 0/1 (MIControl)
 
     /// <summary>Порог «беречь батарею» по умолчанию (не «фиксирован» — уровень выбирается, см. ниже).</summary>
     public const int ChargeThresholdPercent = 80;

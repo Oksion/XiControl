@@ -1,11 +1,17 @@
 # .NET build output
 [Bb]in/
 [Oo]bj/
+[Aa]rtifacts/
 *.user
+*.suo
+*.rsuser
+*.userosscache
+*.sln.docstates
 
 # Rider / VS
 .idea/
 .vs/
+.vscode/
 
 # Publish
 publish/
@@ -14,6 +20,21 @@ publish/
 # Test coverage output (coverlet)
 [Tt]est[Rr]esults/
 .sonarqube/
+[Cc]overage/
+[Cc]overage[Rr]eport/
+BenchmarkDotNet.Artifacts/
+*.trx
+*.coverage
+*.coveragexml
+
+# Local diagnostics / editor and OS debris
+*.log
+*.tmp
+*.bak
+*.orig
+.DS_Store
+Thumbs.db
+desktop.ini
 
 # рабочие материалы исследования — только локально
 reference/
