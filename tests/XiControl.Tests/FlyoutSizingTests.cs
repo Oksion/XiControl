@@ -51,13 +51,4 @@ public sealed class FlyoutSizingTests
     public void MonitorViewConfigRoundTrips(string? stored) =>
         MonitorLayout.ConfigValue(MonitorLayout.Parse(stored)).Should().Be(stored);
 
-    [Theory]
-    [InlineData(false, 0)]
-    [InlineData(true, 1)]
-    public void WindowRegionCanExcludeTheUnpaintedCustomTitlebarScanline(bool clipTop, int expectedTop)
-    {
-        Rectangle bounds = WindowRegionGeometry.Bounds(805, 1050, clipTop);
-
-        bounds.Should().Be(Rectangle.FromLTRB(0, expectedTop, 806, 1051));
-    }
 }

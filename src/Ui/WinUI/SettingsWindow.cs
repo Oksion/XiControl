@@ -17,6 +17,8 @@ namespace XiControl.Ui;
 
 internal sealed class SettingsWindow : FlyoutWindow
 {
+    private const double TitleBarHeight = 48;
+
     private readonly AppConfig _cfg;
     private readonly SettingsActions _actions;
     private readonly NavigationView _navigation;
@@ -26,7 +28,7 @@ internal sealed class SettingsWindow : FlyoutWindow
     private string _selected = "general";
 
     public SettingsWindow(AppConfig cfg, SettingsActions actions)
-        : base(alwaysOnTop: false, hideFromTaskbar: false, cornerRadiusDips: WinUiRadii.Overlay)
+        : base(alwaysOnTop: false, hideFromTaskbar: false)
     {
         _cfg = cfg;
         _actions = actions;
@@ -38,6 +40,7 @@ internal sealed class SettingsWindow : FlyoutWindow
             PaneDisplayMode = NavigationViewPaneDisplayMode.Left,
             OpenPaneLength = 220,
             IsPaneOpen = true,
+            IsPaneToggleButtonVisible = false,
             IsTitleBarAutoPaddingEnabled = false,
             BorderThickness = new Thickness(0),
             Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
@@ -51,27 +54,42 @@ internal sealed class SettingsWindow : FlyoutWindow
             }
         };
         var root = new Grid();
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(TitleBarHeight) });
+        root.RowDefinitions.Add(new RowDefinition());
+        Grid.SetRow(_navigation, 1);
         root.Children.Add(_navigation);
 
-        // No dedicated title/menu row: the navigation surface starts at y=0. A transparent
-        // center strip remains draggable while the hamburger and floating close stay clickable.
+        // Keep the entire NavigationView, including its scroll host, below a real title-bar row.
+        // This follows the WinUI shell pattern and prevents the content template from extending
+        // underneath the window controls.
+        var titleBar = new Grid { Height = TitleBarHeight };
+        root.Children.Add(titleBar);
+
         var dragRegion = new Grid
         {
-            Height = 36,
-            Margin = new Thickness(64, 0, 52, 0),
+            Height = TitleBarHeight,
+            Margin = new Thickness(52, 0, 52, 0),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Top,
             Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
         };
         Canvas.SetZIndex(dragRegion, 1);
-        root.Children.Add(dragRegion);
+        titleBar.Children.Add(dragRegion);
+
+        var menu = WindowChrome.Button(WindowChrome.MenuGlyph, Loc.T("settings.title"),
+            () => _navigation.IsPaneOpen = !_navigation.IsPaneOpen);
+        menu.HorizontalAlignment = HorizontalAlignment.Left;
+        menu.VerticalAlignment = VerticalAlignment.Center;
+        menu.Margin = new Thickness(8, 0, 0, 0);
+        Canvas.SetZIndex(menu, 2);
+        titleBar.Children.Add(menu);
 
         var close = WindowChrome.Button(WindowChrome.CloseGlyph, Loc.T("panel.close"), Hide, close: true);
         close.HorizontalAlignment = HorizontalAlignment.Right;
-        close.VerticalAlignment = VerticalAlignment.Top;
-        close.Margin = new Thickness(0, 4, 8, 0);
+        close.VerticalAlignment = VerticalAlignment.Center;
+        close.Margin = new Thickness(0, 0, 8, 0);
         Canvas.SetZIndex(close, 2);
-        root.Children.Add(close);
+        titleBar.Children.Add(close);
         _surface = new Border
         {
             CornerRadius = new CornerRadius(WinUiRadii.Overlay),
@@ -748,7 +766,7 @@ internal sealed class SettingsBuilder
     public StackPanel Root { get; } = new()
     {
         Spacing = 6,
-        Padding = new Thickness(34, 28, 38, 40),
+        Padding = new Thickness(34, 24, 38, 40),
         MaxWidth = 760,
         HorizontalAlignment = HorizontalAlignment.Left,
     };

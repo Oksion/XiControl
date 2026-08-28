@@ -33,7 +33,7 @@ internal sealed class TrayMenuWindow : FlyoutWindow
     private long _deactivationGraceUntil;
 
     public TrayMenuWindow()
-        : base(cornerRadiusDips: WinUiRadii.Overlay)
+        : base()
     {
         Title = "XiControl";
         _card = new Border

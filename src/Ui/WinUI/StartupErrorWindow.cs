@@ -11,7 +11,7 @@ internal sealed class StartupErrorWindow : FlyoutWindow
     private bool _dismissed;
 
     public StartupErrorWindow(string title, string message)
-        : base(alwaysOnTop: true, hideFromTaskbar: false, cornerRadiusDips: WinUiRadii.Overlay)
+        : base(alwaysOnTop: true, hideFromTaskbar: false)
     {
         Title = title;
         var header = new Grid

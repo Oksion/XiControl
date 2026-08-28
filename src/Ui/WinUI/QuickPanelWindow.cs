@@ -41,7 +41,7 @@ internal sealed class QuickPanelWindow : FlyoutWindow
 
     public QuickPanelWindow(IMifsClient mifs, AppConfig cfg, AppController controller,
         TouchpadControl touchpad, TouchscreenControl touchscreen)
-        : base(cornerRadiusDips: WinUiRadii.Overlay)
+        : base()
     {
         _mifs = mifs;
         _cfg = cfg;

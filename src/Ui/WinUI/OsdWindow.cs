@@ -18,7 +18,7 @@ internal sealed class OsdWindow : FlyoutWindow
     private readonly DispatcherQueueTimer _timer;
 
     public OsdWindow()
-        : base(cornerRadiusDips: WinUiRadii.Overlay)
+        : base()
     {
         Title = Loc.T("app.name");
         _icon = new FontIcon { FontSize = 32, HorizontalAlignment = HorizontalAlignment.Center };

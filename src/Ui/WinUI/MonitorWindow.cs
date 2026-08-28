@@ -44,7 +44,7 @@ internal sealed class MonitorWindow : FlyoutWindow
         TextBlock? Scale);
 
     public MonitorWindow(AppConfig cfg)
-        : base(cornerRadiusDips: WinUiRadii.Overlay, clipTopScanline: true)
+        : base()
     {
         _cfg = cfg;
         _queue = DispatcherQueue;

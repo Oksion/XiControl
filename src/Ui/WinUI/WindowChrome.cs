@@ -8,6 +8,7 @@ namespace XiControl.Ui;
 /// <summary>Shared WinUI command buttons for client-drawn title areas.</summary>
 internal static class WindowChrome
 {
+    internal const string MenuGlyph = "\uE700";
     internal const string MinimizeGlyph = "\uE921";
     internal const string MaximizeGlyph = "\uE922";
     internal const string RestoreGlyph = "\uE923";
