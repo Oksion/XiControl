@@ -553,7 +553,7 @@ Windows. Громкости в списке нет намеренно: для н
 
 В `config.json` это пары `*Action`/`*Command` (`MiClick`, `MiDouble`, `MiHold`, `SettingsKey`,
 `AiKey`, `ProjKey`), значения действий: `modes`, `charge`, `panel`, `owl`, `monitor`,
-`travel`, `touchpad`, `touchscreen`, `projection`, `settings`, `copilot`, `play`, `next`,
+`travel`, `touchpad`, `touchscreen`, `autobright`, `projection`, `settings`, `copilot`, `play`, `next`,
 `prev`, `stop`, `calc`, `launch`, `none`:
 
 ```json

@@ -24,6 +24,7 @@ public sealed class KeyRouter
     public Action? ToggleTravel;
     public Action? ToggleTouchpad;
     public Action? ToggleTouchscreen;
+    public Action? ToggleAutoBrightness;
     public Action? Projection;
     public Action? OpenSettings;
     public Action? Copilot;
@@ -41,6 +42,11 @@ public sealed class KeyRouter
 
     /// <summary>Открыта ли быстрая панель: клавиша «настройки» при открытой панели — всегда заряд.</summary>
     public Func<bool> PanelVisible = () => false;
+
+    /// <summary>Есть ли датчик освещённости. У сов и тачпада гейт лежит в конфиге, а здесь —
+    /// в железе: без датчика фичи нет и в настройках, значит и клавиша молчит. Дефолт false,
+    /// чтобы несмонтированный роутер не дёргал то, чего на машине может не быть.</summary>
+    public Func<bool> AutoBrightnessAvailable = () => false;
 
     /// <param name="keys">Карта «код → смысл»; null — из конфига (дефолты TM2424 +
     /// переопределения <see cref="AppConfig.KeyCodes"/> для других моделей, XIC-38).</param>
@@ -90,6 +96,7 @@ public sealed class KeyRouter
             case "travel": ToggleTravel?.Invoke(); break;  // без ChargeCare внутри не включится
             case "touchpad": if (_cfg.TouchpadFeature) ToggleTouchpad?.Invoke(); break; // фича скрыта — не трогаем
             case "touchscreen": if (_cfg.TouchscreenFeature) ToggleTouchscreen?.Invoke(); break; // фича скрыта — не трогаем
+            case "autobright": if (AutoBrightnessAvailable()) ToggleAutoBrightness?.Invoke(); break; // нет датчика — нечего включать
             case "projection": Projection?.Invoke(); break;
             case "settings": OpenSettings?.Invoke(); break;
             case "copilot": Copilot?.Invoke(); break;

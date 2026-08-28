@@ -45,6 +45,7 @@ public sealed class AppController
     public Action? ProfileModeApplied;         // режим применён из-за смены профиля питания
     public Action? ModesReloaded;              // набор видимых режимов изменился
     public Action<bool>? AutoHzChanged;        // авто-герцовка вкл/выкл
+    public Action<bool>? AutoBrightnessChanged; // авто-яркость вкл/выкл
     public Action? RefreshRateFeatureChanged;  // фича «управление частотой» показана/скрыта
     public Action? OwlFeatureChanged;          // фича «сова» показана/скрыта
     public Action? AwakeChanged;               // сам режим совы переключён
@@ -440,6 +441,7 @@ public sealed class AppController
         }
         _cfg.Save();
         if (on) Task.Run(_autoGuard.Evaluate); // сверка может читать WMI — не с UI-потока
+        AutoBrightnessChanged?.Invoke(on);     // клавиша ждёт OSD, настройки — перерисовки панели
     }
 
     /// <summary>«Обучение кривой» (XIC-37): выкл — правки яркости временные, кривая заморожена;

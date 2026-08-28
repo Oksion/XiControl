@@ -10,8 +10,8 @@ public sealed class KeysTab : SettingsPane
     private static readonly string[] KeyActionValues =
     [
         "modes", "charge", "panel", "owl", "monitor", "travel", "touchpad", "touchscreen",
-        "projection", "settings", "copilot", "play", "next", "prev", "stop", "calc",
-        "launch", "none",
+        "autobright", "projection", "settings", "copilot", "play", "next", "prev", "stop",
+        "calc", "launch", "none",
     ];
 
     // Единственное действие с полем ввода команды — по нему решаем, пересобирать ли слот.

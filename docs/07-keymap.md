@@ -28,6 +28,7 @@
 | `travel` | «В дорогу» (разовый заряд до 100%) |
 | `touchpad` | Тачпад вкл/выкл |
 | `touchscreen` | Сенсорный экран вкл/выкл |
+| `autobright` | Авто-яркость вкл/выкл (только на машинах с датчиком освещённости) |
 | `projection` | Проекция (`DisplaySwitch.exe`, фолбэк Win+P) |
 | `settings` | Параметры Windows |
 | `copilot` | Copilot (Win+C) |
