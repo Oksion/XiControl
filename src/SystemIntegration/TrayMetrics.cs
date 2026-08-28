@@ -154,6 +154,50 @@ public sealed class DptfTemperature : IDisposable
 }
 
 /// <summary>
+/// Мощность CPU package из штатного Windows Energy Meter. На части моделей Xiaomi
+/// прошивка не сообщает мощность адаптера/батареи при работе от сети, но Intel RAPL
+/// остаётся доступен через этот performance provider. Отрицательный знак сохраняет
+/// соглашение PowerDraw: расход отрицательный, заряд батареи положительный.
+/// </summary>
+public sealed class EnergyMeterPower : IDisposable
+{
+    private ManagementObjectSearcher? _query;
+    private bool _off;
+
+    public float ReadWatts()
+    {
+        if (_off) return float.NaN;
+        try
+        {
+            _query ??= new ManagementObjectSearcher(@"root\cimv2",
+                "SELECT Power FROM Win32_PerfFormattedData_PowerMeterCounter_EnergyMeter " +
+                "WHERE Name = 'RAPL_Package0_PKG'");
+            foreach (ManagementObject item in _query.Get())
+            {
+                object? raw = item["Power"];
+                item.Dispose();
+                if (raw is null) continue;
+                return ToConsumptionWatts(Convert.ToUInt64(raw, CultureInfo.InvariantCulture));
+            }
+            return float.NaN;
+        }
+        catch (Exception ex)
+        {
+            Log.Ex("EnergyMeter", ex);
+            _query?.Dispose();
+            _query = null;
+            _off = true;
+            return float.NaN;
+        }
+    }
+
+    internal static float ToConsumptionWatts(ulong milliwatts) =>
+        milliwatts > 0 ? -(milliwatts / 1000f) : float.NaN;
+
+    public void Dispose() => _query?.Dispose();
+}
+
+/// <summary>
 /// Источник значения для индикатора: фасад над PowerDraw/CpuLoad/GpuTelemetry/MemoryLoad/DPTF.
 /// Всё лениво: создаётся только внутренность выбранной метрики, остальные не трогаются.
 /// NaN = данных нет (значок показывает «—»): от сети без заряда, не-Intel GPU, нет DPTF.
@@ -162,6 +206,7 @@ public sealed class TrayMetricSource : IDisposable
 {
     private readonly TrayMetric _kind;
     private PowerDraw? _power;
+    private EnergyMeterPower? _energyMeter;
     private CpuLoad? _cpu;
     private GpuTelemetry? _gpu;
     private DptfTemperature? _temp;
@@ -180,7 +225,9 @@ public sealed class TrayMetricSource : IDisposable
     private float ReadPower()
     {
         _power ??= new PowerDraw();
-        return _power.TryReadWatts(out float w) ? w : float.NaN;
+        if (_power.TryReadWatts(out float watts) && !float.IsNaN(watts)) return watts;
+        _energyMeter ??= new EnergyMeterPower();
+        return _energyMeter.ReadWatts();
     }
 
     private float ReadGpu()
@@ -192,6 +239,7 @@ public sealed class TrayMetricSource : IDisposable
     public void Dispose()
     {
         _power?.Dispose();
+        _energyMeter?.Dispose();
         _gpu?.Dispose();
         _temp?.Dispose();
     }

@@ -86,4 +86,14 @@ public class TrayMetricTests
     [Fact]
     public void CpuPct_нулевой_интервал_безопасен() =>
         TrayMetricFormat.CpuPct(deltaIdle: 0, deltaBusy: 0).Should().Be(0f);
+
+    [Theory]
+    [InlineData(18_750UL, -18.75f)]
+    [InlineData(30_000UL, -30f)]
+    public void EnergyMeter_MilliwattsBecomeConsumptionWatts(ulong milliwatts, float expected) =>
+        EnergyMeterPower.ToConsumptionWatts(milliwatts).Should().Be(expected);
+
+    [Fact]
+    public void EnergyMeter_ZeroMeansUnavailable() =>
+        EnergyMeterPower.ToConsumptionWatts(0).Should().Be(float.NaN);
 }

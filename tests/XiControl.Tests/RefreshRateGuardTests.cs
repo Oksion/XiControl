@@ -14,9 +14,12 @@ public sealed class RefreshRateGuardTests
 {
     private readonly FakePowerEvents _power = new();
     private readonly FakeDisplayEvents _display = new();
-    private readonly FakeTimer _timer = new();
+    private readonly FakeTimer _debounce = new();
+    private readonly FakeTimer _watchdog = new();
+    private int _applies;
 
-    private RefreshRateGuard Guard(AppConfig cfg) => new(cfg, _power, _display, _timer);
+    private RefreshRateGuard Guard(AppConfig cfg) =>
+        new(cfg, _power, _display, _debounce, _watchdog, () => _applies++);
 
     [Theory]
     [InlineData(PowerModes.StatusChange)]
@@ -28,9 +31,10 @@ public sealed class RefreshRateGuardTests
 
         _power.RaisePower(mode);
 
-        _timer.Running.Should().BeTrue();
-        _timer.Fire(); // AutoRefreshRate=false → ApplyForPower выходит сразу, экран не трогаем
-        _timer.Running.Should().BeFalse();
+        _debounce.Running.Should().BeTrue();
+        _debounce.Fire();
+        _debounce.Running.Should().BeFalse();
+        _applies.Should().Be(1);
     }
 
     [Fact]
@@ -41,7 +45,7 @@ public sealed class RefreshRateGuardTests
 
         _power.RaisePower(PowerModes.Suspend);
 
-        _timer.Running.Should().BeFalse();
+        _debounce.Running.Should().BeFalse();
     }
 
     // XIC-22: реакция на чужую смену режима экрана — только при включённой опции,
@@ -54,7 +58,7 @@ public sealed class RefreshRateGuardTests
 
         _display.RaiseDisplayChanged();
 
-        _timer.Running.Should().BeTrue();
+        _debounce.Running.Should().BeTrue();
     }
 
     [Fact]
@@ -65,7 +69,7 @@ public sealed class RefreshRateGuardTests
 
         _display.RaiseDisplayChanged();
 
-        _timer.Running.Should().BeFalse("по умолчанию опция выключена — поведение прежнее");
+        _debounce.Running.Should().BeFalse("по умолчанию опция выключена — поведение прежнее");
     }
 
     [Fact]
@@ -82,9 +86,76 @@ public sealed class RefreshRateGuardTests
         guard.Dispose();
 
         _power.RaisePower(PowerModes.StatusChange);
-        _timer.Running.Should().BeFalse();
+        _debounce.Running.Should().BeFalse();
 
         _display.RaiseDisplayChanged();
-        _timer.Running.Should().BeFalse("подписка на события экрана тоже снимается");
+        _debounce.Running.Should().BeFalse("подписка на события экрана тоже снимается");
+        _watchdog.Running.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Watchdog_IsIdleUntilResume()
+    {
+        using var guard = Guard(new AppConfig());
+
+        _watchdog.Running.Should().BeFalse();
+        _watchdog.Interval.Should().Be(15_000);
+    }
+
+    [Fact]
+    public void Resume_StartsOnePostResumeProbe()
+    {
+        using var guard = Guard(new AppConfig());
+
+        _power.RaisePower(PowerModes.Resume);
+
+        _watchdog.Running.Should().BeTrue();
+        _watchdog.Starts.Should().Be(1);
+    }
+
+    [Fact]
+    public void UnchangedPostResumeProbe_StopsWithoutBecomingPersistent()
+    {
+        using var guard = Guard(new AppConfig());
+        _power.RaisePower(PowerModes.Resume);
+
+        _watchdog.Fire();
+
+        _watchdog.Running.Should().BeFalse();
+        _debounce.Fire();
+        _applies.Should().Be(1, "resume itself still schedules the normal reapply");
+    }
+
+    [Fact]
+    public void MissedPowerTransition_MakesWatchdogPersistent()
+    {
+        using var guard = Guard(new AppConfig());
+        _power.RaisePower(PowerModes.Resume);
+        _debounce.Fire();
+        _power.IsOnline = false; // Windows не прислала StatusChange
+
+        _watchdog.Fire();
+
+        _watchdog.Running.Should().BeTrue("обнаружен пропущенный переход питания");
+        _debounce.Running.Should().BeTrue();
+        _debounce.Fire();
+        _applies.Should().Be(2);
+
+        _power.IsOnline = true;
+        _watchdog.Fire();
+        _debounce.Running.Should().BeTrue("постоянный watchdog замечает следующие переходы");
+    }
+
+    [Fact]
+    public void StatusChangeBeforeProbe_CancelsOneShotWatchdog()
+    {
+        using var guard = Guard(new AppConfig());
+        _power.RaisePower(PowerModes.Resume);
+        _power.IsOnline = false;
+
+        _power.RaisePower(PowerModes.StatusChange);
+
+        _watchdog.Running.Should().BeFalse();
+        _debounce.Running.Should().BeTrue();
     }
 }

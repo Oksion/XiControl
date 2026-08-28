@@ -5,6 +5,7 @@ using XiControl.Input;
 using XiControl.Localization;
 using XiControl.SystemIntegration;
 using XiControl.Wmi;
+using NativePowerStatus = XiControl.SystemIntegration.PowerStatus;
 
 namespace XiControl.Ui;
 
@@ -319,8 +320,7 @@ public sealed class TrayApp : IDisposable
     {
         string s = Loc.T("app.name");
         if (mode is PerfMode m && ModeUi.Key(m) is string key) s += " • " + Loc.T(key);
-        float f = SystemInformation.PowerStatus.BatteryLifePercent;
-        if (f is >= 0f and <= 1f) s += $" • {(int)Math.Round(f * 100)}%";
+        if (NativePowerStatus.Read().BatteryPercent is int pct) s += $" • {pct}%";
         return s.Length <= 127 ? s : s[..127];
     }
 
@@ -416,9 +416,8 @@ public sealed class TrayApp : IDisposable
 
     private void ShowPowerOsd(bool online)
     {
-        var ps = SystemInformation.PowerStatus;
-        float f = ps.BatteryLifePercent;
-        string? sub = (f >= 0f && f <= 1f) ? Loc.T("osd.level", (int)Math.Round(f * 100)) : null;
+        int? pct = NativePowerStatus.Read().BatteryPercent;
+        string? sub = pct is int level ? Loc.T("osd.level", level) : null;
 
         // авто-герцовка включена — дописываем фактическую частоту (ближайшую поддерживаемую;
         // сам переход сделает RefreshRateGuard после дебаунса)
@@ -504,9 +503,8 @@ public sealed class TrayApp : IDisposable
     // (мы на потоке API, не UI). PowerDraw под замком: запросы могут прийти параллельно.
     private ApiStatus ApiStatusSnapshot()
     {
-        var ps = SystemInformation.PowerStatus;
-        float f = ps.BatteryLifePercent;
-        int? pct = (f >= 0f && f <= 1f) ? (int)Math.Round(f * 100) : null;
+        var ps = NativePowerStatus.Read();
+        int? pct = ps.BatteryPercent;
         float? watts = null;
         lock (_apiLock)
         {
@@ -517,7 +515,7 @@ public sealed class TrayApp : IDisposable
         return new ApiStatus(
             mode?.ToString() ?? "unknown",
             _cfg.ChargeCare, _cfg.TravelMode, _cfg.Awake,
-            pct, PowerLine.IsOnline(ps.PowerLineStatus), watts,
+            pct, PowerLine.IsOnline(ps.LineStatus), watts,
             BatteryReportCached().HealthPercent);
     }
 
