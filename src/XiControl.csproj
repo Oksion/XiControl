@@ -32,6 +32,9 @@
   <ItemGroup>
     <!-- SVG-иконки (OSD + трей) встраиваются в сборку; имена файлов уникальны -->
     <EmbeddedResource Include="..\assets\svg\**\*.svg" LogicalName="svg.%(Filename).svg" />
+    <!-- Необязательные локальные OSD Xiaomi. PNG игнорируются git и не распространяются. -->
+    <EmbeddedResource Include="..\assets\oem\xiaomi\osd\*.png"
+                      LogicalName="oem.osd.%(Filename)%(Extension)" />
     <!-- Звуки (WAV) встраиваются в сборку -->
     <EmbeddedResource Include="..\assets\sound\**\*.wav" LogicalName="sound.%(Filename).wav" />
     <!-- Переводы (JSON, по файлу на язык) встраиваются в сборку: lang.<культура>.json -->
