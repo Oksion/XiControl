@@ -24,6 +24,8 @@ public static class SvgIcons
     public const string BadgeNoPd = "badge-nopd";               // оверлей поверх заряда: PD не согласован (серый «?»)
     public const string Touchscreen = "touchscreen";            // экран в рамке + тап-жест — сенсорный экран вкл
     public const string TouchscreenOff = "touchscreen-off";     // то же серым — сенсорный экран выкл
+    public const string AutoBrightness = "auto-brightness";     // солнце с лучами + датчик — авто-яркость вкл
+    public const string AutoBrightnessOff = "auto-brightness-off"; // то же серым — авто-яркость выкл
     public const string TravelOff = "travel-off";    // чемодан без молнии — «В дорогу» выключен / корпус для анимации
     public const string TravelBolt = "travel-bolt";  // молния отдельно — мигает поверх travel-off
     public const string KeyboardBacklight = "keyboard-backlight";

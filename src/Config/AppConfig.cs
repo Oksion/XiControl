@@ -340,8 +340,9 @@ public sealed class AppConfig
 
     // ---- Действия клавиш ----
     // На каждый слот — своё действие из общего списка: "modes" (цикл режимов), "charge"
-    // (заряд 80/100), "panel" (быстрая панель), "owl", "monitor", "travel", "projection"
-    // (Win+P), "settings" (Параметры Windows), "copilot" (Win+C), "play"/"next"/"prev"/"stop"
+    // (заряд 80/100), "panel" (быстрая панель), "owl", "monitor", "travel",
+    // "touchpad", "touchscreen", "autobright" (авто-яркость, только при датчике освещённости),
+    // "projection" (Win+P), "settings" (Параметры Windows), "copilot" (Win+C), "play"/"next"/"prev"/"stop"
     // (мультимедиа), "calc" (калькулятор), "launch" (команда из соответствующего *Command),
     // "none". null → дефолт слота (см. MigrateKeyActions).
 

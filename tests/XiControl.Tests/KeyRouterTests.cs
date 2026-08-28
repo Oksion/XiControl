@@ -33,6 +33,7 @@ public sealed class KeyRouterTests
             ToggleTravel = () => _hits.Add("travel"),
             ToggleTouchpad = () => _hits.Add("touchpad"),
             ToggleTouchscreen = () => _hits.Add("touchscreen"),
+            ToggleAutoBrightness = () => _hits.Add("autobright"),
             Projection = () => _hits.Add("projection"),
             OpenSettings = () => _hits.Add("settings"),
             Copilot = () => _hits.Add("copilot"),
@@ -182,6 +183,26 @@ public sealed class KeyRouterTests
         _router.Run("touchscreen", null);
 
         _hits.Should().Equal("owl", "touchpad", "touchscreen");
+    }
+
+    // Гейт авто-яркости — не в конфиге, а в железе: без датчика фичи нет и в настройках.
+    // Дефолт AutoBrightnessAvailable = false, поэтому несмонтированный роутер молчит сам.
+    [Fact]
+    public void Run_AutoBright_NoSensor_DoesNothing()
+    {
+        _router.Run("autobright", null);
+
+        _hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Run_AutoBright_WithSensor_Fires()
+    {
+        _router.AutoBrightnessAvailable = () => true;
+
+        _router.Run("autobright", null);
+
+        _hits.Should().Equal("autobright");
     }
 
     [Fact]

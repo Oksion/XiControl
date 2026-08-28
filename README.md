@@ -551,7 +551,7 @@ cell only if a touchscreen is present).
 
 In `config.json` these are `*Action`/`*Command` pairs (`MiClick`, `MiDouble`, `MiHold`,
 `SettingsKey`, `AiKey`, `ProjKey`); action values: `modes`, `charge`, `panel`, `owl`, `monitor`,
-`touchpad`, `touchscreen`, `travel`, `projection`, `settings`, `copilot`, `play`, `next`, `prev`,
+`touchpad`, `touchscreen`, `autobright`, `travel`, `projection`, `settings`, `copilot`, `play`, `next`, `prev`,
 `stop`, `calc`, `launch`, `none`:
 
 ```json

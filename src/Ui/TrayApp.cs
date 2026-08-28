@@ -173,6 +173,14 @@ public sealed class TrayApp : IDisposable
                                     Loc.T("osd.hz.on.sub", _cfg.AcRefreshRate, _cfg.BatteryRefreshRate));
             else _osd.Flash(OsdKind.RefreshRateOff, Loc.T("osd.hz.off"));
         };
+        // Авто-яркость приходит и от клавиши, и от тумблера в настройках — OSD в обоих случаях,
+        // как у авто-герцовки: подтверждение нужно ровно тогда, когда панель его не показывает.
+        _controller.AutoBrightnessChanged = on =>
+        {
+            if (_panel.Visible) _panel.RefreshUi();
+            else _osd.Flash(on ? OsdKind.AutoBrightOn : OsdKind.AutoBrightOff,
+                            Loc.T(on ? "osd.autobright.on" : "osd.autobright.off"));
+        };
         _controller.RefreshRateFeatureChanged = _panel.ReloadModes; // ячейка герцовки появляется/уходит
         _controller.OwlFeatureChanged = _panel.ReloadModes; // сова появляется/уходит из раскладки
         _controller.AwakeChanged = () => { if (_panel.Visible) _panel.RefreshUi(); };
@@ -221,6 +229,8 @@ public sealed class TrayApp : IDisposable
             ToggleTravel = () => _controller.SetTravel(!_cfg.TravelMode),
             ToggleTouchpad = _controller.ToggleTouchpad,
             ToggleTouchscreen = _controller.ToggleTouchscreen,
+            ToggleAutoBrightness = () => _controller.SetAutoBrightness(!_cfg.AutoBrightness),
+            AutoBrightnessAvailable = () => _controller.AlsAvailable,
             Projection = KeyActions.Projection,
             OpenSettings = KeyActions.OpenSettings,
             Copilot = KeyActions.Copilot,
