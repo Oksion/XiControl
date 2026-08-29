@@ -52,6 +52,17 @@ public static class TrayMetricFormat
         };
     }
 
+    /// <summary>
+    /// Брать ли для «Потребления» мощность пакета CPU (RAPL) вместо датчика батареи.
+    /// Только когда датчику нечего сказать: Battery API недоступен целиком
+    /// (<paramref name="sensorAlive"/> = false) либо прошивка отвечает «не знаю»
+    /// (<paramref name="rateUnknown"/>). Ток ровно ноль — не тот случай: «от сети без заряда
+    /// показывается прочерк» обещано в описании настройки, а RAPL — другая физическая
+    /// величина, и под подписью «Потребление» она читалась бы как расход всей системы.
+    /// </summary>
+    public static bool UsesCpuPackageFallback(bool sensorAlive, bool rateUnknown) =>
+        !sensorAlive || rateUnknown;
+
     /// <summary>Загрузка CPU из приращений времён GetSystemTimes: kernel включает idle,
     /// поэтому всё время = dBusy, а занятое = dBusy − dIdle.</summary>
     public static float CpuPct(long deltaIdle, long deltaBusy) =>
@@ -213,6 +224,11 @@ public sealed class TrayMetricSource : IDisposable
 
     public TrayMetricSource(TrayMetric kind) => _kind = kind;
 
+    /// <summary>Последнее значение Power пришло не с датчика батареи, а из RAPL — это мощность
+    /// пакета CPU, другая физическая величина. Тултип обязан сказать об этом: в значок влезает
+    /// только число, и «3» вместо системных ватт иначе читается как враньё.</summary>
+    public bool PowerFromCpuPackage { get; private set; }
+
     public float Read() => _kind switch
     {
         TrayMetric.Cpu => (_cpu ??= new CpuLoad()).TryRead(out float c) ? c : float.NaN,
@@ -222,12 +238,23 @@ public sealed class TrayMetricSource : IDisposable
         _ => ReadPower(),
     };
 
+    // Правило фолбэка — в TrayMetricFormat.UsesCpuPackageFallback (там же и объяснение,
+    // почему нулевой ток не повод). Проверено на TM2424: в розетке без заряда IOCTL отдаёт
+    // Rate=0, а не BATTERY_UNKNOWN_RATE, — значит обещанный прочерк остаётся прочерком.
     private float ReadPower()
     {
         _power ??= new PowerDraw();
-        if (_power.TryReadWatts(out float watts) && !float.IsNaN(watts)) return watts;
+        bool alive = _power.TryReadWatts(out float watts);
+        if (!TrayMetricFormat.UsesCpuPackageFallback(alive, _power.RateUnknown))
+        {
+            PowerFromCpuPackage = false;
+            return watts;
+        }
+
         _energyMeter ??= new EnergyMeterPower();
-        return _energyMeter.ReadWatts();
+        float pkg = _energyMeter.ReadWatts();
+        PowerFromCpuPackage = !float.IsNaN(pkg);
+        return pkg;
     }
 
     private float ReadGpu()

@@ -96,4 +96,17 @@ public class TrayMetricTests
     [Fact]
     public void EnergyMeter_ZeroMeansUnavailable() =>
         EnergyMeterPower.ToConsumptionWatts(0).Should().Be(float.NaN);
+
+    // Индикатор «Потребление» показывает ватты батареи. RAPL — мощность пакета CPU, другая
+    // величина, и она допустима только там, где датчика батареи нет вовсе: обещанный в
+    // настройках прочерк «от сети без заряда» подменять ей нельзя. Проверено на TM2424:
+    // в розетке без заряда IOCTL отдаёт Rate=0, то есть NaN при RateUnknown=false.
+    [Theory]
+    [InlineData(true, false, false, "датчик ответил — верим ему, даже если это NaN")]
+    [InlineData(true, true, true, "прошивка не сообщает ток — только тогда RAPL")]
+    [InlineData(false, false, true, "Battery API недоступен целиком — только тогда RAPL")]
+    public void PowerFallback_OnlyWhenBatterySensorHasNothingToSay(
+        bool sensorAlive, bool rateUnknown, bool expectFallback, string because) =>
+        TrayMetricFormat.UsesCpuPackageFallback(sensorAlive, rateUnknown)
+            .Should().Be(expectFallback, because);
 }

@@ -98,7 +98,7 @@ public sealed class TrayMetricIcon : IDisposable
             if (src is null) return; // уже выключаемся
             float v = src.Read();
             string text = TrayMetricFormat.IconText(_kind, v);
-            string tip = Tip(v);
+            string tip = Tip(v, src.PowerFromCpuPackage); // флаг читаем сразу за Read — он про этот же тик
             if (_ui.IsHandleCreated) _ui.BeginInvoke(new Action(() => Apply(text, tip)));
         }
         catch (Exception ex) { Log.Ex("TrayMetric", ex); }
@@ -119,9 +119,13 @@ public sealed class TrayMetricIcon : IDisposable
     }
 
     // Тултип: имя приложения • метрика: точное значение с единицами (форматы — из «Монитора»).
-    private string Tip(float v)
+    // cpuPackage — значение пришло из RAPL вместо датчика батареи: величина другая, и назвать
+    // её надо иначе, иначе ватты пакета CPU читаются как потребление всей системы.
+    private string Tip(float v, bool cpuPackage)
     {
-        string name = Loc.T("traymetric." + TrayMetricFormat.Key(_kind));
+        string name = Loc.T(cpuPackage && _kind == TrayMetric.Power
+            ? "traymetric.power.cpu"
+            : "traymetric." + TrayMetricFormat.Key(_kind));
         string val = float.IsNaN(v) ? "—" : _kind switch
         {
             TrayMetric.Power => Loc.T("monitor.watts", MathF.Abs(v)),

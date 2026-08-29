@@ -26,12 +26,20 @@ public sealed class PowerDraw : IDisposable
     private bool _off; // Battery API не заводится на этой машине (нет батареи и т.п.) — больше не пытаемся
 
     /// <summary>
+    /// Последнее чтение вернуло «не знаю» (BATTERY_UNKNOWN_RATE): прошивка не сообщает ток
+    /// вовсе. Нулевой ток сюда НЕ попадает — «от сети без заряда» это честный ноль, а не
+    /// отсутствие данных, и подменять его чужой величиной нельзя (см. TrayMetricSource).
+    /// </summary>
+    public bool RateUnknown { get; private set; }
+
+    /// <summary>
     /// Мощность батареи, Вт со знаком (+ заряд, − разряд). NaN = от сети без тока / значение неизвестно.
     /// Возвращает false, только если Battery API недоступен целиком → монитор берёт WMI-фолбэк.
     /// </summary>
     public bool TryReadWatts(out float watts)
     {
         watts = float.NaN;
+        RateUnknown = false;
         if (_off) return false;
         try
         {
@@ -44,9 +52,12 @@ public sealed class PowerDraw : IDisposable
 
             var wait = new BATTERY_WAIT_STATUS { BatteryTag = _tag };
             if (DeviceIoControl(_h, IOCTL_BATTERY_QUERY_STATUS, ref wait, Marshal.SizeOf<BATTERY_WAIT_STATUS>(),
-                    out BATTERY_STATUS st, Marshal.SizeOf<BATTERY_STATUS>(), out _, IntPtr.Zero)
-                && st.Rate != BATTERY_UNKNOWN_RATE && st.Rate != 0)
-                watts = st.Rate / 1000f; // мВт → Вт, знак сохранён (+ заряд, − разряд)
+                    out BATTERY_STATUS st, Marshal.SizeOf<BATTERY_STATUS>(), out _, IntPtr.Zero))
+            {
+                RateUnknown = st.Rate == BATTERY_UNKNOWN_RATE;
+                if (!RateUnknown && st.Rate != 0)
+                    watts = st.Rate / 1000f; // мВт → Вт, знак сохранён (+ заряд, − разряд)
+            }
             return true;
         }
         catch (Exception ex) { Log.Ex("PowerDraw", ex); _h?.Dispose(); _h = null; _off = true; return false; }
