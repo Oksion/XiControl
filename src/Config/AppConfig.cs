@@ -245,6 +245,17 @@ public sealed class AppConfig
     /// </summary>
     public List<PerfMode>? HiddenModes { get; set; }
 
+    /// <summary>
+    /// Режимы, которые прошивка ЯВНО отвергла, по источникам питания («ac»/«battery», см.
+    /// <see cref="ModeLearning"/>). Заполняется само по ходу работы: отвергнут на обоих —
+    /// режим убирается из видимых, вернуть его можно тумблером. Чистить руками не нужно.
+    /// </summary>
+    public Dictionary<string, List<PerfMode>>? RejectedModes { get; set; }
+
+    /// <summary>Версия BIOS, при которой выучены <see cref="RejectedModes"/>: обновление
+    /// прошивки может добавить режимы, и старые отказы тогда забываются сами.</summary>
+    public string? RejectedModesBios { get; set; }
+
     /// <summary>Устаревшее: показывать Эко. Переносится в <see cref="HiddenModes"/>.</summary>
     public bool EcoMode { get; set; } = true;
 

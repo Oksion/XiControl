@@ -22,11 +22,15 @@ internal sealed class FakeMifsClient : IMifsClient
     public PerfMode? GetPerfMode() =>
         ThrowOnGetPerfMode ? throw new InvalidOperationException("нет железа") : Mode;
 
+    /// <summary>Режимы, которые «прошивка» отвергает поимённо. Mode при этом НЕ меняется —
+    /// так и ведёт себя железо, где режим не поддержан: чтение-назад показывает прежний.</summary>
+    public readonly HashSet<PerfMode> Rejects = [];
+
     public bool SetPerfMode(PerfMode mode)
     {
         PerfModeCalls.Add(mode);
         PerfModeHit.Release();
-        return SetPerfModeResult;
+        return !Rejects.Contains(mode) && SetPerfModeResult;
     }
 
     public int? GetChargeLimit() => ChargeLimit;

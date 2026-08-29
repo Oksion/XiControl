@@ -70,9 +70,10 @@ double-click; current direction is shown by color (charging green / discharging 
   charge cycle count, capacity in Wh. Stock ACPI/Windows data, read-only.
 - ⚡ **Performance modes**: Eco / Quiet / Balanced / Auto / Turbo /
   Full speed. **Any of them can be hidden** in Settings → Performance — two always stay, so
-  there is something to switch between. Useful because the set differs by model: the Book Pro 14
-  firmware refuses Balanced, and on the Redmi Book Pro 15 2022 only Quiet and Balanced work.
-  Balanced is hidden by default for that reason; turn it on if your laptop accepts it.
+  there is something to switch between. **You usually won't need to:** a mode the firmware
+  refuses both on AC *and* on battery switches itself off — the set differs by model (the
+  Book Pro 14 refuses Balanced; on the Redmi Book Pro 15 2022 only Quiet and Balanced work).
+  Nothing is probed behind your back: it learns from the modes you pick yourself.
 - 🖥️ **OSD overlay** (dark card, custom icons):
   - charger plug/unplug ("Charging to X%" with the actual threshold / "On battery" + level);
   - performance mode and charge limit changes;

@@ -322,6 +322,83 @@ public sealed class AppControllerTests
         _mifs.PerfModeCalls.Should().Equal(PerfMode.Turbo); // после Auto
     }
 
+    // ---- Автоопределение набора режимов по отказам прошивки (XIC-44) ----
+
+    // Главное: отвергнутый режим не должен останавливать кольцо. Одного отказа мало, чтобы
+    // режим спрятался (нужны оба источника питания), и без перехода к следующему кандидату
+    // Mi-кнопка стояла бы до смены питания.
+    [Fact]
+    public void CycleMode_ОтвергнутыйРежимНеОстанавливаетЦикл()
+    {
+        _mifs.Rejects.Add(PerfMode.Balance);
+        _mifs.Mode = PerfMode.Quiet;   // следующий по кольцу — как раз Balance
+
+        _c.CycleMode();
+
+        _mifs.PerfModeCalls.Should().Equal(PerfMode.Balance, PerfMode.Auto);
+        _events.Should().Equal("cycle:Auto");
+    }
+
+    [Fact]
+    public void CycleMode_ЕслиОтвергнутоВсё_ЧестнаяОшибка()
+    {
+        foreach (var m in AppController.AllModes) _mifs.Rejects.Add(m);
+        _mifs.Mode = PerfMode.Quiet;
+        bool failed = false;
+        _c.FirmwareFailed = () => failed = true;
+
+        _c.CycleMode();
+
+        failed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Отказ_ЗапоминаетсяПоИсточникуПитания()
+    {
+        _mifs.Rejects.Add(PerfMode.Balance);
+        _mifs.Mode = PerfMode.Quiet;
+        _power.IsOnline = true;
+
+        _c.SetMode(PerfMode.Balance);
+
+        _cfg.RejectedModes![ModeLearning.Ac].Should().Equal(PerfMode.Balance);
+        _cfg.RejectedModes.Should().NotContainKey(ModeLearning.Battery);
+        _c.VisibleModes.Should().Contain(PerfMode.Balance,
+            "одного источника мало: от сети режим мог и работать");
+    }
+
+    // Ровно то, ради чего всё затевалось: режим, отвергнутый и от сети, и от батареи,
+    // уходит из видимых сам — без свипа и без анкеты на модель.
+    [Fact]
+    public void Отказ_НаОбоихИсточниках_ПрячетРежим()
+    {
+        _mifs.Rejects.Add(PerfMode.Balance);
+        _mifs.Mode = PerfMode.Quiet;
+
+        _power.IsOnline = true;
+        _c.SetMode(PerfMode.Balance);
+        _power.IsOnline = false;
+        _c.SetMode(PerfMode.Balance);
+
+        _cfg.HiddenModes.Should().Contain(PerfMode.Balance);
+        _c.VisibleModes.Should().NotContain(PerfMode.Balance);
+    }
+
+    // Отказ отказу рознь: молчащая прошивка — временная беда, хоронить по ней режим нельзя.
+    [Fact]
+    public void МолчащаяПрошивка_НеХоронитРежим()
+    {
+        _mifs.SetPerfModeResult = false;
+        _mifs.Mode = null;              // GetPerfMode тоже не отвечает
+        bool failed = false;
+        _c.FirmwareFailed = () => failed = true;
+
+        _c.SetMode(PerfMode.Turbo);
+
+        _cfg.RejectedModes.Should().BeNull("это осечка связи, а не отказ железа");
+        failed.Should().BeTrue();
+    }
+
     [Fact]
     public void SetModeVisible_UpdatesVisibleModes_AndNotifies()
     {

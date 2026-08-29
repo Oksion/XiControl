@@ -264,20 +264,83 @@ public sealed class AppController
     /// исключение) → не запоминаем и честно сообщаем об ошибке (Фаза 6.2).</summary>
     public void SetMode(PerfMode mode)
     {
-        if (!Safe(() => _mifs.SetPerfMode(mode), false)) { FirmwareFailed?.Invoke(); return; }
+        if (!Apply(mode)) { FirmwareFailed?.Invoke(); return; }
         _cfg.RememberMode(mode);
         ModeSet?.Invoke(mode);
     }
 
-    /// <summary>Переключить на следующий режим по кругу (Mi-кнопка / клавиша).</summary>
+    /// <summary>
+    /// Переключить на следующий режим по кругу (Mi-кнопка / клавиша).
+    ///
+    /// Отвергнутый прошивкой режим цикл не останавливает — пробуем следующий. Иначе кнопка
+    /// упирается в первый недоступный НАВСЕГДА: одного отказа мало, чтобы режим спрятался
+    /// (нужен отказ и от сети, и от батареи), и до смены питания человек оставался бы с
+    /// кнопкой, которая только показывает ошибку.
+    /// </summary>
     public void CycleMode()
     {
         var cur = Safe<PerfMode?>(() => _mifs.GetPerfMode(), null) ?? PerfMode.Auto;
-        int idx = Array.IndexOf(_modes, cur);
-        var next = _modes[(idx < 0 ? 0 : idx + 1) % _modes.Length];
-        if (!Safe(() => _mifs.SetPerfMode(next), false)) { FirmwareFailed?.Invoke(); return; }
-        _cfg.RememberMode(next);
-        ModeCycled?.Invoke(next);
+        var modes = _modes;                       // снимок: Apply может спрятать режим и пересобрать набор
+        int start = Array.IndexOf(modes, cur) is int i && i >= 0 ? i + 1 : 0;
+
+        for (int step = 0; step < modes.Length; step++)
+        {
+            var next = modes[(start + step) % modes.Length];
+            if (next == cur) continue;            // сам в себя не переключаемся
+            if (!Apply(next)) continue;
+
+            _cfg.RememberMode(next);
+            ModeCycled?.Invoke(next);
+            return;
+        }
+        FirmwareFailed?.Invoke();                 // прошивка отвергла всё, что было предложено
+    }
+
+    /// <summary>Применить режим; при явном отказе прошивки — запомнить его (XIC-44).</summary>
+    private bool Apply(PerfMode mode)
+    {
+        if (Safe(() => _mifs.SetPerfMode(mode), false)) return true;
+        LearnRejection(mode);
+        return false;
+    }
+
+    /// <summary>
+    /// Отказ отказу рознь. Хоронить режим можно, только когда прошивка ОТВЕТИЛА и показала
+    /// другой: молчащая прошивка, занятый EC или ошибка WMI — временное, и запоминать их
+    /// значит навсегда отобрать рабочий режим из-за одной случайной осечки.
+    ///
+    /// Отвергнут и от сети, и от батареи → убираем из видимых. Это и есть всё «автоопределение
+    /// набора»: без свипа, без анкеты на модель, без похода в интернет.
+    /// </summary>
+    private void LearnRejection(PerfMode mode)
+    {
+        if (Safe<PerfMode?>(() => _mifs.GetPerfMode(), null) is not PerfMode actual || actual == mode)
+            return;   // не ответила либо всё-таки применился — это не отказ
+
+        string? bios = Safe<string?>(() => SystemInfo.Current.Bios, null);  // WMI: в тестах и на чужом железе может молчать
+        ForgetLearnedOnBiosChange(bios);
+        _cfg.RejectedModes ??= [];
+        bool online = Safe(() => _power.IsOnline, true);
+        if (!ModeLearning.Record(_cfg.RejectedModes, mode, online)) return;   // уже знали
+
+        Log.Write($"Perf: прошивка отвергла {mode} ({ModeLearning.Source(online)}), стоит {actual}");
+        _cfg.RejectedModesBios = bios;
+
+        if (ModeLearning.RejectedEverywhere(_cfg.RejectedModes, mode))
+        {
+            Log.Write($"Perf: {mode} отвергнут на обоих источниках — убираю из видимых");
+            SetModeVisible(mode, visible: false);   // сам сохранит конфиг и пересоберёт набор
+            return;
+        }
+        _cfg.Save();
+    }
+
+    /// <summary>Обновили BIOS — выученное забываем: набор режимов мог измениться.</summary>
+    private void ForgetLearnedOnBiosChange(string? bios)
+    {
+        if (!ModeLearning.Expired(_cfg.RejectedModesBios, bios)) return;
+        Log.Write("Perf: версия BIOS изменилась — забываю выученные отказы режимов");
+        _cfg.RejectedModes = null;
     }
 
     /// <summary>
