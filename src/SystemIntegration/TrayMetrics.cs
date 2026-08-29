@@ -165,6 +165,130 @@ public sealed class DptfTemperature : IDisposable
 }
 
 /// <summary>
+/// Пересчёт и отбор значений ACPI-термозоны — чистая логика под тестами; живое WMI рядом,
+/// в <see cref="AcpiZoneTemperature"/>.
+/// </summary>
+public static class ThermalZone
+{
+    /// <summary>Десятые Кельвина (формат MSAcpi_ThermalZoneTemperature) → °C.</summary>
+    public static float ToCelsius(double deciKelvin) => (float)((deciKelvin / 10d) - 273.15d);
+
+    /// <summary>Санитарный диапазон общий с DPTF: ноль — неинициализированный датчик,
+    /// выше 130 °C железо не живёт.</summary>
+    public static bool Plausible(float celsius) => celsius is > 0f and < 130f;
+
+    /// <summary>Максимум правдоподобных зон; NaN — годных значений нет.</summary>
+    public static float MaxCelsius(IEnumerable<double> deciKelvin)
+    {
+        float max = float.NaN;
+        foreach (double raw in deciKelvin)
+        {
+            float c = ToCelsius(raw);
+            if (Plausible(c) && (float.IsNaN(max) || c > max)) max = c;
+        }
+        return max;
+    }
+}
+
+/// <summary>
+/// Температура штатной ACPI-термозоны (WMI MSAcpi_ThermalZoneTemperature) — фолбэк для машин
+/// без Intel DPTF (XIC-41): на AMD-моделях провайдер Intel не ставится вовсе, и «Монитор»
+/// оставался без строки температуры. Величина ДРУГАЯ: одно грубое число платы, а не максимум
+/// по доменам. Измерено на TM2424 в один момент с DPTF — зона 27,9 °C против 73 °C горячего
+/// домена, у владельца TM2113 та же зона даёт правдоподобные 49,1 °C. Значит смысл зоны зависит
+/// от вендора, и подменять ею DPTF молча нельзя: источник помечается в UI. Класса нет —
+/// выключаемся навсегда, как DPTF.
+/// </summary>
+public sealed class AcpiZoneTemperature : IDisposable
+{
+    private ManagementObjectSearcher? _q;
+    private bool _off;
+
+    /// <summary>Класс на этой модели есть (хотя бы одна зона отвечала).</summary>
+    public bool Present { get; private set; }
+
+    /// <summary>Максимум по зонам, °C; NaN — данных нет (или класса нет).</summary>
+    public float ReadMaxC()
+    {
+        if (_off) return float.NaN;
+        try
+        {
+            _q ??= new ManagementObjectSearcher(@"root\wmi",
+                "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature");
+            bool any = false;
+            var raw = new List<double>();
+            foreach (ManagementObject o in _q.Get())
+            {
+                any = true;
+                object? t = o["CurrentTemperature"];
+                o.Dispose();
+                if (t is not null) raw.Add(Convert.ToDouble(t, CultureInfo.InvariantCulture));
+            }
+            if (any) Present = true; else _off = true;
+            return ThermalZone.MaxCelsius(raw);
+        }
+        catch (Exception ex) { Log.Ex("AcpiZone", ex); _q?.Dispose(); _q = null; _off = true; return float.NaN; }
+    }
+
+    public void Dispose() => _q?.Dispose();
+}
+
+/// <summary>Чем измерена температура: у ACPI-зоны другой физический смысл, и UI обязан сказать это.</summary>
+public enum TempSource { None, Dptf, AcpiZone }
+
+/// <summary>
+/// Температура с выбором источника (XIC-41): DPTF первичен, ACPI-термозона — фолбэк там, где его
+/// нет. Выбор делается по первому удавшемуся чтению и больше не пересматривается — отсутствующий
+/// класс повторно не дёргаем. Если DPTF на модели ЕСТЬ, но сейчас молчит, на зону НЕ переключаемся:
+/// это его временная пустота, а не другое железо, и подмена дала бы скачок величины на ровном месте.
+/// </summary>
+public sealed class TemperatureSource : IDisposable
+{
+    private readonly DptfTemperature _dptf = new();
+    private readonly AcpiZoneTemperature _zone = new();
+    private readonly bool _forceZone;
+
+    /// <param name="forceZone">Отладка: читать зону, даже если DPTF доступен. На Intel-машине
+    /// иначе не прогнать путь фолбэка — DPTF там есть всегда.</param>
+    public TemperatureSource(bool forceZone = false) => _forceZone = forceZone;
+
+    /// <summary>Источник последнего удавшегося чтения; None — температур на модели нет.</summary>
+    public TempSource Source { get; private set; }
+
+    /// <summary>Хоть один источник ответил — «Монитору» можно резервировать строку.</summary>
+    public bool Present => Source != TempSource.None;
+
+    public float ReadMaxC()
+    {
+        if (!_forceZone && Source != TempSource.AcpiZone)
+        {
+            float c = _dptf.ReadMaxC();
+            if (!float.IsNaN(c)) { Choose(TempSource.Dptf); return c; }
+            if (_dptf.Present) return float.NaN; // DPTF на модели есть — ждём его, не подменяем
+        }
+        float z = _zone.ReadMaxC();
+        if (!float.IsNaN(z)) { Choose(TempSource.AcpiZone); return z; }
+        return float.NaN;
+    }
+
+    // Полевая диагностика: по этой строке в отчёте видно, что показывал «Монитор» на чужой машине.
+    private void Choose(TempSource source)
+    {
+        if (Source == source) return;
+        Source = source;
+        Log.Write(source == TempSource.Dptf
+            ? "Температура: источник — Intel DPTF (максимум по доменам)"
+            : "Температура: источник — ACPI-термозона (нет DPTF; это температура платы, точность ниже)");
+    }
+
+    public void Dispose()
+    {
+        _dptf.Dispose();
+        _zone.Dispose();
+    }
+}
+
+/// <summary>
 /// Мощность CPU package из штатного Windows Energy Meter. На части моделей Xiaomi
 /// прошивка не сообщает мощность адаптера/батареи при работе от сети, но Intel RAPL
 /// остаётся доступен через этот performance provider. Отрицательный знак сохраняет
@@ -220,21 +344,31 @@ public sealed class TrayMetricSource : IDisposable
     private EnergyMeterPower? _energyMeter;
     private CpuLoad? _cpu;
     private GpuTelemetry? _gpu;
-    private DptfTemperature? _temp;
+    private TemperatureSource? _temp;
+    private readonly bool _forceAcpiTemp;
 
-    public TrayMetricSource(TrayMetric kind) => _kind = kind;
+    public TrayMetricSource(TrayMetric kind, bool forceAcpiTemp = false)
+    {
+        _kind = kind;
+        _forceAcpiTemp = forceAcpiTemp;
+    }
 
     /// <summary>Последнее значение Power пришло не с датчика батареи, а из RAPL — это мощность
     /// пакета CPU, другая физическая величина. Тултип обязан сказать об этом: в значок влезает
     /// только число, и «3» вместо системных ватт иначе читается как враньё.</summary>
     public bool PowerFromCpuPackage { get; private set; }
 
+    /// <summary>Температура прочитана не из DPTF, а из ACPI-термозоны — это температура платы,
+    /// другая величина (XIC-41). Как и с ваттами пакета, в значок влезает только число, поэтому
+    /// сказать об этом обязан тултип.</summary>
+    public bool TempFromAcpiZone { get; private set; }
+
     public float Read() => _kind switch
     {
         TrayMetric.Cpu => (_cpu ??= new CpuLoad()).TryRead(out float c) ? c : float.NaN,
         TrayMetric.Gpu => ReadGpu(),
         TrayMetric.Ram => MemoryLoad.TryRead(out float r, out _, out _) ? r : float.NaN,
-        TrayMetric.Temp => (_temp ??= new DptfTemperature()).ReadMaxC(),
+        TrayMetric.Temp => ReadTemp(),
         _ => ReadPower(),
     };
 
@@ -255,6 +389,14 @@ public sealed class TrayMetricSource : IDisposable
         float pkg = _energyMeter.ReadWatts();
         PowerFromCpuPackage = !float.IsNaN(pkg);
         return pkg;
+    }
+
+    private float ReadTemp()
+    {
+        _temp ??= new TemperatureSource(_forceAcpiTemp);
+        float c = _temp.ReadMaxC();
+        TempFromAcpiZone = _temp.Source == TempSource.AcpiZone;
+        return c;
     }
 
     private float ReadGpu()
