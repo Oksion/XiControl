@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <path d="M44 60 V44 a20 20 0 0 1 40 0 V60" fill="none" stroke="#90A4AE" stroke-width="10" stroke-linecap="round"/>
-  <rect x="32" y="56" width="64" height="48" rx="10" fill="#FFC107"/>
-  <circle cx="64" cy="75" r="7" fill="#455A64"/>
-  <rect x="60" y="79" width="8" height="14" rx="4" fill="#455A64"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><path fill="#90a4ae" d="M64 19c-13.748 0-25 11.252-25 25v16a5 5 0 0 0 5 5 5 5 0 0 0 5-5V44c0-8.344 6.657-15 15-15s15 6.656 15 15v16a5 5 0 0 0 5 5 5 5 0 0 0 5-5V44c0-13.748-11.252-25-25-25" overflow="visible"/><path fill="#ffc107" d="M42 56h44c5.54 0 10 4.46 10 10v28c0 5.54-4.46 10-10 10H42c-5.54 0-10-4.46-10-10V66c0-5.54 4.46-10 10-10"/><path fill="#455a64" d="M51 68a2 2 0 0 0-2 2v20.969a2 2 0 0 0 2 2h.469a2 2 0 0 0 2-2v-9.297h6.984a2 2 0 0 0 2-2v-.453a2 2 0 0 0-2-2H53.47v-4.75h6.984a2 2 0 0 0 2-2V70a2 2 0 0 0-2-2zm16.125 6.922a2 2 0 0 0-2 2v14.047a2 2 0 0 0 2 2h.469a2 2 0 0 0 2-2V79.375h2.953c.583 0 .869.12 1.273.523.401.401.524.691.524 1.29v9.78a2 2 0 0 0 2 2h.469a2 2 0 0 0 2-2v-9.78c0-1.65-.67-3.264-1.836-4.43a6.3 6.3 0 0 0-4.43-1.836Z" font-family="GENISO" font-size="32" overflow="visible" style="-inkscape-font-specification:&quot;GENISO, Normal&quot;"/></svg>

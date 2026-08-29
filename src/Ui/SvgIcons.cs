@@ -34,6 +34,7 @@ public static class SvgIcons
     public const string KeyboardBacklightAuto = "keyboard-backlight-auto";
     public const string MicOn = "mic-on";
     public const string MicOff = "mic-off";
+    public const string PerfBalance = "perf-balance";        // весы (баланс)
     public const string PerfAuto = "perf-auto";
     public const string PerfAutoDial = "perf-auto-dial";     // спидометр без стрелки
     public const string PerfAutoNeedle = "perf-auto-needle"; // стрелка, пивот в центре
@@ -53,10 +54,15 @@ public static class SvgIcons
     public const string FnLockOff = "fn-lock-off";
     public const string CapsLockOn = "caps-lock-on";
     public const string CapsLockOff = "caps-lock-off";
+    public const string NumLockOn = "num-lock-on";
+    public const string NumLockOff = "num-lock-off";
+    public const string WinKeyLockOn = "win-key-lock-on";
+    public const string WinKeyLockOff = "win-key-lock-off";
     public const string OwlAwake = "owl-awake";   // «не спать» включён
     public const string OwlAsleep = "owl-asleep"; // «не спать» выключен
 
     // Трей (монохром, currentColor, 24×24)
+    public const string TrayPerfBalance = "tray-perf-balance";
     public const string TrayPerfEco = "tray-perf-eco";
     public const string TrayPerfFull = "tray-perf-full";
     public const string TrayPerfQuiet = "tray-perf-quiet";

@@ -1,14 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <g stroke="#FFB300" stroke-width="6" stroke-linecap="round">
-    <path d="M64 32 V22"/>
-    <path d="M64 96 V106"/>
-    <path d="M96 64 H106"/>
-    <path d="M32 64 H22"/>
-    <path d="M87 41 L94 34"/>
-    <path d="M41 41 L34 34"/>
-    <path d="M41 87 L34 94"/>
-  </g>
-  <circle cx="64" cy="64" r="24" fill="#FFB300"/>
-  <path d="M88 110 L97 86 L106 110" fill="none" stroke="#FFB300" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M91 103 H103" stroke="#FFB300" stroke-width="5" stroke-linecap="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><g stroke="#ffb300" stroke-linecap="round" stroke-width="6"><path fill="#ffb300" stroke="none" d="M64 19a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3 3 3 0 0 0 3-3V22a3 3 0 0 0-3-3M34 31a3 3 0 0 0-2.121.879 3 3 0 0 0 0 4.242l7 7a3 3 0 0 0 4.242 0 3 3 0 0 0 0-4.242l-7-7A3 3 0 0 0 34 31m60 0a3 3 0 0 0-2.121.879l-7 7a3 3 0 0 0 0 4.242 3 3 0 0 0 4.242 0l7-7a3 3 0 0 0 0-4.242A3 3 0 0 0 94 31m-30 9a24 24 0 0 0-24 24 24 24 0 0 0 24 24 24 24 0 0 0 24-24 24 24 0 0 0-24-24M22 61a3 3 0 0 0-3 3 3 3 0 0 0 3 3h10a3 3 0 0 0 3-3 3 3 0 0 0-3-3zm74 0a3 3 0 0 0-3 3 3 3 0 0 0 3 3h10a3 3 0 0 0 3-3 3 3 0 0 0-3-3zm1 22.5a2.5 2.5 0 0 0-2.342 1.623l-9 24a2.5 2.5 0 0 0 1.465 3.219 2.5 2.5 0 0 0 3.219-1.465l2.015-5.377h9.286l2.015 5.377a2.5 2.5 0 0 0 3.219 1.465 2.5 2.5 0 0 0 1.465-3.219l-9-24A2.5 2.5 0 0 0 97 83.5M41 84a3 3 0 0 0-2.121.879l-7 7a3 3 0 0 0 0 4.242 3 3 0 0 0 4.242 0l7-7a3 3 0 0 0 0-4.242A3 3 0 0 0 41 84m23 9a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3 3 3 0 0 0 3-3V96a3 3 0 0 0-3-3m33 .121 2.768 7.379h-5.536z" overflow="visible"/></g></svg>

@@ -34,6 +34,7 @@ public static class TrayIcons
         {
             PerfMode.Eco => SvgIcons.TrayPerfEco,
             PerfMode.Quiet => SvgIcons.TrayPerfQuiet,
+            PerfMode.Balance => SvgIcons.TrayPerfBalance,
             PerfMode.Turbo => SvgIcons.TrayPerfTurbo,
             PerfMode.FullSpeed => SvgIcons.TrayPerfFull,
             _ => SvgIcons.TraySettings, // Авто + база

@@ -26,7 +26,9 @@ internal static class ModeUi
         PerfMode.Auto => FlyoutPalette.Blue,
         PerfMode.Turbo => FlyoutPalette.Orange,
         PerfMode.FullSpeed => FlyoutPalette.Red,
-        PerfMode.Balance => FlyoutPalette.Blue,
+        // Бирюза под весы: у «Баланса» был цвет «Авто», и в панели две ячейки читались бы
+        // как одна и та же. Своё лицо, но по яркости в одном ряду с остальными акцентами.
+        PerfMode.Balance => Color.FromArgb(38, 198, 218),
         _ => FlyoutPalette.Blue,
     };
 
@@ -48,7 +50,7 @@ internal static class ModeUi
         PerfMode.Auto => OsdKind.Auto,
         PerfMode.Turbo => OsdKind.Turbo,
         PerfMode.FullSpeed => OsdKind.Full,
-        PerfMode.Balance => OsdKind.Auto,
+        PerfMode.Balance => OsdKind.Balance,
         _ => OsdKind.Auto,
     };
 }

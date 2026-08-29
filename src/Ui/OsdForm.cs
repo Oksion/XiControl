@@ -2,7 +2,7 @@ using System.Drawing.Drawing2D;
 
 namespace XiControl.Ui;
 
-public enum OsdKind { Charging, ChargingLimited, OnBattery, Eco, Quiet, Auto, Turbo, Full, CareOn, CareOff, MicOn, MicOff, Backlight, BacklightMid, BacklightOff, BacklightAuto, FnLockOn, FnLockOff, CapsLockOn, CapsLockOff, RefreshRate, RefreshRateOff, Travel, TravelOff, TouchpadOn, TouchpadOff, TouchscreenOn, TouchscreenOff, AutoBrightOn, AutoBrightOff, Error }
+public enum OsdKind { Charging, ChargingLimited, OnBattery, Eco, Quiet, Auto, Turbo, Full, CareOn, CareOff, MicOn, MicOff, Backlight, BacklightMid, BacklightOff, BacklightAuto, FnLockOn, FnLockOff, CapsLockOn, CapsLockOff, NumLockOn, NumLockOff, WinKeyLockOn, WinKeyLockOff, Balance, RefreshRate, RefreshRateOff, Travel, TravelOff, TouchpadOn, TouchpadOff, TouchscreenOn, TouchscreenOff, AutoBrightOn, AutoBrightOff, Error }
 
 /// <summary>Значок-оверлей качества зарядника поверх иконки заряда (независимо от лимита 80/100).</summary>
 public enum ChargeBadge { None, Slow, NoPd }
@@ -203,6 +203,7 @@ public sealed class OsdForm : Form
             OsdKind.CareOff         => SvgIcons.BatterySaverOff,
             OsdKind.Eco             => SvgIcons.PerfEco,
             OsdKind.Quiet           => SvgIcons.PerfQuiet,
+            OsdKind.Balance         => SvgIcons.PerfBalance,
             OsdKind.Auto            => SvgIcons.PerfAuto,
             OsdKind.Turbo           => SvgIcons.PerfTurbo,
             OsdKind.Full            => SvgIcons.PerfFull,
@@ -216,6 +217,10 @@ public sealed class OsdForm : Form
             OsdKind.FnLockOff       => SvgIcons.FnLockOff,
             OsdKind.CapsLockOn      => SvgIcons.CapsLockOn,
             OsdKind.CapsLockOff     => SvgIcons.CapsLockOff,
+            OsdKind.NumLockOn       => SvgIcons.NumLockOn,
+            OsdKind.NumLockOff      => SvgIcons.NumLockOff,
+            OsdKind.WinKeyLockOn    => SvgIcons.WinKeyLockOn,
+            OsdKind.WinKeyLockOff   => SvgIcons.WinKeyLockOff,
             OsdKind.RefreshRate     => SvgIcons.RefreshRate,
             OsdKind.RefreshRateOff  => SvgIcons.RefreshRateOff,
             OsdKind.Travel          => SvgIcons.Travel,

@@ -259,14 +259,14 @@ public sealed class TrayApp : IDisposable
                 value != 0 ? "osd.touchpad.on" : "osd.touchpad.off"),
             LowPowerKey = _ => WeakChargerOsd(),
             NumLockKey = value => ShowToggleOsd(
-                value != 0 ? OsdKind.FnLockOn : OsdKind.FnLockOff,
+                value != 0 ? OsdKind.NumLockOn : OsdKind.NumLockOff,
                 "osd.numlock", value != 0),
             // 0x1A/0x13 распознаны, но цикла частоты ещё нет (RefreshRate.Cycle приезжает
             // отдельной задачей). До тех пор пишем в журнал: клавиша, которая молчит и не
             // оставляет следа, выглядит как поломка и не даёт разобрать чужие отчёты.
             RefreshRateKey = value => Log.Write($"Key: смена частоты value=0x{value:X2} — обработчик ещё не смонтирован"),
             WinKeyLockKey = value => ShowToggleOsd(
-                value != 0 ? OsdKind.FnLockOn : OsdKind.FnLockOff,
+                value != 0 ? OsdKind.WinKeyLockOn : OsdKind.WinKeyLockOff,
                 value != 0 ? "osd.winkey.locked" : "osd.winkey.unlocked"),
             CameraPrivacyKey = value => Log.Write($"Key: camera/privacy 0xA0 value=0x{value:X2}"),
             FnLockKey = OnFnLockKey,
