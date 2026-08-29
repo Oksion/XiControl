@@ -2,13 +2,21 @@ using System.Management;
 
 namespace XiControl.Wmi;
 
-/// <summary>Результат вызова MiInterface.</summary>
+/// <summary>
+/// Результат вызова MiInterface. Разбор зависит от диалекта прошивки (XIC-43): «успех» и место
+/// значения у моделей разные, поэтому сырые байты интерпретирует <see cref="MifsReply"/>.
+/// </summary>
 public sealed class MifsResult
 {
-    public required bool Ok { get; init; }        // OUT[1] == 0x80
     public required byte[] Out { get; init; }
-    public byte Val4 => Out.Length > 4 ? Out[4] : (byte)0;  // значение/эхо (perf mode здесь)
-    public byte Val6 => Out.Length > 6 ? Out[6] : (byte)0;  // значение (charge статус здесь)
+    public required MifsDialect Dialect { get; init; }
+    public required byte Cmd { get; init; }   // нужна эхо-диалекту: там ответ — повтор команды
+
+    public bool Ok => MifsReply.Ok(Dialect, Out, Cmd);
+
+    /// <param name="classicOffset">Смещение значения в классическом диалекте:
+    /// <see cref="MifsReply.PerfOffset"/> или <see cref="MifsReply.ChargeOffset"/>.</param>
+    public byte Value(int classicOffset) => MifsReply.Value(Dialect, Out, classicOffset);
 }
 
 /// <summary>
@@ -19,6 +27,7 @@ public sealed class MifsClient : IMifsClient
 {
     private readonly ManagementObject _inst;
     private readonly object _lock = new();   // сериализуем вызовы (UI + события питания)
+    private MifsDialect _dialect = MifsDialect.Unknown;   // определяется один раз, см. Dialect()
 
     public MifsClient()
     {
@@ -31,7 +40,12 @@ public sealed class MifsClient : IMifsClient
     }
 
     /// <summary>Сырой вызов. op=OpGet/OpSet, cmd/arg/val раскладываются по offset 3/4/6.</summary>
-    public MifsResult Invoke(byte op, byte cmd, byte arg = 0, byte val = 0)
+    public MifsResult Invoke(byte op, byte cmd, byte arg = 0, byte val = 0) =>
+        new() { Out = Raw(op, cmd, arg, val), Dialect = Dialect(), Cmd = cmd };
+
+    /// <summary>Транспорт без интерпретации — им же снимается проба для определения диалекта,
+    /// когда интерпретировать ещё нечем.</summary>
+    private byte[] Raw(byte op, byte cmd, byte arg, byte val)
     {
         var inData = new byte[Mifs.BufferSize];
         inData[1] = op;
@@ -44,10 +58,32 @@ public sealed class MifsClient : IMifsClient
             using var pars = _inst.GetMethodParameters(Mifs.MethodName);
             pars["InData"] = inData;
             using var outParams = _inst.InvokeMethod(Mifs.MethodName, pars, null);
-            var outData = outParams?["OutData"] as byte[] ?? Array.Empty<byte>();
-            return new MifsResult { Ok = outData.Length > 1 && outData[1] == Mifs.StatusOk, Out = outData };
+            return outParams?["OutData"] as byte[] ?? [];
         }
     }
+
+    /// <summary>
+    /// Диалект ответа этой прошивки. Определяется одним GET при первом обращении и кэшируется:
+    /// железо в пределах сеанса не меняется. Под тем же замком, что и вызовы, — Monitor
+    /// реентрантен, а два потока не должны снимать пробу одновременно.
+    /// </summary>
+    private MifsDialect Dialect()
+    {
+        if (_dialect != MifsDialect.Unknown) return _dialect;
+        lock (_lock)
+        {
+            if (_dialect != MifsDialect.Unknown) return _dialect;
+            var probe = Raw(Mifs.OpGet, Mifs.CmdPerf, 0, 0);
+            _dialect = MifsReply.Detect(probe, Mifs.CmdPerf);
+            Log.Write($"MIFS: диалект ответа — {_dialect} (GET 0x{Mifs.CmdPerf:X2} → {Dump(probe)})");
+            if (_dialect == MifsDialect.Unsupported)
+                Log.Write("MIFS: раскладка ответа не опознана — функции прошивки выключены");
+            return _dialect;
+        }
+    }
+
+    private static string Dump(byte[] b) =>
+        string.Join(' ', b.Take(8).Select(x => x.ToString("X2", System.Globalization.CultureInfo.InvariantCulture)));
 
     public MifsResult Get(byte cmd, byte arg = 0) => Invoke(Mifs.OpGet, cmd, arg);
     public MifsResult Set(byte cmd, byte arg = 0, byte val = 0) => Invoke(Mifs.OpSet, cmd, arg, val);
@@ -57,7 +93,7 @@ public sealed class MifsClient : IMifsClient
     public PerfMode? GetPerfMode()
     {
         var r = Get(Mifs.CmdPerf);
-        return r.Ok ? (PerfMode)r.Val4 : null;
+        return r.Ok ? (PerfMode)r.Value(MifsReply.PerfOffset) : null;
     }
 
     /// <returns>true, если прошивка приняла режим.</returns>
@@ -69,11 +105,13 @@ public sealed class MifsClient : IMifsClient
 
     // ---- Порог заряда (уровни 40/50/60/70/80 / полный 100%) ----
 
-    /// <summary>Текущий порог заряда, %; null — прошивка не ответила или код неизвестен.</summary>
+    /// <summary>Текущий порог заряда, %; null — прошивка не ответила, код неизвестен или
+    /// её диалект не несёт данных этой группы (тогда честнее прочерк, чем выдумка).</summary>
     public int? GetChargeLimit()
     {
+        if (!MifsReply.CarriesChargeData(Dialect())) return null;
         var r = Get(Mifs.CmdCharge, Mifs.ChargeSubEnable);
-        return r.Ok ? Mifs.ChargePercentForCode(r.Val6) : null;
+        return r.Ok ? Mifs.ChargePercentForCode(r.Value(MifsReply.ChargeOffset)) : null;
     }
 
     /// <summary>
@@ -83,6 +121,11 @@ public sealed class MifsClient : IMifsClient
     /// </summary>
     public bool SetChargeLimit(int percent)
     {
+        // Диалект без данных этой группы — писать некуда: на TM2113 измерено, что запись кодов
+        // не меняет ответ вовсе. Честное false (интерфейс покажет «не сработало») лучше, чем
+        // тихий «успех» по эху и лимит, которого на самом деле нет.
+        if (!MifsReply.CarriesChargeData(Dialect())) return false;
+
         var code = Mifs.ChargeCodeForPercent(percent);
         if (code is null) return false;
         var off = Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, 0);   // «выкл» = 100%
@@ -97,15 +140,17 @@ public sealed class MifsClient : IMifsClient
     /// (обычный USB мощность не сообщает). Значение — согласованная PD-мощность БП.</summary>
     public int GetAdapterWatts()
     {
+        if (!MifsReply.CarriesChargeData(Dialect())) return 0;
         var r = Get(Mifs.CmdCharge, Mifs.SensorAdapterWatts);
-        return r.Ok ? r.Val6 : 0;
+        return r.Ok ? r.Value(MifsReply.ChargeOffset) : 0;
     }
 
     /// <summary>Здоровье батареи (SOH1), % от исходной ёмкости; null — не прочиталось.</summary>
     public int? GetBatteryHealth()
     {
+        if (!MifsReply.CarriesChargeData(Dialect())) return null;
         var r = Get(Mifs.CmdCharge, Mifs.SensorBatteryHealth);
-        return r.Ok ? r.Val6 : null;
+        return r.Ok ? r.Value(MifsReply.ChargeOffset) : null;
     }
 
     public void Dispose() => _inst.Dispose();

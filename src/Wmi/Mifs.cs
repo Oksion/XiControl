@@ -17,9 +17,10 @@ public static class Mifs
     public const byte OpGet = 0xFA;
     public const byte OpSet = 0xFB;
 
-    // статус ответа (OUT[1])
-    public const byte StatusOk = 0x80;   // функция поддерживается
-    // 0xE0 = не поддерживается
+    // статус ответа (OUT[1]) — ТОЛЬКО в классическом диалекте: на части моделей байта статуса
+    // нет вовсе и здесь лежит эхо команды, см. MifsDialect и docs/01
+    public const byte StatusOk = 0x80;          // функция поддерживается
+    public const byte StatusUnsupported = 0xE0; // функция не поддерживается на этой модели
 
     // команды (offset 3)
     public const byte CmdPerf = 0x08;    // режим производительности
