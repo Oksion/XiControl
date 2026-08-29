@@ -249,12 +249,17 @@ public sealed class TrayApp : IDisposable
             TouchpadStateKey = value => ShowToggleOsd(
                 value != 0 ? OsdKind.TouchpadOn : OsdKind.TouchpadOff,
                 value != 0 ? "osd.touchpad.on" : "osd.touchpad.off"),
-            LowPowerKey = _ => _osd.Flash(OsdKind.Error, Loc.T("osd.charger.weak")),
+            LowPowerKey = _ => WeakChargerOsd(),
             NumLockKey = value => ShowToggleOsd(
                 value != 0 ? OsdKind.FnLockOn : OsdKind.FnLockOff,
                 "osd.numlock", value != 0),
-            // 0x1A здесь уже распознан; RefreshRate.Cycle и монтаж обработчика приходят отдельным M3.
-            WinKeyLockKey = _ => _osd.Flash(OsdKind.FnLockOn, Loc.T("osd.winkey.locked")),
+            // 0x1A/0x13 распознаны, но цикла частоты ещё нет (RefreshRate.Cycle приезжает
+            // отдельной задачей). До тех пор пишем в журнал: клавиша, которая молчит и не
+            // оставляет следа, выглядит как поломка и не даёт разобрать чужие отчёты.
+            RefreshRateKey = value => Log.Write($"Key: смена частоты value=0x{value:X2} — обработчик ещё не смонтирован"),
+            WinKeyLockKey = value => ShowToggleOsd(
+                value != 0 ? OsdKind.FnLockOn : OsdKind.FnLockOff,
+                value != 0 ? "osd.winkey.locked" : "osd.winkey.unlocked"),
             CameraPrivacyKey = value => Log.Write($"Key: camera/privacy 0xA0 value=0x{value:X2}"),
             FnLockKey = OnFnLockKey,
             CapsLockKey = value => ShowToggleOsd(
@@ -405,8 +410,18 @@ public sealed class TrayApp : IDisposable
 
     private void OnProjectionWarningKey(byte value)
     {
-        if (value == 2) _osd.Flash(OsdKind.Error, Loc.T("osd.charger.weak"));
-        else Log.Write($"Key: unknown projection/power value=0x{value:X2}");
+        if (value == 2) WeakChargerOsd();
+        else Log.Write($"Key: неизвестное значение проекции/питания value=0x{value:X2}");
+    }
+
+    // Предупреждение о слабом блоке приходит двумя путями (0x0C и проекция с value=2), и оба
+    // ведут сюда. Гейт — тот же тумблер, что у бейджа ватт в OSD зарядки: человек, выключивший
+    // «ватты зарядника», выключил именно этот разговор, и обходить его с другой стороны нечестно.
+    // В журнал пишем всегда — событие прошивки интересно при разборе отчётов независимо от OSD.
+    private void WeakChargerOsd()
+    {
+        Log.Write("Key: прошивка сообщила о слабом блоке питания");
+        if (_cfg.ChargerWattsOsd) _osd.Flash(OsdKind.Error, Loc.T("osd.charger.weak"));
     }
 
     // Физическая клавиша уже сменила режим в EC: только синхронизируем сохранённое состояние

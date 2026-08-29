@@ -296,6 +296,7 @@
   "osd.capslock": "Caps Lock",
   "osd.numlock": "Num Lock",
   "osd.winkey.locked": "Windows key locked",
+  "osd.winkey.unlocked": "Windows key unlocked",
   "osd.failed": "Didn't work",
   "osd.failed.sub": "Firmware didn't respond — see log",
   "settings.flyout.theme": "Panel and pop-up theme",

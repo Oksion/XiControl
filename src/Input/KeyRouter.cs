@@ -99,7 +99,15 @@ public sealed class KeyRouter
             case KeyKind.WinKeyLock: WinKeyLockKey?.Invoke(value); break;
             case KeyKind.CameraPrivacy: CameraPrivacyKey?.Invoke(value); break;
             case KeyKind.AiUp:
+                break; // отпускание AI-клавиши: пара уже отработана на нажатии
             case KeyKind.Reserved:
+                // Действия нет, но молчать нельзя. «Резерв» — это пустой слот диспетчера OEM,
+                // выясненный статическим разбором ЧУЖОЙ прошивки (docs/14). На модели, которой
+                // мы не видели, тот же код вполне может быть живой клавишей, и человек ищет её
+                // ровно этой строкой в log.txt — так описано в docs/07-keymap.md и так мы прямо
+                // сейчас разбираем отчёты в issue #37. Проглотить её — отобрать единственный
+                // способ починиться самому через KeyCodes в config.json.
+                Log.Write($"Key: резервный код диспетчера code=0x{code:X2} value=0x{value:X2} — действия нет");
                 break;
             default:
                 // другие модели шлют другие коды/value — лог помогает разбирать отчёты тестеров,

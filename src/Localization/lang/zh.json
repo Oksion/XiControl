@@ -296,6 +296,7 @@
   "osd.capslock": "大写锁定",
   "osd.numlock": "数字锁定",
   "osd.winkey.locked": "Windows 键已锁定",
+  "osd.winkey.unlocked": "Windows 键已解锁",
   "osd.failed": "操作失败",
   "osd.failed.sub": "固件未响应 — 详见日志",
   "settings.flyout.theme": "面板与弹窗主题",

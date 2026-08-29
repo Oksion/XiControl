@@ -296,6 +296,7 @@
   "osd.capslock": "Caps Lock",
   "osd.numlock": "Num Lock",
   "osd.winkey.locked": "Клавиша Windows заблокирована",
+  "osd.winkey.unlocked": "Клавиша Windows разблокирована",
   "osd.failed": "Не сработало",
   "osd.failed.sub": "Прошивка не ответила — детали в логе",
   "settings.flyout.theme": "Тема панелей и всплывашек",
