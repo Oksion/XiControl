@@ -63,7 +63,10 @@ public sealed class RefreshRateGuard : IDisposable
         else if (mode == PowerModes.Resume)
         {
             Arm();
-            if (!_persistentWatchdog)
+            // Проверять питание после сна имеет смысл только ради авто-герцовки: с выключенной
+            // опцией Reapply всё равно выйдет сразу, а таймер (и тем более постоянный режим)
+            // остался бы крутиться фоном ради того, чего мы не делаем.
+            if (!_persistentWatchdog && AutoSwitchOn)
             {
                 // Не обновляем _lastOnline: watchdog должен заметить смену питания во сне,
                 // если Windows не прислала StatusChange после пробуждения.
@@ -73,8 +76,14 @@ public sealed class RefreshRateGuard : IDisposable
         }
     }
 
+    /// <summary>Те же условия, что и у RefreshRate.ApplyForPower: без них применять нечего.</summary>
+    private bool AutoSwitchOn => _cfg.RefreshRateFeature && _cfg.AutoRefreshRate;
+
     private void VerifyPower()
     {
+        // Опцию могли выключить уже после того, как watchdog стал постоянным — гасим.
+        if (!AutoSwitchOn) { _persistentWatchdog = false; _watchdog.Stop(); return; }
+
         bool online = _power.IsOnline;
         if (online != _lastOnline)
         {

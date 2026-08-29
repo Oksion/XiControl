@@ -21,6 +21,10 @@ public sealed class RefreshRateGuardTests
     private RefreshRateGuard Guard(AppConfig cfg) =>
         new(cfg, _power, _display, _debounce, _watchdog, () => _applies++);
 
+    /// <summary>Watchdog существует ради авто-герцовки, поэтому её проверки идут с включённой
+    /// опцией: по умолчанию она выключена, и таймер тогда не заводится вовсе.</summary>
+    private static AppConfig AutoHz() => new() { AutoRefreshRate = true };
+
     [Theory]
     [InlineData(PowerModes.StatusChange)]
     [InlineData(PowerModes.Resume)]
@@ -96,7 +100,7 @@ public sealed class RefreshRateGuardTests
     [Fact]
     public void Watchdog_IsIdleUntilResume()
     {
-        using var guard = Guard(new AppConfig());
+        using var guard = Guard(AutoHz());
 
         _watchdog.Running.Should().BeFalse();
         _watchdog.Interval.Should().Be(15_000);
@@ -105,7 +109,7 @@ public sealed class RefreshRateGuardTests
     [Fact]
     public void Resume_StartsOnePostResumeProbe()
     {
-        using var guard = Guard(new AppConfig());
+        using var guard = Guard(AutoHz());
 
         _power.RaisePower(PowerModes.Resume);
 
@@ -116,7 +120,7 @@ public sealed class RefreshRateGuardTests
     [Fact]
     public void UnchangedPostResumeProbe_StopsWithoutBecomingPersistent()
     {
-        using var guard = Guard(new AppConfig());
+        using var guard = Guard(AutoHz());
         _power.RaisePower(PowerModes.Resume);
 
         _watchdog.Fire();
@@ -129,7 +133,7 @@ public sealed class RefreshRateGuardTests
     [Fact]
     public void MissedPowerTransition_MakesWatchdogPersistent()
     {
-        using var guard = Guard(new AppConfig());
+        using var guard = Guard(AutoHz());
         _power.RaisePower(PowerModes.Resume);
         _debounce.Fire();
         _power.IsOnline = false; // Windows не прислала StatusChange
@@ -146,10 +150,40 @@ public sealed class RefreshRateGuardTests
         _debounce.Running.Should().BeTrue("постоянный watchdog замечает следующие переходы");
     }
 
+    // Опция выключена — проверять после сна нечего: Reapply всё равно выйдет сразу, а таймер
+    // крутился бы фоном ради того, чего мы не делаем.
+    [Fact]
+    public void Resume_WithAutoSwitchOff_LeavesWatchdogIdle()
+    {
+        using var guard = Guard(new AppConfig());
+
+        _power.RaisePower(PowerModes.Resume);
+
+        _watchdog.Running.Should().BeFalse();
+        _debounce.Running.Should().BeTrue("обычный дебаунс после сна остаётся");
+    }
+
+    // Постоянный режим не должен пережить выключение опции.
+    [Fact]
+    public void PersistentWatchdog_StopsWhenAutoSwitchTurnedOff()
+    {
+        var cfg = AutoHz();
+        using var guard = Guard(cfg);
+        _power.RaisePower(PowerModes.Resume);
+        _power.IsOnline = false;
+        _watchdog.Fire();
+        _watchdog.Running.Should().BeTrue();
+
+        cfg.AutoRefreshRate = false;
+        _watchdog.Fire();
+
+        _watchdog.Running.Should().BeFalse();
+    }
+
     [Fact]
     public void StatusChangeBeforeProbe_CancelsOneShotWatchdog()
     {
-        using var guard = Guard(new AppConfig());
+        using var guard = Guard(AutoHz());
         _power.RaisePower(PowerModes.Resume);
         _power.IsOnline = false;
 
