@@ -54,6 +54,12 @@ public sealed class TrayApp : IDisposable
     private readonly MiButtonGesture _mi;
     private readonly KeyRouter _router;
 
+    /// <summary>Режим, о котором мы уже сообщили пользователю. Прошивка шлёт уведомление
+    /// 0x16 на любую смену — включая нашу собственную и по два раза на одно переключение;
+    /// это поле отличает «новость» от эха. Никогда не источник правды о текущем режиме:
+    /// его спрашивают у прошивки (см. TrayText, ApiStatusSnapshot).</summary>
+    private PerfMode? _shownMode;
+
     // Конструктор только сохраняет зависимости и монтирует UI-каркас (меню, значок,
     // панель, подписки, колбэки контроллера). Стартовая бизнес-логика — в Start().
     public TrayApp(IMifsClient mifs, AppConfig cfg, IKeyEventSource events, IPowerEvents power,
@@ -155,12 +161,14 @@ public sealed class TrayApp : IDisposable
         _controller.TravelCancelled = () => { if (_panel.Visible) _panel.RefreshUi(); };
         _controller.ModeSet = m =>
         {
+            _shownMode = m;                        // прошивка сейчас пришлёт эхо 0x16 — гасим его
             if (_panel.Visible) _panel.RefreshUi(); // выбор сделан в панели — OSD поверх не нужен
             else _osd.Flash(ModeUi.Kind(m), Loc.T(ModeUi.Key(m) ?? "mode.auto"));
             _icon.Refresh();
         };
         _controller.ModeCycled = m =>
         {
+            _shownMode = m;
             if (_panel.Visible) _panel.RefreshUi(); // выбор «перелистывается» в панели, OSD не нужен
             else _osd.Flash(ModeUi.Kind(m), Loc.T(ModeUi.Key(m) ?? "mode.auto"));
             _icon.Refresh();
@@ -430,9 +438,17 @@ public sealed class TrayApp : IDisposable
     {
         if (ModeUi.FromHotkeyValue(value) is not PerfMode mode)
         {
-            Log.Write($"Key: unknown performance value=0x{value:X2}");
+            Log.Write($"Key: неизвестное значение режима value=0x{value:X2}");
             return;
         }
+        // 0x16 приходит на ЛЮБУЮ смену режима — и на чужую, и на нашу собственную, причём
+        // парами: на TM2424 в журнале 42 события, всегда по два на одно переключение. Без этой
+        // проверки одно нажатие Mi-кнопки давало бы три OSD подряд — наш собственный плюс два
+        // от эха прошивки. Тот же приём, что у яркости: помним, что показали сами, и молчим,
+        // когда железо сообщает ровно это.
+        if (mode == _shownMode) return;
+        _shownMode = mode;
+
         _cfg.RememberMode(mode);
         if (_panel.Visible) _panel.RefreshUi();
         else _osd.Flash(ModeUi.Kind(mode), Loc.T(ModeUi.Key(mode) ?? "mode.auto"));
