@@ -279,8 +279,8 @@ public sealed class AppControllerTests
     [Fact]
     public void CycleMode_AdvancesByPowerOrder()
     {
-        // порядок: Eco, Quiet, Balance, Auto, Turbo, FullSpeed. Конфиг здесь не мигрирован,
-        // поэтому видно всё — в проде Balance по умолчанию скрыт (см. AppConfigMigrationTests)
+        // порядок: Eco, Quiet, Balance, Auto, Turbo, FullSpeed — дефолтом не скрыт ни один:
+        // набор режимов решает прошивка, а не мы (см. AppConfigMigrationTests)
         _mifs.Mode = PerfMode.Quiet;
 
         _c.CycleMode();

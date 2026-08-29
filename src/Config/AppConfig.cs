@@ -530,7 +530,11 @@ public sealed class AppConfig
         HiddenModes = [];
         if (!EcoMode) HiddenModes.Add(PerfMode.Eco);
         if (!FullSpeedMode) HiddenModes.Add(PerfMode.FullSpeed);
-        HiddenModes.Add(PerfMode.Balance);
+        // Balance намеренно НЕ прячем: его отвергает прошивка Book Pro 14, но на Redmi Book
+        // Pro 15 2022 это один из двух рабочих режимов, и спрятанный дефолтом он там не
+        // перебирается вовсе — то есть никогда себя и не покажет. Пусть решает автоопределение
+        // (XIC-44): на отказе CycleMode молча берёт следующий режим, а отвергнутый и от сети,
+        // и от батареи уходит из видимых сам (XIC-57).
     }
 
     /// <summary>Запомнить режим для восстановления — только если опция включена и значение изменилось (бережём SSD).</summary>

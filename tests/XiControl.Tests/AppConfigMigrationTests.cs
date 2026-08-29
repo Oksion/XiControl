@@ -122,16 +122,18 @@ public sealed class AppConfigMigrationTests
         cfg.HiddenModes.Should().Contain([PerfMode.Eco, PerfMode.FullSpeed]);
     }
 
-    // Balance по умолчанию скрыт: на TM2424 прошивка его не принимает, и ячейка, которая
-    // честно ответит «не сработало», — плохой дефолт. Включается одним тумблером.
+    // Balance по умолчанию ВИДЕН. Прошивка Book Pro 14 его не принимает, но пряча его дефолтом
+    // мы ломали Redmi Book Pro 15 2022, где он — один из двух рабочих режимов: скрытый режим не
+    // участвует в переборе, значит отказа не случится, и автоопределение до него не доберётся
+    // никогда. Набор режимов определяет прошивка, а не наш дефолт (XIC-57).
     [Fact]
-    public void Balance_ПоУмолчаниюСкрыт()
+    public void Balance_ПоУмолчаниюВиден()
     {
         var cfg = new AppConfig();
 
         cfg.MigrateKeyActions();
 
-        cfg.HiddenModes.Should().Equal(PerfMode.Balance);
+        cfg.HiddenModes.Should().BeEmpty();
     }
 
     [Fact]
