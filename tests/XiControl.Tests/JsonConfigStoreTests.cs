@@ -55,6 +55,28 @@ public sealed class JsonConfigStoreTests : IDisposable
         new JsonConfigStore(_dir).Load().ChargeCare.Should().BeTrue();
     }
 
+    // Регрессия: перечисления пишутся именами («Balance»), а Deserialize звался БЕЗ JsonOpts —
+    // прочитать это имя он не мог, падал, и Load молча отдавал дефолты. То есть один запуск
+    // стирал человеку весь конфиг. Чтение и запись обязаны ходить через одни опции.
+    [Fact]
+    public void ИменаПеречисленийПереживаютКругЗаписьЧтение()
+    {
+        var store = new JsonConfigStore(_dir);
+        var cfg = store.Load();
+        cfg.ChargeCare = true;
+        cfg.StartPerfMode = PerfMode.Turbo;
+        cfg.HiddenModes = [PerfMode.Balance, PerfMode.Eco];
+        cfg.Save();
+
+        var back = new JsonConfigStore(_dir).Load();
+
+        back.ChargeCare.Should().BeTrue("иначе разбор упал и конфиг уехал в дефолты");
+        back.StartPerfMode.Should().Be(PerfMode.Turbo);
+        back.HiddenModes.Should().Equal([PerfMode.Balance, PerfMode.Eco]);
+        File.ReadAllText(store.FilePath).Should().Contain("\"Balance\"",
+            "config.json правят руками — там должны быть имена, а не числа");
+    }
+
     [Fact]
     public void LegacyIntLanguage_MigratesToCultureCode()
     {

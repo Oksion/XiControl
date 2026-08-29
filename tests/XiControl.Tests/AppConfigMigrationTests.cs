@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using XiControl.Config;
+using XiControl.Wmi;
 using Xunit;
 
 namespace XiControl.Tests;
@@ -106,5 +107,40 @@ public sealed class AppConfigMigrationTests
         cfg.SettingsKeyAction.Should().Be("modes");
         cfg.AiKeyAction.Should().Be("none");
         cfg.ProjKeyAction.Should().Be("charge");
+    }
+
+    // ---- Видимость режимов: старые тумблеры EcoMode/FullSpeedMode → HiddenModes ----
+
+    // Человек, скрывший Эко год назад, не должен увидеть его снова после обновления.
+    [Fact]
+    public void СтарыеТумблерыВидимости_ПереносятсяВHiddenModes()
+    {
+        var cfg = new AppConfig { EcoMode = false, FullSpeedMode = false };
+
+        cfg.MigrateKeyActions();
+
+        cfg.HiddenModes.Should().Contain([PerfMode.Eco, PerfMode.FullSpeed]);
+    }
+
+    // Balance по умолчанию скрыт: на TM2424 прошивка его не принимает, и ячейка, которая
+    // честно ответит «не сработало», — плохой дефолт. Включается одним тумблером.
+    [Fact]
+    public void Balance_ПоУмолчаниюСкрыт()
+    {
+        var cfg = new AppConfig();
+
+        cfg.MigrateKeyActions();
+
+        cfg.HiddenModes.Should().Equal(PerfMode.Balance);
+    }
+
+    [Fact]
+    public void УжеМигрированныйКонфиг_НеТрогаем()
+    {
+        var cfg = new AppConfig { EcoMode = false, HiddenModes = [PerfMode.Turbo] };
+
+        cfg.MigrateKeyActions();
+
+        cfg.HiddenModes.Should().Equal([PerfMode.Turbo], "выбор человека важнее старых тумблеров");
     }
 }

@@ -279,12 +279,14 @@ public sealed class AppControllerTests
     [Fact]
     public void CycleMode_AdvancesByPowerOrder()
     {
-        _mifs.Mode = PerfMode.Quiet; // Eco, Quiet, Auto, Turbo, FullSpeed
+        // порядок: Eco, Quiet, Balance, Auto, Turbo, FullSpeed. Конфиг здесь не мигрирован,
+        // поэтому видно всё — в проде Balance по умолчанию скрыт (см. AppConfigMigrationTests)
+        _mifs.Mode = PerfMode.Quiet;
 
         _c.CycleMode();
 
-        _mifs.PerfModeCalls.Should().Equal(PerfMode.Auto);
-        _events.Should().Equal("cycle:Auto");
+        _mifs.PerfModeCalls.Should().Equal(PerfMode.Balance);
+        _events.Should().Equal("cycle:Balance");
     }
 
     [Fact]
@@ -300,7 +302,8 @@ public sealed class AppControllerTests
     [Fact]
     public void CycleMode_SkipsHiddenModes()
     {
-        _c.ToggleModeVisibility(eco: false, full: false); // остаются Quiet, Auto, Turbo
+        _c.SetModeVisible(PerfMode.Eco, false);
+        _c.SetModeVisible(PerfMode.FullSpeed, false); // остаются Quiet, Balance, Auto, Turbo
         _events.Clear();
         _mifs.Mode = PerfMode.Turbo;
 
@@ -320,12 +323,35 @@ public sealed class AppControllerTests
     }
 
     [Fact]
-    public void ToggleModeVisibility_UpdatesVisibleModes_AndNotifies()
+    public void SetModeVisible_UpdatesVisibleModes_AndNotifies()
     {
-        _c.ToggleModeVisibility(eco: false, full: true);
+        _c.SetModeVisible(PerfMode.Eco, false);
 
-        _c.VisibleModes.Should().Equal(PerfMode.Quiet, PerfMode.Auto, PerfMode.Turbo, PerfMode.FullSpeed);
-        _cfg.EcoMode.Should().BeFalse();
+        _c.VisibleModes.Should().Equal(
+            PerfMode.Quiet, PerfMode.Balance, PerfMode.Auto, PerfMode.Turbo, PerfMode.FullSpeed);
+        _cfg.HiddenModes.Should().Equal(PerfMode.Eco);
+        _events.Should().Equal("modes-reloaded");
+    }
+
+    // Минимум два: последние два режима скрыть нельзя — иначе переключать не на что.
+    [Fact]
+    public void SetModeVisible_НеДаётСкрытьПоследниеДва()
+    {
+        foreach (var m in AppController.AllModes) _c.SetModeVisible(m, false);
+
+        _c.VisibleModes.Should().HaveCount(ModeVisibility.Minimum);
+        _c.CanHideMode.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SetModeVisible_ВозвращаетСкрытыйОбратно()
+    {
+        _c.SetModeVisible(PerfMode.Turbo, false);
+        _events.Clear();
+
+        _c.SetModeVisible(PerfMode.Turbo, true);
+
+        _c.VisibleModes.Should().Contain(PerfMode.Turbo);
         _events.Should().Equal("modes-reloaded");
     }
 

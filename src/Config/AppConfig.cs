@@ -236,15 +236,19 @@ public sealed class AppConfig
     public int? BatteryBrightness { get; set; }
 
     /// <summary>
-    /// Показывать скрытый режим Эко (0x0A) в меню, панели и цикле Mi-кнопки.
-    /// Настраивается только правкой config.json (перезапуск).
+    /// Режимы, убранные из меню, панели и цикла Mi-кнопки. Настраивается в
+    /// Настройки → Производительность; правится и руками. Минимум два режима остаются видимыми
+    /// всегда — набор, из которого нечего выбирать, бессмысленен, поэтому лишнее скрытие
+    /// игнорируется (см. <see cref="ModeVisibility"/>).
+    ///
+    /// null — конфиг ещё не мигрирован со старых <c>EcoMode</c>/<c>FullSpeedMode</c>.
     /// </summary>
+    public List<PerfMode>? HiddenModes { get; set; }
+
+    /// <summary>Устаревшее: показывать Эко. Переносится в <see cref="HiddenModes"/>.</summary>
     public bool EcoMode { get; set; } = true;
 
-    /// <summary>
-    /// Показывать режим «Полная мощность» (0x04). false — режим убирается из UI
-    /// и включить его из приложения нельзя. Только правкой config.json (перезапуск).
-    /// </summary>
+    /// <summary>Устаревшее: показывать «Полную мощность». Переносится в <see cref="HiddenModes"/>.</summary>
     public bool FullSpeedMode { get; set; } = true;
 
     /// <summary>
@@ -461,6 +465,8 @@ public sealed class AppConfig
     /// </summary>
     public void MigrateKeyActions()
     {
+        MigrateModeVisibility();
+
         const string Charge = "charge";
         if (MiClickAction is null)
         {
@@ -496,6 +502,25 @@ public sealed class AppConfig
     /// к поддержанному пресету (неизвестное значение → дефолт 80).</summary>
     public int CarePercent() =>
         Mifs.ChargeCodeForPercent(CareLimitPercent) is null ? Mifs.ChargeThresholdPercent : CareLimitPercent;
+
+    /// <summary>
+    /// Перенос старых тумблеров видимости (EcoMode/FullSpeedMode) в <see cref="HiddenModes"/>.
+    /// Человек, скрывший Эко год назад, не должен увидеть его снова после обновления.
+    ///
+    /// Balance по умолчанию скрыт: на TM2424 прошивка его не принимает, и показывать всем
+    /// ячейку, которая честно ответит «не сработало», — плохой дефолт. Владельцы моделей, где
+    /// он работает (TM2113), включают его одним тумблером. Когда появится автоопределение
+    /// набора (XIC-44), дефолт станет неважен.
+    /// </summary>
+    private void MigrateModeVisibility()
+    {
+        if (HiddenModes is not null) return;
+
+        HiddenModes = [];
+        if (!EcoMode) HiddenModes.Add(PerfMode.Eco);
+        if (!FullSpeedMode) HiddenModes.Add(PerfMode.FullSpeed);
+        HiddenModes.Add(PerfMode.Balance);
+    }
 
     /// <summary>Запомнить режим для восстановления — только если опция включена и значение изменилось (бережём SSD).</summary>
     public void RememberMode(PerfMode mode)

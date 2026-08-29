@@ -68,8 +68,11 @@ double-click; current direction is shown by color (charging green / discharging 
   charge limit. The threshold is configurable (Settings → Battery). Driver-free (read-only).
 - 🩺 **Battery health** — Settings → Battery: actual wear (current vs. design capacity),
   charge cycle count, capacity in Wh. Stock ACPI/Windows data, read-only.
-- ⚡ **Performance modes**: Eco (hidden firmware mode) / Quiet / Auto /
-  Turbo / Full speed. Eco and Full speed can be removed from the UI via config.
+- ⚡ **Performance modes**: Eco (hidden firmware mode) / Quiet / Balanced / Auto / Turbo /
+  Full speed. **Any of them can be hidden** in Settings → Performance — two always stay, so
+  there is something to switch between. Useful because the set differs by model: the Book Pro 14
+  firmware refuses Balanced, and on the Redmi Book Pro 15 2022 only Quiet and Balanced work.
+  Balanced is hidden by default for that reason; turn it on if your laptop accepts it.
 - 🖥️ **OSD overlay** (dark card, custom icons):
   - charger plug/unplug ("Charging to X%" with the actual threshold / "On battery" + level);
   - performance mode and charge limit changes;

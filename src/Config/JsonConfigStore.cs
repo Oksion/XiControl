@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using XiControl.Localization;
 
 namespace XiControl.Config;
@@ -7,7 +8,15 @@ namespace XiControl.Config;
 /// %APPDATA%\XiControl либо папка программы в портативном режиме; явная папка — для тестов).</summary>
 public sealed class JsonConfigStore : IConfigStore
 {
-    private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
+    // Перечисления пишем именами, а не числами: config.json правят руками, и "Balance" в нём
+    // понятнее, чем 1. Отдельные свойства уже помечены [JsonStringEnumConverter] и от этого не
+    // меняются — глобальный конвертер нужен коллекциям (HiddenModes), где атрибут на свойстве
+    // относился бы к списку, а не к его элементам. Чтение остаётся терпимым: имена и числа.
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        WriteIndented = true,
+        Converters = { new JsonStringEnumConverter() },
+    };
 
     private readonly string _dir;
 
@@ -22,8 +31,10 @@ public sealed class JsonConfigStore : IConfigStore
         AppConfig cfg;
         try
         {
+            // JsonOpts обязателен и на чтении: без него имена перечислений («Balance»),
+            // которыми мы теперь пишем, не разбираются — и весь конфиг молча уехал бы в дефолты.
             cfg = File.Exists(FilePath)
-                ? JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(FilePath)) ?? Fresh()
+                ? JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(FilePath), JsonOpts) ?? Fresh()
                 : Fresh();
         }
         catch (Exception ex) { Log.Ex("JsonConfigStore.Load", ex); cfg = Fresh(); /* повреждённый конфиг → дефолт */ }

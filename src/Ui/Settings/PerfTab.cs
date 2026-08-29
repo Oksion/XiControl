@@ -26,12 +26,19 @@ public sealed class PerfTab : SettingsPane
 
         ui.AddHeader(this, "settings.tab.perf", "settings.perf.sub");
         ui.AddGroup(this, "settings.perf.modes");
-        // после смены видимости пересобираем окно (после выхода из обработчика):
-        // комбо профилей ниже предлагают только видимые режимы
-        ui.AddRow(this, "settings.show.eco", "settings.show.eco.desc",
-            ui.Toggle(cfg.EcoMode, on => { act.SetModeVisibility(on, cfg.FullSpeedMode); rebuild(); }));
-        ui.AddRow(this, "settings.show.full", "settings.show.full.desc",
-            ui.Toggle(cfg.FullSpeedMode, on => { act.SetModeVisibility(cfg.EcoMode, on); rebuild(); }));
+        // Любой режим можно убрать с глаз — кроме случая, когда видимых осталось два: набор,
+        // из которого нечего выбирать, бессмысленен. Тумблер последних двух гасим, а не даём
+        // нажать вхолостую. После смены видимости пересобираем окно (после выхода из
+        // обработчика): комбо профилей ниже предлагают только видимые режимы.
+        bool canHide = act.CanHideMode();
+        foreach (var mode in AppController.AllModes)
+        {
+            var m = mode;                                   // замыкание на копию
+            bool visible = cfg.HiddenModes?.Contains(m) != true;
+            var toggle = ui.Toggle(visible, on => { act.SetModeVisible(m, on); rebuild(); });
+            toggle.Enabled = visible ? canHide : true;       // снять можно, вернуть — всегда
+            ui.AddRow(this, ModeUi.Key(m) ?? "mode.auto", ModeVisibilityHint(m), toggle);
+        }
 
         ui.AddGroup(this, "settings.startmode");
         var strat = act.GetStartStrategy();
@@ -51,6 +58,17 @@ public sealed class PerfTab : SettingsPane
     }
 
     // Панель, умеющая принимать клавиатурный фокус (стрелки/Space/Enter — радио-поведение).
+    /// <summary>Пояснение к режиму в списке видимости: чем он полезен и где не работает.</summary>
+    private static string ModeVisibilityHint(PerfMode m) => m switch
+    {
+        PerfMode.Eco => "settings.show.eco.desc",
+        PerfMode.Quiet => "settings.show.quiet.desc",
+        PerfMode.Balance => "settings.show.balance.desc",
+        PerfMode.Turbo => "settings.show.turbo.desc",
+        PerfMode.FullSpeed => "settings.show.full.desc",
+        _ => "settings.show.auto.desc",
+    };
+
     private sealed class FocusCard : Panel
     {
         public FocusCard()

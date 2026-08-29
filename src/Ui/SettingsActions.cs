@@ -24,7 +24,8 @@ public sealed class SettingsActions
     public required Func<string> CurrentLanguage;             // текущий культурный код
     public required Action<string> SetLanguage;              // сменить язык по культурному коду
     public required Action<string?> SetFlyoutTheme;          // тема панелей/OSD: null/"light"/"system"
-    public required Action<bool, bool> SetModeVisibility;    // eco, full
+    public required Action<PerfMode, bool> SetModeVisible;   // режим, показывать ли
+    public required Func<bool> CanHideMode;                  // остались ли режимы сверх минимума
     public required Func<StartStrategy> GetStartStrategy;
     public required Action<StartStrategy> SetStartStrategy;
     public required Action<bool, PerfMode?> SetProfileMode;  // ac, mode

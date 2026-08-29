@@ -34,7 +34,7 @@ public sealed class AppController
     // Все режимы по нарастанию мощности — этот же порядок задаёт цикл Mi-кнопки
     // и список в комбо профилей питания (вкладка «Производительность»).
     internal static readonly PerfMode[] AllModes =
-        [PerfMode.Eco, PerfMode.Quiet, PerfMode.Auto, PerfMode.Turbo, PerfMode.FullSpeed];
+        [PerfMode.Eco, PerfMode.Quiet, PerfMode.Balance, PerfMode.Auto, PerfMode.Turbo, PerfMode.FullSpeed];
 
     // --- уведомления для UI: ядро сообщает «что случилось», не «что показать» ---
     public Action<bool>? CareChanged;          // защита заряда переключена пользователем
@@ -280,15 +280,24 @@ public sealed class AppController
         ModeCycled?.Invoke(next);
     }
 
-    /// <summary>Показ/скрытие Эко и Полной мощности в наборе режимов.</summary>
-    public void ToggleModeVisibility(bool eco, bool full)
+    /// <summary>
+    /// Показать/скрыть один режим. Последние два скрыть нельзя — набор, из которого нечего
+    /// выбирать, бессмысленен; попытка молча игнорируется (UI такой тумблер и не даёт нажать).
+    /// </summary>
+    public void SetModeVisible(PerfMode mode, bool visible)
     {
-        _cfg.EcoMode = eco;
-        _cfg.FullSpeedMode = full;
+        var next = ModeVisibility.Toggle(AllModes, _cfg.HiddenModes, mode, visible);
+        if (_cfg.HiddenModes is not null && next.Length == _cfg.HiddenModes.Count
+            && next.All(_cfg.HiddenModes.Contains)) return;   // запрет или ничего не изменилось
+
+        _cfg.HiddenModes = [.. next];
         _cfg.Save();
         ApplyModeVisibility();
         ModesReloaded?.Invoke();
     }
+
+    /// <summary>Можно ли скрыть ещё один режим (для гашения тумблеров в настройках).</summary>
+    public bool CanHideMode => ModeVisibility.CanHide(_modes.Length);
 
     // Применить желаемый стартовый режим; если прошивка не приняла (напр. Full-speed на батарее) — Auto.
     private void ApplyStartMode(PerfMode mode)
@@ -297,9 +306,7 @@ public sealed class AppController
             Safe(() => _mifs.SetPerfMode(PerfMode.Auto), false);
     }
 
-    private void ApplyModeVisibility() => _modes = AllModes.Where(m =>
-        (_cfg.EcoMode || m != PerfMode.Eco) &&
-        (_cfg.FullSpeedMode || m != PerfMode.FullSpeed)).ToArray();
+    private void ApplyModeVisibility() => _modes = ModeVisibility.Visible(AllModes, _cfg.HiddenModes);
 
     // ---- Стратегия режима при старте ----
 
