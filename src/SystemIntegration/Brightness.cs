@@ -15,7 +15,9 @@ public static class Brightness
     /// Метки наших записей яркости: событие WmiMonitorBrightnessEvent с помеченным значением —
     /// наше (восстановление слота, шаг плавного хода), любое другое — человек. Сравнение по
     /// значению надёжнее окна затишья по времени: WMI-вызовы асинхронные и по таймингу не
-    /// выстраиваются, а плавный ход длиннее любого разумного окна (XIC-29).
+    /// выстраиваются, а плавный ход длиннее любого разумного окна (XIC-29). Метки двух сроков:
+    /// значение, на котором мы стоим, живёт долго, а пройденные шаги хода — коротко, иначе весь
+    /// пройденный диапазон становится слепым и правки пользователя в нём теряются.
     /// </summary>
     public static readonly OwnWrites Own = new();
 
@@ -67,7 +69,7 @@ public static class Brightness
         if (delta == 0) return;
         int interval = Math.Max(30, durationMs / delta); // пол на случай кривого config.json
         int step = to > from ? 1 : -1;
-        Own.Note(from); // запоздалое событие исходного уровня во время хода — эхо, не действие человека
+        Own.NoteStep(from); // запоздалое событие исходного уровня во время хода — эхо, не действие человека
         Task.Run(() =>
         {
             try
@@ -75,9 +77,11 @@ public static class Brightness
                 for (int v = from + step; ; v += step)
                 {
                     if (ct.IsCancellationRequested) return;
-                    Own.Note(v);
+                    // NoteStep, а не Note: пройденный шаг перестаёт быть «нашим» почти сразу —
+                    // иначе весь пройденный диапазон был бы слепой зоной на весь TTL вперёд
+                    Own.NoteStep(v);
                     Set(v);
-                    if (v == to) return;
+                    if (v == to) { Own.Note(v); return; } // на цели мы стоим — ей полная метка
                     if (ct.WaitHandle.WaitOne(interval)) return; // сон с мгновенной отменой
                 }
             }
@@ -115,21 +119,37 @@ public static class Brightness
 /// </summary>
 public sealed class OwnWrites
 {
-    private const int TtlMs = 10_000;
+    private const int TtlMs = 10_000;      // значение, на котором мы стоим
+    private const int StepTtlMs = 1_500;   // промежуточный шаг плавного хода
 
     private readonly Dictionary<int, long> _until = [];  // значение → тик, до которого метка жива
     private readonly object _lock = new();
 
     public void Note(int level) => Note(level, Environment.TickCount64);
 
-    public void Note(int level, long nowMs)
+    public void Note(int level, long nowMs) => Mark(level, nowMs, TtlMs);
+
+    /// <summary>
+    /// Метка промежуточного шага плавного хода — живёт коротко. Событие о нашей же записи
+    /// приходит почти сразу, а долгая метка на КАЖДОМ пройденном шаге превращала весь
+    /// пройденный диапазон в слепую зону: спуск 100 → 93 помечал 100, 99, … 93, и клавиша
+    /// «ярче» (Windows возвращает ровно в этот диапазон) читалась как наша запись —
+    /// ход не отменялся, уступка не срабатывала, кривая ничему не училась (XIC-56).
+    /// </summary>
+    public void NoteStep(int level) => NoteStep(level, Environment.TickCount64);
+
+    public void NoteStep(int level, long nowMs) => Mark(level, nowMs, StepTtlMs);
+
+    // Метка не укорачивается: наткнувшийся на «стоячее» значение ход не должен обнулить его TTL.
+    private void Mark(int level, long nowMs, int ttlMs)
     {
         lock (_lock)
         {
             // заодно прибираем протухшее — словарь не растёт бесконечно
             foreach (var k in _until.Where(p => nowMs > p.Value).Select(p => p.Key).ToArray())
                 _until.Remove(k);
-            _until[level] = nowMs + TtlMs;
+            long until = nowMs + ttlMs;
+            _until[level] = _until.TryGetValue(level, out long prev) ? Math.Max(prev, until) : until;
         }
     }
 

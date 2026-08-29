@@ -70,6 +70,31 @@ public sealed class BrightnessCapGuardTests
         own.IsOwn(70, nowMs: 1000 + 60_000).Should().BeFalse();
     }
 
+    [Fact]
+    public void OwnWrites_PassedRampStep_StopsBeingOursQuickly()
+    {
+        // Регрессия: шаг схождения 100 → 93 помечал КАЖДОЕ пройденное значение полным TTL,
+        // и весь диапазон на десять секунд становился слепым. Клавиша «ярче» возвращает
+        // яркость ровно в него — правка читалась как наша запись: ход не отменялся, уступка
+        // не срабатывала, и «вверх» переставало работать вообще (поймано вживую на TM2424).
+        var own = new OwnWrites();
+        own.NoteStep(100, nowMs: 1000);   // ход вышел из 100 и ушёл ниже
+
+        own.IsOwn(100, nowMs: 1200).Should().BeTrue("запоздалое эхо нашей же записи — ещё наше");
+        own.IsOwn(100, nowMs: 4000).Should().BeFalse("ход давно прошёл мимо — это уже человек");
+    }
+
+    [Fact]
+    public void OwnWrites_RampTarget_KeepsFullTtl()
+    {
+        // на цели хода мы стоим: дубли и запоздалые события по ней приходят и через секунды
+        var own = new OwnWrites();
+        own.NoteStep(93, nowMs: 1000);
+        own.Note(93, nowMs: 1000);        // финальный шаг помечается обоими способами
+
+        own.IsOwn(93, nowMs: 1000 + 8_000).Should().BeTrue("метку не укорачивает шаговая");
+    }
+
     // ---- Машина состояний guard-а ----
 
     [Fact]
