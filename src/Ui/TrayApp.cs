@@ -261,10 +261,7 @@ public sealed class TrayApp : IDisposable
             NumLockKey = value => ShowToggleOsd(
                 value != 0 ? OsdKind.NumLockOn : OsdKind.NumLockOff,
                 "osd.numlock", value != 0),
-            // 0x1A/0x13 распознаны, но цикла частоты ещё нет (RefreshRate.Cycle приезжает
-            // отдельной задачей). До тех пор пишем в журнал: клавиша, которая молчит и не
-            // оставляет следа, выглядит как поломка и не даёт разобрать чужие отчёты.
-            RefreshRateKey = value => Log.Write($"Key: смена частоты value=0x{value:X2} — обработчик ещё не смонтирован"),
+            RefreshRateKey = OnRefreshRateKey,
             WinKeyLockKey = value => ShowToggleOsd(
                 value != 0 ? OsdKind.WinKeyLockOn : OsdKind.WinKeyLockOff,
                 value != 0 ? "osd.winkey.locked" : "osd.winkey.unlocked"),
@@ -420,6 +417,33 @@ public sealed class TrayApp : IDisposable
     {
         if (value == 2) WeakChargerOsd();
         else Log.Write($"Key: неизвестное значение проекции/питания value=0x{value:X2}");
+    }
+
+    // Смена видеорежима может занять секунды, поэтому не держим UI-поток. После await
+    // возвращаемся в него для OSD и сохранения профиля; Cycle сам сериализует быстрые нажатия.
+    private async void OnRefreshRateKey(byte value)
+    {
+        Log.Write($"Key: смена частоты value=0x{value:X2} — запускаем цикл");
+        if (!_cfg.RefreshRateFeature)
+        {
+            Log.Write("Key: управление частотой отключено — экран не трогаем");
+            return;
+        }
+
+        int? hz = await Task.Run(RefreshRate.Cycle);
+        if (hz is not int current)
+        {
+            // Закрытая крышка / режим «только внешний экран» штатны: не рисуем ложную ошибку.
+            Log.Write("Key: частоту не сменили — встроенная панель не активна или режимы недоступны");
+            return;
+        }
+
+        RefreshRate.RememberCycleForHold(_cfg, _power.IsOnline, current);
+        Log.Write($"Key: частота встроенной панели = {current} Гц");
+
+        // Приложение могло закрыться, пока драйвер переключал видеорежим.
+        if (_osd.IsDisposed || !_osd.IsHandleCreated) return;
+        _osd.Flash(OsdKind.RefreshRate, Loc.T("osd.hz", current));
     }
 
     // Предупреждение о слабом блоке приходит двумя путями (0x0C и проекция с value=2), и оба

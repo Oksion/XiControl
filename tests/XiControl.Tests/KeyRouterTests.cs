@@ -160,12 +160,13 @@ public sealed class KeyRouterTests
         _router.Handle(Mifs.KeyCalculator, 0);
         _router.Handle(Mifs.KeyLowPower, 2);
         _router.Handle(Mifs.KeyNumLock, 1);
+        _router.Handle(Mifs.KeyRefreshRateCompat, 2);
         _router.Handle(Mifs.KeyRefreshRate, 1);
         _router.Handle(Mifs.KeyWinLock, 1);
         _router.Handle(Mifs.KeyCameraPrivacy, 0);
 
         _hits.Should().Equal("screenshot", "taskview", "touchpadstate:1",
-            "calc", "lowpower:2", "numlock:1", "refresh:1", "winkey:1", "camera:0");
+            "calc", "lowpower:2", "numlock:1", "refresh:2", "refresh:1", "winkey:1", "camera:0");
     }
 
     [Fact]

@@ -142,6 +142,32 @@ public static class RefreshRate
         return rates[0];
     }
 
+    /// <summary>
+    /// Запомнить осознанный выбор аппаратной клавишей для текущего источника питания.
+    /// Нужно только при включённом удержании: иначе DisplaySettingsChanged от собственного
+    /// Cycle() через 1,5 с вернул бы старое значение профиля. Без удержания Windows уже
+    /// сохраняет выбор через CDS_UPDATEREGISTRY, а профиль пользователя менять не следует.
+    /// </summary>
+    internal static bool RememberCycleForHold(AppConfig cfg, bool online, int hz)
+    {
+        if (!cfg.RefreshRateFeature || !cfg.AutoRefreshRate || !cfg.HoldRefreshRate || hz <= 1)
+            return false;
+
+        if (online)
+        {
+            if (cfg.AcRefreshRate == hz) return false;
+            cfg.AcRefreshRate = hz;
+        }
+        else
+        {
+            if (cfg.BatteryRefreshRate == hz) return false;
+            cfg.BatteryRefreshRate = hz;
+        }
+
+        cfg.Save();
+        return true;
+    }
+
     /// <summary>«Панели нет» — не сбой, а нормальный расклад, и звать его так в логе нельзя:
     /// разбирая чужой log.txt, «не удалось установить» отправит искать несуществующую поломку.</summary>
     private enum ApplyResult { Ok, NoPanel, Failed }

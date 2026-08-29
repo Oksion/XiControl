@@ -52,6 +52,7 @@ public class KeyMapTests
         map.Kind(Mifs.KeySupportAssistant).Should().Be(KeyKind.Reserved);
         map.Kind(Mifs.KeyOemDevice).Should().Be(KeyKind.Reserved);
         map.Kind(Mifs.KeyCalculator).Should().Be(KeyKind.Calculator);
+        map.Kind(Mifs.KeyRefreshRateCompat).Should().Be(KeyKind.RefreshRate);
         map.Kind(Mifs.KeyRefreshRate).Should().Be(KeyKind.RefreshRate);
         map.Kind(Mifs.KeyCameraPrivacy).Should().Be(KeyKind.CameraPrivacy);
         map.Kind(0x08).Should().Be(KeyKind.Reserved);

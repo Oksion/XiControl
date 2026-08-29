@@ -477,6 +477,10 @@ rate is set with `ChangeDisplaySettingsEx` — no driver needed):
   uncheck it — whatever was set stays, restore it manually).
 - The actual mode switch runs **on a background thread** (doesn't block the UI), and a failure is
   merely logged to `log.txt`, the app doesn't crash. The power-change OSD appends the actual rate ("… • 120 Hz").
+- On supported Xiaomi models, the refresh-rate hotkey (`0x1A`, with `0x13` as a compatibility
+  alias) cycles the built-in panel's available modes and shows the resulting rate in the localized
+  OSD. With **Keep refresh rate** enabled, that deliberate choice becomes the configured rate for
+  the current power source, so the guard does not undo it 1.5 seconds later.
 
 When editing `AcRefreshRate`/`BatteryRefreshRate` directly in the config, restart the app
 (a choice in the settings window applies immediately; a non-standard value from the config is shown too).
@@ -491,7 +495,7 @@ the system's display-mode-changed event only.
 
 > An expected side effect, and the point of the feature: while the option is on, you can't change
 > the rate via Windows settings — we restore it faster than Windows asks "Keep these settings?".
-> To change it by hand, turn the toggle off.
+> To change it there by hand, turn the toggle off; the supported hardware hotkey remains usable.
 
 ### Tray indicator
 
