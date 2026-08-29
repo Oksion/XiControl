@@ -2,7 +2,7 @@ using System.Drawing.Drawing2D;
 
 namespace XiControl.Ui;
 
-public enum OsdKind { Charging, ChargingLimited, OnBattery, Eco, Quiet, Auto, Turbo, Full, CareOn, CareOff, MicOn, MicOff, Backlight, BacklightMid, BacklightOff, BacklightAuto, FnLockOn, FnLockOff, RefreshRate, RefreshRateOff, Travel, TravelOff, TouchpadOn, TouchpadOff, TouchscreenOn, TouchscreenOff, AutoBrightOn, AutoBrightOff, Error }
+public enum OsdKind { Charging, ChargingLimited, OnBattery, Eco, Quiet, Auto, Turbo, Full, CareOn, CareOff, MicOn, MicOff, Backlight, BacklightMid, BacklightOff, BacklightAuto, FnLockOn, FnLockOff, CapsLockOn, CapsLockOff, RefreshRate, RefreshRateOff, Travel, TravelOff, TouchpadOn, TouchpadOff, TouchscreenOn, TouchscreenOff, AutoBrightOn, AutoBrightOff, Error }
 
 /// <summary>Значок-оверлей качества зарядника поверх иконки заряда (независимо от лимита 80/100).</summary>
 public enum ChargeBadge { None, Slow, NoPd }
@@ -214,6 +214,8 @@ public sealed class OsdForm : Form
             OsdKind.BacklightAuto   => SvgIcons.KeyboardBacklightAuto,
             OsdKind.FnLockOn        => SvgIcons.FnLockOn,
             OsdKind.FnLockOff       => SvgIcons.FnLockOff,
+            OsdKind.CapsLockOn      => SvgIcons.CapsLockOn,
+            OsdKind.CapsLockOff     => SvgIcons.CapsLockOff,
             OsdKind.RefreshRate     => SvgIcons.RefreshRate,
             OsdKind.RefreshRateOff  => SvgIcons.RefreshRateOff,
             OsdKind.Travel          => SvgIcons.Travel,

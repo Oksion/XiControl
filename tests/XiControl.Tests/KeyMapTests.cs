@@ -44,6 +44,17 @@ public class KeyMapTests
         map.Kind(Mifs.KeyMiDown).Should().Be(KeyKind.MiDown);
         map.Kind(Mifs.KeyMiUp).Should().Be(KeyKind.MiUp);
         map.Kind(Mifs.KeyFnLock).Should().Be(KeyKind.FnLock);
+        map.Kind(Mifs.KeyCapsLock).Should().Be(KeyKind.CapsLock);
+        map.Kind(Mifs.KeyPerformance).Should().Be(KeyKind.Performance);
+        map.Kind(Mifs.KeyScreenshot).Should().Be(KeyKind.Screenshot);
+        map.Kind(Mifs.KeyTaskView).Should().Be(KeyKind.TaskView);
+        map.Kind(Mifs.KeyGameCenter).Should().Be(KeyKind.Reserved);
+        map.Kind(Mifs.KeySupportAssistant).Should().Be(KeyKind.Reserved);
+        map.Kind(Mifs.KeyOemDevice).Should().Be(KeyKind.Reserved);
+        map.Kind(Mifs.KeyCalculator).Should().Be(KeyKind.Calculator);
+        map.Kind(Mifs.KeyRefreshRate).Should().Be(KeyKind.RefreshRate);
+        map.Kind(Mifs.KeyCameraPrivacy).Should().Be(KeyKind.CameraPrivacy);
+        map.Kind(0x08).Should().Be(KeyKind.Reserved);
         map.Kind(0x55).Should().Be(KeyKind.Unknown, "неизвестный код так и остаётся неизвестным");
     }
 
@@ -94,12 +105,14 @@ public class KeyMapTests
     [Fact]
     public void FromConfig_ИмяСлотаБезРегистра()
     {
-        var cfg = new AppConfig { KeyCodes = new() { ["MIDOWN"] = "0x18", ["fnlock"] = "0x07" } };
+        var cfg = new AppConfig { KeyCodes = new() { ["MIDOWN"] = "0x18", ["fnlock"] = "0x07", ["CAPSLOCK"] = "0x09", ["PERFORMANCE"] = "0x16" } };
 
         var map = KeyMap.FromConfig(cfg);
 
         map.Kind(0x18).Should().Be(KeyKind.MiDown);
         map.Kind(0x07).Should().Be(KeyKind.FnLock);
+        map.Kind(0x09).Should().Be(KeyKind.CapsLock);
+        map.Kind(0x16).Should().Be(KeyKind.Performance);
     }
 
     [Theory]

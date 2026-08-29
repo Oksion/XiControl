@@ -233,6 +233,8 @@ public sealed class TrayApp : IDisposable
             ToggleAutoBrightness = () => _controller.SetAutoBrightness(!_cfg.AutoBrightness),
             AutoBrightnessAvailable = () => _controller.AlsAvailable,
             Projection = KeyActions.Projection,
+            Screenshot = KeyActions.Screenshot,
+            TaskView = KeyActions.TaskView,
             OpenSettings = KeyActions.OpenSettings,
             Copilot = KeyActions.Copilot,
             MediaPlayPause = KeyActions.MediaPlayPause,
@@ -243,7 +245,22 @@ public sealed class TrayApp : IDisposable
             Launch = KeyActions.LaunchCommand,
             MicKey = OnMicKey,
             BacklightKey = OnBacklightKey,
+            ProjectionWarningKey = OnProjectionWarningKey,
+            TouchpadStateKey = value => ShowToggleOsd(
+                value != 0 ? OsdKind.TouchpadOn : OsdKind.TouchpadOff,
+                value != 0 ? "osd.touchpad.on" : "osd.touchpad.off"),
+            LowPowerKey = _ => _osd.Flash(OsdKind.Error, Loc.T("osd.charger.weak")),
+            NumLockKey = value => ShowToggleOsd(
+                value != 0 ? OsdKind.FnLockOn : OsdKind.FnLockOff,
+                "osd.numlock", value != 0),
+            // 0x1A здесь уже распознан; RefreshRate.Cycle и монтаж обработчика приходят отдельным M3.
+            WinKeyLockKey = _ => _osd.Flash(OsdKind.FnLockOn, Loc.T("osd.winkey.locked")),
+            CameraPrivacyKey = value => Log.Write($"Key: camera/privacy 0xA0 value=0x{value:X2}"),
             FnLockKey = OnFnLockKey,
+            CapsLockKey = value => ShowToggleOsd(
+                value != 0 ? OsdKind.CapsLockOn : OsdKind.CapsLockOff,
+                "osd.capslock", value != 0),
+            PerformanceKey = OnPerformanceKey,
             PanelVisible = () => _panel.Visible,
         };
         _events.KeyPressed += OnKey;
@@ -385,6 +402,30 @@ public sealed class TrayApp : IDisposable
         };
         _osd.Flash(kind, Loc.T("osd.backlight"), sub);
     }
+
+    private void OnProjectionWarningKey(byte value)
+    {
+        if (value == 2) _osd.Flash(OsdKind.Error, Loc.T("osd.charger.weak"));
+        else Log.Write($"Key: unknown projection/power value=0x{value:X2}");
+    }
+
+    // Физическая клавиша уже сменила режим в EC: только синхронизируем сохранённое состояние
+    // и UI. Повторная запись была бы лишней и могла бы вызвать второй переход прошивки.
+    private void OnPerformanceKey(byte value)
+    {
+        if (ModeUi.FromHotkeyValue(value) is not PerfMode mode)
+        {
+            Log.Write($"Key: unknown performance value=0x{value:X2}");
+            return;
+        }
+        _cfg.RememberMode(mode);
+        if (_panel.Visible) _panel.RefreshUi();
+        else _osd.Flash(ModeUi.Kind(mode), Loc.T(ModeUi.Key(mode) ?? "mode.auto"));
+        _icon.Refresh();
+    }
+
+    private void ShowToggleOsd(OsdKind kind, string titleKey, bool? on = null) =>
+        _osd.Flash(kind, Loc.T(titleKey), on is bool state ? Loc.T(state ? "osd.on" : "osd.off") : null);
 
     // Флаг «сессия заблокирована»: прочие типы SessionSwitch (logon/logoff/remote) не трогают —
     // logoff и так завершает приложение, а RDP-переключения к видимости OSD отношения не имеют

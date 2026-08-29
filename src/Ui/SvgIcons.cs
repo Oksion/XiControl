@@ -51,6 +51,8 @@ public static class SvgIcons
     public const string Settings = "settings";
     public const string FnLockOn = "fn-lock-on";
     public const string FnLockOff = "fn-lock-off";
+    public const string CapsLockOn = "caps-lock-on";
+    public const string CapsLockOff = "caps-lock-off";
     public const string OwlAwake = "owl-awake";   // «не спать» включён
     public const string OwlAsleep = "owl-asleep"; // «не спать» выключен
 
