@@ -83,6 +83,12 @@ double-click; current direction is shown by color (charging green / discharging 
   "projection" keys can be bound to any function — from cycling modes to launching your
   own program (see "Key remapping"); the microphone key mutes the system mic, the backlight
   key shows an OSD with the level.
+- 🎛️ **The rest of the stock keys answer too** — nothing to configure. Xi Control follows the same
+  firmware dispatcher the vendor utility listens to, so Caps Lock, Num Lock, the Windows-key lock
+  and the touchpad indicator get a localised OSD, the snipping-tool and Task View keys do what
+  their icons promise, and a performance-mode key syncs the tray icon and the remembered mode.
+  Which of these exist depends on the model — a laptop that never sends a code simply never shows
+  that OSD.
 - 🖱️ **Touchpad on/off** — an action for any key + a cell in the panel. Disabling is done the
   stock way (like in Device Manager, no drivers) and does not survive a reboot — the touchpad
   can't get stuck disabled.
@@ -563,6 +569,33 @@ In `config.json` these are `*Action`/`*Command` pairs (`MiClick`, `MiDouble`, `M
 
 The old options (`MiShortPress`, `MiDoubleClick`, `SettingsKey`, `AiKeyProgram`/`AiKeyArgs`)
 are migrated automatically on the first launch of the new version.
+
+### Stock keys that answer without being asked
+
+Beyond the remappable slots above, the firmware announces a whole family of key events — the same
+ones the vendor's own utility listens to. Xi Control follows that dispatcher, so these need no
+configuration at all:
+
+| Key | What happens |
+|---|---|
+| Caps Lock / Num Lock / Windows-key lock | localised OSD with the new state |
+| Touchpad indicator | on/off OSD (the firmware has already switched it) |
+| Snipping tool | Win+Shift+S |
+| Task View | Win+Tab |
+| Calculator | the system calculator key |
+| Performance mode | tray icon, remembered mode and OSD are kept in sync |
+| Weak-power warning | a warning OSD, if charger wattage in the OSD is on |
+
+**Which of these your laptop has depends on the model.** A machine that never sends a given code
+simply never shows that OSD — nothing is broken and nothing needs switching off. Codes we recognise
+but that carry no action are written to `log.txt` instead of being swallowed: that line is how the
+owner of a model we have never seen finds their own codes and puts them into `KeyCodes` (see
+[docs/07-keymap.md](docs/07-keymap.md)).
+
+Performance mode is a special case worth knowing about: **the mode shown is read back from the
+firmware, never taken from the key event.** On the Redmi Book Pro 15 2022 the stock key cycles three
+modes while the firmware accepts two — press it into the third and the vendor's own OSD announces a
+switch that never happens. Xi Control stays quiet rather than repeating the claim.
 
 ### HTTP API (control from the local network)
 
