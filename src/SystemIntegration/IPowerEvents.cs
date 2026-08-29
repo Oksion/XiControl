@@ -43,7 +43,7 @@ public static class PowerLine
 {
     public static bool IsOnline(PowerLineStatus status) => status != PowerLineStatus.Offline;
 
-    public static bool IsOnline() => IsOnline(SystemInformation.PowerStatus.PowerLineStatus);
+    public static bool IsOnline() => IsOnline(PowerStatus.Read().LineStatus);
 }
 
 /// <summary>
@@ -70,7 +70,7 @@ public sealed class SystemEventsSource : IPowerEvents, IDisplayEvents
 
     public bool IsOnline => PowerLine.IsOnline();
 
-    public float BatteryLifePercent => SystemInformation.PowerStatus.BatteryLifePercent;
+    public float BatteryLifePercent => PowerStatus.Read().BatteryLifePercent;
 
     public SystemEventsSource()
     {

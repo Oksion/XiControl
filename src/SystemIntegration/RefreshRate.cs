@@ -82,10 +82,65 @@ public static class RefreshRate
         catch (Exception ex) { Log.Ex("RefreshRate.Resolve", ex); return null; }
     }
 
+    /// <summary>Поддерживаемые частоты текущего разрешения встроенной панели.
+    /// Пустой массив означает, что панель сейчас не активна или драйвер не отдал режимы.</summary>
+    public static int[] Supported()
+    {
+        try
+        {
+            if (InternalPanel() is not string panel) return [];
+            var cur = NewDevmode();
+            if (!EnumDisplaySettingsExW(panel, EnumCurrentSettings, ref cur, 0)) return [];
+            return SupportedRates(panel, cur);
+        }
+        catch (Exception ex) { Log.Ex("RefreshRate.Supported", ex); return []; }
+    }
+
+    /// <summary>Автопереключение имеет смысл только при наличии хотя бы двух режимов.</summary>
+    public static bool SupportsAutomaticSwitching() => HasMultipleRates(Supported());
+
+    internal static bool HasMultipleRates(IEnumerable<int> rates) =>
+        rates.Where(x => x > 1).Distinct().Take(2).Count() == 2;
+
     /// <summary>Установить ближайшую к hz поддерживаемую частоту встроенной панели.
     /// true — установлена (или уже стояла). Можно звать с любого потока; параллельные
     /// вызовы сериализуются.</summary>
     public static bool Apply(int hz) => ApplyCore(hz) == ApplyResult.Ok;
+
+    /// <summary>Переключить встроенную панель на следующую поддерживаемую частоту и вернуть
+    /// реально установленное значение. null — панель не активна или смена не удалась.</summary>
+    public static int? Cycle()
+    {
+        lock (Sync)
+        {
+            try
+            {
+                if (InternalPanel() is not string panel) return null;
+                var cur = NewDevmode();
+                if (!EnumDisplaySettingsExW(panel, EnumCurrentSettings, ref cur, 0)) return null;
+
+                var rates = SupportedRates(panel, cur);
+                if (NextRate((int)cur.dmDisplayFrequency, rates) is not int next) return null;
+                if ((int)cur.dmDisplayFrequency == next) return next;
+
+                cur.dmDisplayFrequency = (uint)next;
+                cur.dmFields = DmPelsWidth | DmPelsHeight | DmBitsPerPel | DmDisplayFrequency;
+                return ChangeDisplaySettingsExW(panel, ref cur, IntPtr.Zero, CdsUpdateRegistry, IntPtr.Zero)
+                    == DispChangeSuccessful ? next : null;
+            }
+            catch (Exception ex) { Log.Ex("RefreshRate.Cycle", ex); return null; }
+        }
+    }
+
+    /// <summary>Следующая частота по возрастанию; после максимальной — минимальная.</summary>
+    internal static int? NextRate(int current, IEnumerable<int> supported)
+    {
+        int[] rates = supported.Where(x => x > 1).Distinct().Order().ToArray();
+        if (rates.Length == 0) return null;
+        foreach (int rate in rates)
+            if (rate > current) return rate;
+        return rates[0];
+    }
 
     /// <summary>«Панели нет» — не сбой, а нормальный расклад, и звать его так в логе нельзя:
     /// разбирая чужой log.txt, «не удалось установить» отправит искать несуществующую поломку.</summary>
@@ -127,6 +182,17 @@ public static class RefreshRate
     private static int Nearest(string panel, Devmode cur, int hz)
     {
         int best = 0;
+        foreach (int f in SupportedRates(panel, cur))
+        {
+            if (best == 0 || Math.Abs(f - hz) < Math.Abs(best - hz) ||
+                (Math.Abs(f - hz) == Math.Abs(best - hz) && f > best)) best = f;
+        }
+        return best;
+    }
+
+    private static int[] SupportedRates(string panel, Devmode cur)
+    {
+        var rates = new HashSet<int>();
         var probe = NewDevmode();
         for (int i = 0; EnumDisplaySettingsExW(panel, i, ref probe, 0); i++)
         {
@@ -134,10 +200,9 @@ public static class RefreshRate
                 probe.dmBitsPerPel != cur.dmBitsPerPel) continue;
             int f = (int)probe.dmDisplayFrequency;
             if (f <= 1) continue; // 0/1 — «аппаратная по умолчанию», не частота
-            if (best == 0 || Math.Abs(f - hz) < Math.Abs(best - hz) ||
-                (Math.Abs(f - hz) == Math.Abs(best - hz) && f > best)) best = f;
+            rates.Add(f);
         }
-        return best;
+        return rates.Order().ToArray();
     }
 
     // ---- Поиск встроенной панели (CCD API, user32; driver-free) ----
