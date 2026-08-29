@@ -124,11 +124,14 @@ public sealed class QuickPanelForm : FlyoutForm
         catch (Exception ex) { Log.Ex("QuickPanel.Touchscreen", ex); _tsAvail = false; }
     }
 
-    /// <summary>Пересобрать набор видимых режимов из конфига (EcoMode/FullSpeedMode).</summary>
+    /// <summary>
+    /// Пересобрать набор видимых режимов. Правило берём из общего <see cref="ModeVisibility"/>,
+    /// а не повторяем здесь: панель уже разъезжалась с контроллером — свой фильтр знал только
+    /// про Эко и Полную мощность и пропускал скрытый «Баланс».
+    /// </summary>
     public void ReloadModes()
     {
-        _modes = AppController.AllModes
-            .Where(m => (_cfg.EcoMode || m != PerfMode.Eco) && (_cfg.FullSpeedMode || m != PerfMode.FullSpeed))
+        _modes = ModeVisibility.Visible(AppController.AllModes, _cfg.HiddenModes)
             .Select(m => (m, ModeUi.Key(m) ?? "mode.auto", ModeUi.Accent(m)))
             .ToArray();
         _modeRects = new Rectangle[_modes.Length];
@@ -599,6 +602,7 @@ public sealed class QuickPanelForm : FlyoutForm
         {
             PerfMode.Eco => SvgIcons.PerfEco,
             PerfMode.Quiet => SvgIcons.PerfQuiet,
+            PerfMode.Balance => SvgIcons.PerfBalance,
             PerfMode.Auto => SvgIcons.PerfAuto,
             PerfMode.Turbo => SvgIcons.PerfTurbo,
             PerfMode.FullSpeed => SvgIcons.PerfFull,

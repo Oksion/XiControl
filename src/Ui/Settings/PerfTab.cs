@@ -141,13 +141,14 @@ public sealed class PerfTab : SettingsPane
         foreach (var r in _profileRows) r.Visible = prof;
     }
 
-    // Только видимые режимы (скрытый Full-speed из приложения включить нельзя — контракт
-    // AppConfig.FullSpeedMode); плюс текущий выбор, даже если его успели скрыть.
+    // Только видимые режимы (скрытый из приложения включить нельзя) плюс текущий выбор, даже
+    // если его успели скрыть. Правило — из общего ModeVisibility, чтобы список не разъезжался
+    // с панелью и меню: свой фильтр здесь знал только про Эко и Полную мощность.
     private ComboBox ProfileCombo(bool ac)
     {
         var cur = ac ? _cfg.AcPerfMode : _cfg.BatteryPerfMode;
-        var modes = AppController.AllModes.Where(m => m == cur
-            || (m != PerfMode.Eco || _cfg.EcoMode) && (m != PerfMode.FullSpeed || _cfg.FullSpeedMode)).ToArray();
+        var visible = ModeVisibility.Visible(AppController.AllModes, _cfg.HiddenModes);
+        var modes = AppController.AllModes.Where(m => m == cur || visible.Contains(m)).ToArray();
         var items = new List<string> { Loc.T("settings.profile.nochange") };
         items.AddRange(modes.Select(m => Loc.T(ModeUi.Key(m) ?? "mode.auto")));
         int idx = cur is PerfMode pm ? Array.FindIndex(modes, m => m == pm) + 1 : 0;

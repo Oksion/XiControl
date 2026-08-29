@@ -112,7 +112,7 @@
   "settings.show.balance.desc": "均衡：并非所有机型都有 — Book Pro 14 的固件不接受该模式。",
   "settings.show.auto.desc": "智能：固件按负载自行选择模式。",
   "settings.show.turbo.desc": "高性能：日常使用中的最高性能。",
-  "settings.show.eco.desc": "节能：固件隐藏的省电模式。",
+  "settings.show.eco.desc": "节能：最省电的配置 — 关闭键盘背光。",
   "settings.show.full.desc": "全速：需要接通电源。",
   "settings.startmode": "启动模式",
   "settings.start.none": "不更改",

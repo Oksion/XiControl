@@ -112,7 +112,7 @@
   "settings.show.balance.desc": "Balanced: not on every model — the Book Pro 14 firmware refuses it.",
   "settings.show.auto.desc": "Auto: the firmware picks the mode by load.",
   "settings.show.turbo.desc": "Turbo: top performance for everyday work.",
-  "settings.show.eco.desc": "Eco: a hidden power-saving mode of the firmware.",
+  "settings.show.eco.desc": "Eco: the most economical profile — turns the keyboard backlight off.",
   "settings.show.full.desc": "Full speed: requires AC power.",
   "settings.startmode": "Startup mode",
   "settings.start.none": "Leave as is",
