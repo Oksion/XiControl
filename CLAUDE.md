@@ -224,7 +224,8 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   `ControlLib.dll` из System32; driver-free, без админа, ленивая инициализация; не Intel → ряд GPU
   в «Мониторе» просто не появляется, см. `docs/09`),
   `TrayMetrics` (XIC-35: `TrayMetricFormat` — чистое форматирование под тестами, `CpuLoad`/
-  `MemoryLoad`/`DptfTemperature` — источники, общие с «Монитором», `TrayMetricSource` —
+  `MemoryLoad`/`TemperatureSource` — источники, общие с «Монитором» (температура двухуровневая:
+  Intel DPTF, иначе ACPI-термозона с честной подписью «температура платы», XIC-41), `TrayMetricSource` —
   ленивый фасад по выбранной метрике);
   **HTTP API (XIC-13, opt-in)** — `HttpApi` (хост на `HttpListener`/http.sys, без ASP.NET Core;
   создаётся только при включённой фиче → выключено = 0 CPU), `ApiRouter` (авторизация Bearer+SHA-256
