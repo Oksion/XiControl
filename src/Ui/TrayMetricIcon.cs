@@ -47,7 +47,7 @@ public sealed class TrayMetricIcon : IDisposable
     public void Start()
     {
         _kind = TrayMetricFormat.ParseKind(_cfg.TrayMetricKind);
-        _source = new TrayMetricSource(_kind);
+        _source = new TrayMetricSource(_kind, _cfg.ForceAcpiTemperature);
         _light = Theme.TaskbarIsLight();
         _tray = new NotifyIcon { Text = Loc.T("app.name") };
         Apply("—", null);
@@ -67,7 +67,7 @@ public sealed class TrayMetricIcon : IDisposable
         {
             _kind = kind;
             _source?.Dispose();
-            _source = new TrayMetricSource(kind);
+            _source = new TrayMetricSource(kind, _cfg.ForceAcpiTemperature);
             _text = null; // «12» ватт и «12» процентов — разные значения, перерисовать
         }
         _timer.Stop();
@@ -98,7 +98,8 @@ public sealed class TrayMetricIcon : IDisposable
             if (src is null) return; // уже выключаемся
             float v = src.Read();
             string text = TrayMetricFormat.IconText(_kind, v);
-            string tip = Tip(v, src.PowerFromCpuPackage); // флаг читаем сразу за Read — он про этот же тик
+            // флаги читаем сразу за Read — они про этот же тик
+            string tip = Tip(v, src.PowerFromCpuPackage, src.TempFromAcpiZone);
             if (_ui.IsHandleCreated) _ui.BeginInvoke(new Action(() => Apply(text, tip)));
         }
         catch (Exception ex) { Log.Ex("TrayMetric", ex); }
@@ -121,11 +122,15 @@ public sealed class TrayMetricIcon : IDisposable
     // Тултип: имя приложения • метрика: точное значение с единицами (форматы — из «Монитора»).
     // cpuPackage — значение пришло из RAPL вместо датчика батареи: величина другая, и назвать
     // её надо иначе, иначе ватты пакета CPU читаются как потребление всей системы.
-    private string Tip(float v, bool cpuPackage)
+    private string Tip(float v, bool cpuPackage, bool acpiZone)
     {
-        string name = Loc.T(cpuPackage && _kind == TrayMetric.Power
-            ? "traymetric.power.cpu"
-            : "traymetric." + TrayMetricFormat.Key(_kind));
+        // подменённую величину называем своим именем — иначе число читается как враньё
+        string name = Loc.T((_kind, cpuPackage, acpiZone) switch
+        {
+            (TrayMetric.Power, true, _) => "traymetric.power.cpu",
+            (TrayMetric.Temp, _, true) => "traymetric.temp.zone",
+            _ => "traymetric." + TrayMetricFormat.Key(_kind),
+        });
         string val = float.IsNaN(v) ? "—" : _kind switch
         {
             TrayMetric.Power => Loc.T("monitor.watts", MathF.Abs(v)),

@@ -45,7 +45,7 @@ public sealed class MonitorForm : FlyoutForm
     private readonly SystemIntegration.PowerDraw _powerDraw = new(); // живая мощность через Battery IOCTL
     private readonly SystemIntegration.GpuTelemetry _gpuTel = new(); // iGPU через Intel IGCL (ленивая инициализация)
     private readonly SystemIntegration.CpuLoad _cpuLoad = new();          // GetSystemTimes (общий с индикатором трея)
-    private readonly SystemIntegration.DptfTemperature _dptf = new();     // температуры DPTF (общий с индикатором трея)
+    private readonly SystemIntegration.TemperatureSource _tempSrc;        // DPTF, иначе ACPI-зона (общий с индикатором трея)
     private float _ramUsedGb, _ramTotalGb;
     private int _adapterWatts; // ватты подключённого PD-БП (0 — нет/не PD); MIFS, driver-free
     private float _gpuMhz, _gpuWatts; // текущая частота и мощность GPU — в подстроку ряда
@@ -76,6 +76,7 @@ public sealed class MonitorForm : FlyoutForm
     {
         _cfg = cfg;
         _mifs = mifs;
+        _tempSrc = new SystemIntegration.TemperatureSource(cfg.ForceAcpiTemperature);
         _tip = new FlyoutTip(this);
         _view = cfg.MonitorView?.ToLowerInvariant() switch
         {
@@ -278,8 +279,8 @@ public sealed class MonitorForm : FlyoutForm
     /// </summary>
     private float SampleTempC()
     {
-        float c = _dptf.ReadMaxC();
-        if (_dptf.Present && !_hasTemp) { _hasTemp = true; ReadCriticalOnce(); } // класс есть → строка + крит-порог
+        float c = _tempSrc.ReadMaxC();
+        if (_tempSrc.Present && !_hasTemp) { _hasTemp = true; ReadCriticalOnce(); } // источник есть → строка + крит-порог
         return c;
     }
 
@@ -403,7 +404,9 @@ public sealed class MonitorForm : FlyoutForm
             float tc = _temp.Count > 0 ? _temp[^1] : float.NaN;
             Color now = !float.IsNaN(tc) && tc >= HotAt ? TempHotCol : TempCol; // текущее значение — вишнёвым, если горячо
             DrawRow(g, Next(),
-                Loc.T("monitor.temp"), float.IsNaN(tc) ? "—" : Loc.T("monitor.temp.c", (int)tc), now, _temp, TempMax,
+                // у ACPI-зоны другой смысл (плата, не горячая точка) — подпись строки это говорит
+                Loc.T(_tempSrc.Source == SystemIntegration.TempSource.AcpiZone ? "monitor.temp.zone" : "monitor.temp"),
+                float.IsNaN(tc) ? "—" : Loc.T("monitor.temp.c", (int)tc), now, _temp, TempMax,
                 scaleLabel: Loc.T("monitor.temp.c", (int)TempMax),
                 pick: v => v >= HotAt ? TempHotCol : TempCol); // горячая зона на графике — вишнёвая
         }
@@ -541,7 +544,7 @@ public sealed class MonitorForm : FlyoutForm
             _tick.Dispose();
             _tip.Dispose();
             _battery?.Dispose();
-            _dptf.Dispose();
+            _tempSrc.Dispose();
             _powerDraw.Dispose();
             _gpuTel.Dispose();
         }
