@@ -481,6 +481,10 @@ rate is set with `ChangeDisplaySettingsEx` — no driver needed):
   alias) cycles the built-in panel's available modes and shows the resulting rate in the localized
   OSD. With **Keep refresh rate** enabled, that deliberate choice becomes the configured rate for
   the current power source, so the guard does not undo it 1.5 seconds later.
+- **No such key on your model?** The same cycle is available as the assignable action `hz`
+  ("Cycle screen refresh rate") in Settings → Keys, so it can be put on the Mi button or any other
+  remappable key. It obeys the same **Refresh rate control** toggle: with the feature off, nothing
+  touches the display.
 
 When editing `AcRefreshRate`/`BatteryRefreshRate` directly in the config, restart the app
 (a choice in the settings window applies immediately; a non-standard value from the config is shown too).
@@ -566,7 +570,7 @@ cell only if a touchscreen is present).
 
 In `config.json` these are `*Action`/`*Command` pairs (`MiClick`, `MiDouble`, `MiHold`,
 `SettingsKey`, `AiKey`, `ProjKey`); action values: `modes`, `charge`, `panel`, `owl`, `monitor`,
-`touchpad`, `touchscreen`, `autobright`, `travel`, `projection`, `settings`, `copilot`, `play`, `next`, `prev`,
+`touchpad`, `touchscreen`, `autobright`, `hz`, `travel`, `projection`, `settings`, `copilot`, `play`, `next`, `prev`,
 `stop`, `calc`, `launch`, `none`:
 
 ```json

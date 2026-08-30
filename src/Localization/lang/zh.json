@@ -152,6 +152,7 @@
   "settings.act.touchpad": "触控板开关",
   "settings.act.touchscreen": "触摸屏开关",
   "settings.act.autobright": "自动亮度开关",
+  "settings.act.hz": "循环切换屏幕刷新率",
   "settings.act.projection": "投影（Win+P）",
   "settings.act.settings": "Windows 设置",
   "settings.act.copilot": "Copilot（Win+C）",

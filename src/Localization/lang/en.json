@@ -152,6 +152,7 @@
   "settings.act.touchpad": "Touchpad on/off",
   "settings.act.touchscreen": "Touchscreen on/off",
   "settings.act.autobright": "Auto-brightness on/off",
+  "settings.act.hz": "Cycle screen refresh rate",
   "settings.act.projection": "Projection (Win+P)",
   "settings.act.settings": "Windows Settings",
   "settings.act.copilot": "Copilot (Win+C)",

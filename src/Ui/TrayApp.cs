@@ -240,6 +240,7 @@ public sealed class TrayApp : IDisposable
             ToggleTouchscreen = _controller.ToggleTouchscreen,
             ToggleAutoBrightness = () => _controller.SetAutoBrightness(!_cfg.AutoBrightness),
             AutoBrightnessAvailable = () => _controller.AlsAvailable,
+            CycleRefreshRate = () => _ = CycleRefreshRateAsync(),
             Projection = KeyActions.Projection,
             Screenshot = KeyActions.Screenshot,
             TaskView = KeyActions.TaskView,
@@ -419,9 +420,9 @@ public sealed class TrayApp : IDisposable
         else Log.Write($"Key: неизвестное значение проекции/питания value=0x{value:X2}");
     }
 
-    // Смена видеорежима может занять секунды, поэтому не держим UI-поток. После await
-    // возвращаемся в него для OSD и сохранения профиля; Cycle сам сериализует быстрые нажатия.
-    private async void OnRefreshRateKey(byte value)
+    // Аппаратная клавиша герцовки. Гейт проверяем здесь, а не только в общем методе:
+    // молчащая клавиша без следа в журнале выглядит как поломка и мешает разбирать отчёты.
+    private void OnRefreshRateKey(byte value)
     {
         Log.Write($"Key: смена частоты value=0x{value:X2} — запускаем цикл");
         if (!_cfg.RefreshRateFeature)
@@ -429,21 +430,34 @@ public sealed class TrayApp : IDisposable
             Log.Write("Key: управление частотой отключено — экран не трогаем");
             return;
         }
+        _ = CycleRefreshRateAsync();
+    }
 
-        int? hz = await Task.Run(RefreshRate.Cycle);
-        if (hz is not int current)
+    // Общий путь клавиши герцовки и назначаемого действия «hz» (XIC-58): на моделях без
+    // аппаратной клавиши цикл вешается на любую другую. Смена видеорежима может занять
+    // секунды, поэтому не держим UI-поток. После await возвращаемся в него для OSD и
+    // сохранения профиля; Cycle сам сериализует быстрые нажатия. Task, а не async void:
+    // глобального обработчика исключений у нас нет, и вылет отсюда уронил бы приложение.
+    private async Task CycleRefreshRateAsync()
+    {
+        try
         {
-            // Закрытая крышка / режим «только внешний экран» штатны: не рисуем ложную ошибку.
-            Log.Write("Key: частоту не сменили — встроенная панель не активна или режимы недоступны");
-            return;
+            int? hz = await Task.Run(RefreshRate.Cycle);
+            if (hz is not int current)
+            {
+                // Закрытая крышка / «только внешний экран» штатны: не рисуем ложную ошибку.
+                Log.Write("Key: частоту не сменили — встроенная панель не активна или режимы недоступны");
+                return;
+            }
+
+            RefreshRate.RememberCycleForHold(_cfg, _power.IsOnline, current);
+            Log.Write($"Key: частота встроенной панели = {current} Гц");
+
+            // Приложение могло закрыться, пока драйвер переключал видеорежим.
+            if (_osd.IsDisposed || !_osd.IsHandleCreated) return;
+            _osd.Flash(OsdKind.RefreshRate, Loc.T("osd.hz", current));
         }
-
-        RefreshRate.RememberCycleForHold(_cfg, _power.IsOnline, current);
-        Log.Write($"Key: частота встроенной панели = {current} Гц");
-
-        // Приложение могло закрыться, пока драйвер переключал видеорежим.
-        if (_osd.IsDisposed || !_osd.IsHandleCreated) return;
-        _osd.Flash(OsdKind.RefreshRate, Loc.T("osd.hz", current));
+        catch (Exception ex) { Log.Ex("RefreshRate.Cycle.key", ex); }
     }
 
     // Предупреждение о слабом блоке приходит двумя путями (0x0C и проекция с value=2), и оба

@@ -25,6 +25,7 @@ public sealed class KeyRouter
     public Action? ToggleTouchpad;
     public Action? ToggleTouchscreen;
     public Action? ToggleAutoBrightness;
+    public Action? CycleRefreshRate;
     public Action? Projection;
     public Action? Screenshot;
     public Action? TaskView;
@@ -134,6 +135,7 @@ public sealed class KeyRouter
             case "touchpad": if (_cfg.TouchpadFeature) ToggleTouchpad?.Invoke(); break; // фича скрыта — не трогаем
             case "touchscreen": if (_cfg.TouchscreenFeature) ToggleTouchscreen?.Invoke(); break; // фича скрыта — не трогаем
             case "autobright": if (AutoBrightnessAvailable()) ToggleAutoBrightness?.Invoke(); break; // нет датчика — нечего включать
+            case "hz": if (_cfg.RefreshRateFeature) CycleRefreshRate?.Invoke(); break; // фича убрана — экран не трогаем
             case "projection": Projection?.Invoke(); break;
             case "settings": OpenSettings?.Invoke(); break;
             case "copilot": Copilot?.Invoke(); break;
