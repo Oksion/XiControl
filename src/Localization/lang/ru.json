@@ -152,6 +152,7 @@
   "settings.act.touchpad": "Тачпад вкл/выкл",
   "settings.act.touchscreen": "Сенсорный экран вкл/выкл",
   "settings.act.autobright": "Авто-яркость вкл/выкл",
+  "settings.act.hz": "Частота экрана по кругу",
   "settings.act.projection": "Проекция (Win+P)",
   "settings.act.settings": "Параметры Windows",
   "settings.act.copilot": "Copilot (Win+C)",

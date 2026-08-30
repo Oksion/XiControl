@@ -10,7 +10,7 @@ public sealed class KeysTab : SettingsPane
     private static readonly string[] KeyActionValues =
     [
         "modes", "charge", "panel", "owl", "monitor", "travel", "touchpad", "touchscreen",
-        "autobright", "projection", "settings", "copilot", "play", "next", "prev", "stop",
+        "autobright", "hz", "projection", "settings", "copilot", "play", "next", "prev", "stop",
         "calc", "launch", "none",
     ];
 

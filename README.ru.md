@@ -484,6 +484,10 @@ dotnet publish src/XiControl.csproj -c Release -r win-x64 --self-contained -p:Pu
   перебирает доступные режимы встроенной панели и показывает итоговую частоту в локализованном
   OSD. При включённом **«Удерживать частоту»** этот осознанный выбор становится значением профиля
   текущего питания, поэтому guard не отменяет его через 1,5 секунды.
+- **На твоей модели такой клавиши нет?** Тот же цикл доступен как назначаемое действие `hz`
+  («Частота экрана по кругу») в Настройки → Клавиши — вешается на Mi-кнопку или любую другую
+  переназначаемую клавишу. Подчиняется тому же тумблеру **«Управление частотой»**: фича выключена —
+  экран не трогаем ниоткуда.
 
 При правке `AcRefreshRate`/`BatteryRefreshRate` прямо в конфиге перезапусти приложение
 (выбор в окне настроек применяется сразу; нестандартное значение из конфига окно тоже покажет).
@@ -568,7 +572,7 @@ Windows. Громкости в списке нет намеренно: для н
 
 В `config.json` это пары `*Action`/`*Command` (`MiClick`, `MiDouble`, `MiHold`, `SettingsKey`,
 `AiKey`, `ProjKey`), значения действий: `modes`, `charge`, `panel`, `owl`, `monitor`,
-`travel`, `touchpad`, `touchscreen`, `autobright`, `projection`, `settings`, `copilot`, `play`, `next`,
+`travel`, `touchpad`, `touchscreen`, `autobright`, `hz`, `projection`, `settings`, `copilot`, `play`, `next`,
 `prev`, `stop`, `calc`, `launch`, `none`:
 
 ```json

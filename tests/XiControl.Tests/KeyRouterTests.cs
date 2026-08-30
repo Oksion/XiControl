@@ -34,6 +34,7 @@ public sealed class KeyRouterTests
             ToggleTouchpad = () => _hits.Add("touchpad"),
             ToggleTouchscreen = () => _hits.Add("touchscreen"),
             ToggleAutoBrightness = () => _hits.Add("autobright"),
+            CycleRefreshRate = () => _hits.Add("hz"),
             Projection = () => _hits.Add("projection"),
             Screenshot = () => _hits.Add("screenshot"),
             TaskView = () => _hits.Add("taskview"),
@@ -267,6 +268,28 @@ public sealed class KeyRouterTests
         _router.Run("autobright", null);
 
         _hits.Should().Equal("autobright");
+    }
+
+    // Цикл частоты (XIC-58) вешается на любую клавишу, но подчиняется тому же тумблеру,
+    // что и автопереключение: выключил «Управление частотой» — экран не трогаем ниоткуда.
+    [Fact]
+    public void Run_Hz_FeatureOff_DoesNothing()
+    {
+        _cfg.RefreshRateFeature = false;
+
+        _router.Run("hz", null);
+
+        _hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Run_Hz_FeatureOn_Fires()
+    {
+        _cfg.RefreshRateFeature = true;
+
+        _router.Run("hz", null);
+
+        _hits.Should().Equal("hz");
     }
 
     [Fact]
