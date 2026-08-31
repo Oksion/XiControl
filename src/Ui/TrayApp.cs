@@ -711,6 +711,7 @@ public sealed class TrayApp : IDisposable
                 SetTouchpadDeadZoneMm = _controller.SetTouchpadDeadZoneMm,
                 SetTouchpadEdgeSliders = _controller.SetTouchpadEdgeSliders,
                 SetTouchpadEdgeWidthMm = _controller.SetTouchpadEdgeWidthMm,
+                SetTouchpadEdgeSwipes = _controller.SetTouchpadEdgeSwipes,
                 SetTouchpadEdgeSwap = _controller.SetTouchpadEdgeSwap,
                 SetOwlFeature = _controller.ToggleOwlFeature,
                 SetCareLimit = _controller.SetCareLimit,

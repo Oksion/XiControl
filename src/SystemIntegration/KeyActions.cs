@@ -109,10 +109,10 @@ public static class KeyActions
     /// <summary>Шаг громкости: положительный — громче, отрицательный — тише. Штатными
     /// клавишами, а не через IAudioEndpointVolume: так работает системный OSD громкости,
     /// и человек видит привычную шкалу вместо нашей выдумки (XIC-61).</summary>
-    public static void VolumeStep(int steps)
+    public static void VolumeStep(int taps)
     {
-        byte key = steps > 0 ? VK_VOLUME_UP : VK_VOLUME_DOWN;
-        for (int i = 0; i < Math.Min(Math.Abs(steps), 10); i++) TapKey(key);
+        byte key = taps > 0 ? VK_VOLUME_UP : VK_VOLUME_DOWN;
+        for (int i = 0; i < Math.Min(Math.Abs(taps), 20); i++) TapKey(key);
     }
 
     public static void MediaPlayPause() => TapKey(VK_MEDIA_PLAY_PAUSE);

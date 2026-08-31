@@ -61,7 +61,14 @@ public sealed class RawTouchpadReader : IDisposable
         if (t is null) return;
         _stopping = true;
         if (_hwnd != IntPtr.Zero) PostMessageW(_hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
-        if (!t.Join(2000)) Log.Write("RawTouchpad: поток не завершился за 2 с — оставляем фоновым");
+        if (!t.Join(2000))
+        {
+            // Ссылку НЕ обнуляем: иначе следующий Start поднял бы второй читатель, оба окна
+            // получали бы WM_INPUT, и каждый жест считался бы дважды. Застрявший одиночка
+            // безопаснее пары.
+            Log.Write("RawTouchpad: поток не завершился за 2 с — чтение больше не поднимаем");
+            return;
+        }
         _thread = null;
     }
 
@@ -165,9 +172,10 @@ public sealed class RawTouchpadReader : IDisposable
                 _frame.Clear();
                 foreach (var link in info.Links)
                 {
-                    // Tip Switch: без касания координаты коллекции — прошлогодний мусор.
-                    if (HidP_GetUsageValue(0, PageDigitizer, link, UsageTipSwitch, out uint tip,
-                            info.Preparsed, report, reportSize) != HidpSuccess || tip == 0) continue;
+                    // Tip Switch — это КНОПКА, а не значение: HidP_GetUsageValue на ней всегда
+                    // отвечает ошибкой, и строгая проверка отбрасывала бы каждый контакт.
+                    // Нажатые кнопки коллекции отдаёт HidP_GetUsages списком usage-кодов.
+                    if (!IsTouching(info.Preparsed, link, report, reportSize)) continue;
                     if (HidP_GetUsageValue(0, PageGeneric, link, UsageX, out uint x,
                             info.Preparsed, report, reportSize) != HidpSuccess) continue;
                     if (HidP_GetUsageValue(0, PageGeneric, link, UsageY, out uint y,
@@ -184,6 +192,20 @@ public sealed class RawTouchpadReader : IDisposable
             }
         }
         finally { pin.Free(); }
+    }
+
+    // Палец на панели: ищем Tip Switch среди нажатых кнопок этой коллекции. Буфер с запасом —
+    // кнопок в PTP-коллекции единицы, а перевыделять его на каждый контакт незачем.
+    private readonly ushort[] _usages = new ushort[32];
+
+    private bool IsTouching(IntPtr preparsed, ushort link, byte[] report, uint reportSize)
+    {
+        uint length = (uint)_usages.Length;
+        if (HidP_GetUsages(0, PageDigitizer, link, _usages, ref length, preparsed, report, reportSize) != HidpSuccess)
+            return false;
+        for (uint i = 0; i < length; i++)
+            if (_usages[i] == UsageTipSwitch) return true;
+        return false;
     }
 
     private static double Fraction(uint raw, int min, int max) =>
@@ -245,6 +267,7 @@ public sealed class RawTouchpadReader : IDisposable
     [DllImport("hid.dll")] private static extern int HidP_GetCaps(IntPtr pp, out HIDP_CAPS caps);
     [DllImport("hid.dll")] private static extern int HidP_GetValueCaps(int type, [In, Out] HIDP_VALUE_CAPS[] caps, ref ushort len, IntPtr pp);
     [DllImport("hid.dll")] private static extern int HidP_GetUsageValue(int type, ushort page, ushort link, ushort usage, out uint value, IntPtr pp, byte[] report, uint len);
+    [DllImport("hid.dll")] private static extern int HidP_GetUsages(int type, ushort page, ushort link, [In, Out] ushort[] usages, ref uint length, IntPtr pp, byte[] report, uint len);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct WNDCLASSEXW

@@ -39,11 +39,26 @@ public sealed class TouchpadTab : SettingsPane
         width.Enabled = cfg.TouchpadEdgeSliders;
         ui.AddRow(this, "settings.touchpad.edges.size", "settings.touchpad.edges.size.desc", width);
 
+        var speed = SwipeCombo(cfg.TouchpadEdgeSwipesPerRange, act.SetTouchpadEdgeSwipes);
+        speed.Enabled = cfg.TouchpadEdgeSliders;
+        ui.AddRow(this, "settings.touchpad.edges.speed", "settings.touchpad.edges.speed.desc", speed);
+
         var swap = ui.Toggle(cfg.TouchpadEdgeSwap, act.SetTouchpadEdgeSwap);
         swap.Enabled = cfg.TouchpadEdgeSliders;
         ui.AddRow(this, "settings.touchpad.edges.swap", "settings.touchpad.edges.swap.desc", swap);
 
         ui.AddNote(this, "settings.touchpad.edges.note");
+    }
+
+    /// <summary>Чувствительность: сколько проходов вдоль края покрывают шкалу целиком.
+    /// Величина выбрана потому, что её человек чувствует пальцем, а не потому, что её удобно
+    /// хранить: «шаг в процентах высоты» ни о чём не говорит, пока не поводишь.</summary>
+    private ComboBox SwipeCombo(int current, Action<int> apply)
+    {
+        int[] presets = EdgeSlideScale.Presets;
+        int swipes = presets.Contains(current) ? current : 2;
+        string[] names = [.. presets.Select(p => Loc.T($"settings.touchpad.edges.speed.{p}"))];
+        return Ui.Combo(names, Array.IndexOf(presets, swipes), i => apply(presets[i]), Ui.Sc(140));
     }
 
     /// <summary>Ширина краевой полосы. Верх списка ограничен намеренно: измерено, что заведомо

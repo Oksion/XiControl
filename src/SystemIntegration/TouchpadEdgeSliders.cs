@@ -41,22 +41,45 @@ public sealed class TouchpadEdgeSliders : IDisposable
 
     private readonly AppConfig _cfg;
     private readonly TouchpadControl _pad;
-    private readonly TouchpadEdgeGesture _gesture;
+    private TouchpadEdgeGesture _gesture;
     private readonly RawTouchpadReader _reader;
     private readonly Action<int> _volume;
     private readonly Action<int> _brightness;
+    private EdgeSlideScale _scale;
+    private readonly IAppTimer _pump;
     private readonly object _lock = new();
 
+    private int _pendingBrightness;   // накоплено с потока чтения, применяет воркер
+    private int _pendingTaps;
+    private int _level;               // кэш яркости; трогает только воркер — замок не нужен
+    private volatile bool _resync = true;  // перечитать яркость: жест начался заново
+    private int _busy;                // тик воркера уже идёт (WorkerTimer умеет входить повторно)
+
     public TouchpadEdgeSliders(AppConfig cfg, TouchpadControl pad,
-        Action<int>? volume = null, Action<int>? brightness = null)
+        Action<int>? volume = null, Action<int>? brightness = null, IAppTimer? pump = null)
     {
         _cfg = cfg;
         _pad = pad;
         _volume = volume ?? KeyActions.VolumeStep;
         _brightness = brightness ?? BrightnessStep;
-        _gesture = new TouchpadEdgeGesture(WidthFraction(cfg), cfg.TouchpadEdgeStepPercent / 100.0);
+        _gesture = new TouchpadEdgeGesture(WidthFraction(cfg), EdgeSlideScale.StepFraction);
+        _scale = new EdgeSlideScale(cfg.TouchpadEdgeSwipesPerRange);
+        // дальше их пересобирает Reconfigure — настройки живут не только на старте
         _reader = new RawTouchpadReader(OnFrame);
+
+        // Применение вынесено с потока чтения намеренно. Первая версия звала WMI прямо в
+        // обработчике кадра: синхронный Brightness.Get на каждый шаг плюс Task.Run на каждую
+        // запись. При быстром движении это десятки одновременных WMI-операций в секунду —
+        // цикл сообщений забивается, пул потоков голодает, и ползунок через минуту-другую
+        // просто переставал отвечать. Теперь поток чтения только копит намерение.
+        _pump = pump ?? new WorkerTimer();
+        _pump.Interval = PumpMs;
+        _pump.Tick += Drain;
     }
+
+    /// <summary>Как часто применяем накопленное. 50 мс — быстрее человеческого «плавно»,
+    /// но на два порядка реже, чем приходят кадры касаний.</summary>
+    private const int PumpMs = 50;
 
     /// <summary>Тачпад в системе есть — без него опция бессмысленна.</summary>
     public bool Available => _pad.Available;
@@ -64,16 +87,23 @@ public sealed class TouchpadEdgeSliders : IDisposable
     /// <summary>Поднять чтение, если фича включена. Зовётся на старте и при смене настройки.</summary>
     public void Start()
     {
+        // Пересобираем ВСЕГДА, даже если фича выключена: ширина полосы и чувствительность
+        // берутся из конфига, а он меняется на ходу. Первая версия строила жест и шкалу
+        // один раз в конструкторе — и настройка чувствительности молча ничего не делала:
+        // Apply перезапускал чтение, но считали его прежние объекты со старыми числами.
+        Reconfigure();
         if (!_cfg.TouchpadEdgeSliders || !Available) return;
-        _gesture.Reset();
         _reader.Start();
+        _pump.Start();
     }
 
     /// <summary>Остановить чтение (выключение фичи, выход).</summary>
     public void Stop()
     {
+        _pump.Stop();
         _reader.Stop();
         _gesture.Reset();
+        ResetPending();
     }
 
     /// <summary>
@@ -123,13 +153,25 @@ public sealed class TouchpadEdgeSliders : IDisposable
     // решение и вызов действия; ничего тяжёлого, иначе очередь сообщений начнёт отставать.
     private void OnFrame(IReadOnlyList<TouchContact> contacts)
     {
-        (TouchpadEdge Edge, int Steps) result;
-        lock (_lock) result = _gesture.Update(contacts);
-        if (result.Steps == 0) return;
+        lock (_lock)
+        {
+            var result = _gesture.Update(contacts);
+            if (contacts.Count == 0)
+            {
+                // Палец оторван: остаток шкалы к следующему жесту не относится, а кэш яркости
+                // протух — в следующий раз читаем реальную (её могли сменить и мимо нас).
+                // Флагом, а не записью под замком: замок берёт и воркер, а он ходит в WMI,
+                // и поток чтения касаний вставал бы на нём в очередь.
+                _scale.Reset();
+                _resync = true;
+                return;
+            }
+            if (result.Steps == 0) return;
 
-        bool swap = _cfg.TouchpadEdgeSwap;
-        bool brightness = (result.Edge == TouchpadEdge.Left) != swap;
-        if (brightness) _brightness(result.Steps); else _volume(result.Steps);
+            bool toBrightness = (result.Edge == TouchpadEdge.Left) != _cfg.TouchpadEdgeSwap;
+            if (toBrightness) _pendingBrightness += _scale.Brightness(result.Steps);
+            else _pendingTaps += _scale.VolumeTaps(result.Steps);
+        }
     }
 
     private static double WidthFraction(AppConfig cfg)
@@ -141,17 +183,82 @@ public sealed class TouchpadEdgeSliders : IDisposable
         return NormalizeWidthMm(cfg.TouchpadEdgeWidthMm) / PadWidthMm;
     }
 
-    // Шаг яркости — ручная правка: пишем БЕЗ метки Own, чтобы кривая авто-яркости училась,
-    // а лимит считал это осознанным выбором человека (см. XIC-56 про метки).
-    private static void BrightnessStep(int steps)
+    // Воркер: применяем накопленное пачкой. Здесь можно ходить в WMI — поток свой.
+    // WorkerTimer периодический и умеет войти повторно, если тик затянулся: WMI-запись
+    // изредка занимает больше 50 мс. Пропускаем такой тик — накопленное дождётся следующего.
+    private void Drain()
     {
-        if (Brightness.Get() is not int now) return;
-        int next = Math.Clamp(now + (steps * 5), 0, 100);
-        if (next != now) Brightness.ApplyAsUser(next);
+        if (Interlocked.Exchange(ref _busy, 1) != 0) return;
+        try
+        {
+            int percent, taps;
+            lock (_lock)
+            {
+                percent = _pendingBrightness;
+                taps = _pendingTaps;
+                _pendingBrightness = 0;
+                _pendingTaps = 0;
+            }
+            if (taps != 0) _volume(taps);
+            if (percent != 0) _brightness(percent);
+        }
+        catch (Exception ex) { Log.Ex("TouchpadEdges.Drain", ex); }
+        finally { Interlocked.Exchange(ref _busy, 0); }
+    }
+
+    /// <summary>
+    /// Перечитать настройки без похода в реестр: ширина полосы и чувствительность живут в
+    /// конфиге, а меняются на ходу. Отдельно от <see cref="Apply"/> намеренно — смена
+    /// чувствительности не трогает зоны, и гонять ради неё перезапуск узла (тачпад на секунду
+    /// пропадает) было бы наказанием за движение ползунка в настройках.
+    /// </summary>
+    public void Reconfigure()
+    {
+        lock (_lock)
+        {
+            _gesture = new TouchpadEdgeGesture(WidthFraction(_cfg), EdgeSlideScale.StepFraction);
+            _scale = new EdgeSlideScale(_cfg.TouchpadEdgeSwipesPerRange);
+            _pendingBrightness = 0;
+            _pendingTaps = 0;
+        }
+        _resync = true;
+    }
+
+    private void ResetPending()
+    {
+        lock (_lock)
+        {
+            _pendingBrightness = 0;
+            _pendingTaps = 0;
+            _scale.Reset();
+        }
+        _resync = true;
+    }
+
+    // Яркость — ручная правка: пишем БЕЗ метки Own, чтобы кривая авто-яркости училась,
+    // а лимит считал это осознанным выбором человека (см. XIC-56 про метки).
+    // Уровень кэшируем на время жеста: WMI-чтение на каждый шаг и было тем, что вешало
+    // ползунок при быстром движении.
+    private void BrightnessStep(int percent)
+    {
+        // _level и _resync принадлежат воркеру (Drain защищён от повторного входа), поэтому
+        // замок здесь не нужен — и не должен браться: под ним стоит WMI-чтение, а тот же
+        // замок берёт поток чтения касаний.
+        if (_resync)
+        {
+            if (Brightness.Get() is not int now) return;
+            _level = now;
+            _resync = false;
+        }
+        int next = Math.Clamp(_level + percent, 0, 100);
+        if (next == _level) return;
+        _level = next;
+        Brightness.ApplyAsUser(next);
     }
 
     public void Dispose()
     {
+        _pump.Dispose();
         _reader.Dispose();
     }
 }

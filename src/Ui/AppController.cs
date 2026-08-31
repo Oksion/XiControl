@@ -811,6 +811,15 @@ public sealed class AppController
         if (_cfg.TouchpadEdgeSliders) Task.Run(() => Safe(_edges.Apply, false));
     }
 
+    /// <summary>Чувствительность краевых ползунков (проходов на всю шкалу). Реестра не касается —
+    /// пересобираем только пересчёт шагов, поэтому ни перезапуска узла, ни перечитывания зон.</summary>
+    public void SetTouchpadEdgeSwipes(int swipes)
+    {
+        _cfg.TouchpadEdgeSwipesPerRange = swipes;
+        _cfg.Save();
+        Safe(() => { _edges.Reconfigure(); return true; }, false);
+    }
+
     /// <summary>Поменять края местами. Реестра не касается — меняется только трактовка жеста,
     /// поэтому ни перезапуска узла, ни перечитывания зон не нужно.</summary>
     public void SetTouchpadEdgeSwap(bool on)

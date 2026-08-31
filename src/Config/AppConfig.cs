@@ -142,8 +142,10 @@ public sealed class AppConfig
     /// большое значение PTP-маппер игнорирует вовсе и зона просто не работает.</summary>
     public int TouchpadEdgeWidthMm { get; set; } = SystemIntegration.TouchpadEdgeSliders.DefaultWidthMm;
 
-    /// <summary>Сколько высоты панели (%) нужно пройти на один шаг. Мельче — дёргано, крупнее — туго.</summary>
-    public int TouchpadEdgeStepPercent { get; set; } = 6;
+    /// <summary>Чувствительность краевых ползунков: сколько проходов вдоль края нужно, чтобы
+    /// пройти шкалу целиком. Один — резко, три — плавно. Яркость и громкость идут по этой
+    /// величине в ногу; до неё они расходились в 2,5 раза (шаг громкости Windows — 2%).</summary>
+    public int TouchpadEdgeSwipesPerRange { get; set; } = 2;
 
     /// <summary>Поменять края местами: слева громкость, справа яркость.</summary>
     public bool TouchpadEdgeSwap { get; set; } = false;
