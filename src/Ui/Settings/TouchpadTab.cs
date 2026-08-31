@@ -28,6 +28,33 @@ public sealed class TouchpadTab : SettingsPane
         ui.AddNote(this, "settings.touchpad.deadzone.note");
         // предупреждаем только когда это правда мешает — иначе строка была бы шумом
         if (TouchpadDeadZone.AapDisabled == true) ui.AddNote(this, "settings.touchpad.deadzone.aap");
+
+        // Краевые ползунки (XIC-61). Механика та же, что у зоны снизу: подавление курсора —
+        // штатной curtain-зоной, а сам жест читается сырым вводом.
+        ui.AddGroup(this, "settings.touchpad.edges");
+        ui.AddRow(this, "settings.touchpad.edges", "settings.touchpad.edges.desc",
+            ui.Toggle(cfg.TouchpadEdgeSliders, on => { act.SetTouchpadEdgeSliders(on); rebuild(); }));
+
+        var width = EdgeCombo(cfg.TouchpadEdgeWidthMm, act.SetTouchpadEdgeWidthMm);
+        width.Enabled = cfg.TouchpadEdgeSliders;
+        ui.AddRow(this, "settings.touchpad.edges.size", "settings.touchpad.edges.size.desc", width);
+
+        var swap = ui.Toggle(cfg.TouchpadEdgeSwap, act.SetTouchpadEdgeSwap);
+        swap.Enabled = cfg.TouchpadEdgeSliders;
+        ui.AddRow(this, "settings.touchpad.edges.swap", "settings.touchpad.edges.swap.desc", swap);
+
+        ui.AddNote(this, "settings.touchpad.edges.note");
+    }
+
+    /// <summary>Ширина краевой полосы. Верх списка ограничен намеренно: измерено, что заведомо
+    /// большое значение PTP-маппер игнорирует вовсе и зона молча перестаёт работать.</summary>
+    private ComboBox EdgeCombo(int current, Action<int> apply)
+    {
+        int mm = TouchpadEdgeSliders.NormalizeWidthMm(current);
+        int[] presets = [8, 10, 12, 15, 20];
+        int[] sizes = presets.Contains(mm) ? presets : [.. presets.Append(mm).Order()];
+        return Ui.Combo([.. sizes.Select(x => $"{x} " + Loc.T("settings.touchpad.deadzone.unit"))],
+            Array.IndexOf(sizes, mm), i => apply(sizes[i]), Ui.Sc(110));
     }
 
     // Высота зоны: пресеты + текущее значение из config.json, если оно нестандартное

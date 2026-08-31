@@ -36,6 +36,7 @@ internal static class Program
         services.AddSingleton<TouchpadControl>();
         services.AddSingleton<TouchscreenControl>();
         services.AddSingleton<TouchpadDeadZone>();
+        services.AddSingleton<TouchpadEdgeSliders>();
         // «В дорогу» временно снимает защиту (заряд до 100%) — гард бережёт 80% только когда travel выключен
         services.AddSingleton(sp =>
         {

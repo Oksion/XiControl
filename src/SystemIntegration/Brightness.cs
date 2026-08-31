@@ -56,6 +56,23 @@ public static class Brightness
     }
 
     /// <summary>
+    /// Установить яркость КАК ПРАВКУ ЧЕЛОВЕКА — без метки Own (XIC-61, краевой ползунок).
+    /// Разница принципиальная: помеченную запись авто-яркость и лимит считают своей и
+    /// игнорируют, а ползунок под пальцем — это выбор пользователя, кривая обязана на нём
+    /// учиться, а лимит — принять его за осознанный. Иначе яркость уезжала бы обратно через
+    /// минуту, и виноваты были бы мы.
+    /// </summary>
+    public static void ApplyAsUser(int percent)
+    {
+        int lvl = Math.Clamp(percent, 0, 100);
+        Task.Run(() =>
+        {
+            try { if (Get() != lvl) Set(lvl); }
+            catch (Exception ex) { Log.Ex("Brightness.ApplyAsUser", ex); }
+        });
+    }
+
+    /// <summary>
     /// Плавный ход от <paramref name="from"/> к <paramref name="to"/> шагами по 1% (шкала
     /// непрерывная, проверено на TM2424). Весь путь занимает ~<paramref name="durationMs"/>
     /// независимо от дельты. Идёт в фоне: WmiSetBrightness небыстрый, спуск на 30% — 30 вызовов,

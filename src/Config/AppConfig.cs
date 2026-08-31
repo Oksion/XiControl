@@ -133,6 +133,21 @@ public sealed class AppConfig
     /// только по явному выбору пользователя.</summary>
     public bool RememberBrightness { get; set; } = false;
 
+    /// <summary>Края тачпада работают как ползунки: слева яркость, справа громкость (XIC-61).
+    /// Курсорное движение в полосах гасится штатными curtain-зонами Windows, сам жест читается
+    /// через Raw Input. Требует Precision Touchpad; выключено по умолчанию.</summary>
+    public bool TouchpadEdgeSliders { get; set; } = false;
+
+    /// <summary>Ширина краевой полосы, мм. Потолок не косметический: измерено, что заведомо
+    /// большое значение PTP-маппер игнорирует вовсе и зона просто не работает.</summary>
+    public int TouchpadEdgeWidthMm { get; set; } = SystemIntegration.TouchpadEdgeSliders.DefaultWidthMm;
+
+    /// <summary>Сколько высоты панели (%) нужно пройти на один шаг. Мельче — дёргано, крупнее — туго.</summary>
+    public int TouchpadEdgeStepPercent { get; set; } = 6;
+
+    /// <summary>Поменять края местами: слева громкость, справа яркость.</summary>
+    public bool TouchpadEdgeSwap { get; set; } = false;
+
     /// <summary>
     /// Отладка: читать температуру из ACPI-термозоны, даже если Intel DPTF доступен (XIC-41).
     /// Только правкой config.json — на Intel-машине путь фолбэка иначе не прогнать, он работает

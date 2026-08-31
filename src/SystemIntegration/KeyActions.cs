@@ -9,6 +9,7 @@ public static class KeyActions
     private const byte VK_LWIN = 0x5B, VK_SHIFT = 0x10, VK_P = 0x50, VK_C = 0x43,
                        VK_S = 0x53, VK_TAB = 0x09;
     // Мультимедиа и «калькулятор» — стандартные VK, их ловит шелл, а не конкретное окно
+    private const byte VK_VOLUME_DOWN = 0xAE, VK_VOLUME_UP = 0xAF;
     private const byte VK_MEDIA_NEXT = 0xB0, VK_MEDIA_PREV = 0xB1, VK_MEDIA_STOP = 0xB2,
                        VK_MEDIA_PLAY_PAUSE = 0xB3, VK_LAUNCH_APP2 = 0xB7;
     private const uint KEYEVENTF_KEYUP = 0x02;
@@ -105,6 +106,15 @@ public static class KeyActions
 
     /// <summary>Воспроизведение / пауза. Медиа-клавишу получает владелец медиа-сессии
     /// Windows (SMTC), поэтому работает с любым плеером — своей интеграции не нужно.</summary>
+    /// <summary>Шаг громкости: положительный — громче, отрицательный — тише. Штатными
+    /// клавишами, а не через IAudioEndpointVolume: так работает системный OSD громкости,
+    /// и человек видит привычную шкалу вместо нашей выдумки (XIC-61).</summary>
+    public static void VolumeStep(int steps)
+    {
+        byte key = steps > 0 ? VK_VOLUME_UP : VK_VOLUME_DOWN;
+        for (int i = 0; i < Math.Min(Math.Abs(steps), 10); i++) TapKey(key);
+    }
+
     public static void MediaPlayPause() => TapKey(VK_MEDIA_PLAY_PAUSE);
 
     /// <summary>Следующий трек.</summary>

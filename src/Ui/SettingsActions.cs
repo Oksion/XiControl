@@ -51,6 +51,9 @@ public sealed class SettingsActions
     public required Action<Action> CheckUpdatesNow;          // проверить по кнопке; колбэк — перерисовать вкладку
     public required Action<bool> SetTouchpadDeadZone;        // мёртвая зона у нижнего края тачпада
     public required Action<int> SetTouchpadDeadZoneMm;       // её высота в мм
+    public required Action<bool> SetTouchpadEdgeSliders;      // края тачпада как ползунки (XIC-61)
+    public required Action<int> SetTouchpadEdgeWidthMm;       // ширина краевых полос в мм
+    public required Action<bool> SetTouchpadEdgeSwap;         // поменять края местами
     public required Action<bool> SetOwlFeature;
     public required Action<int> SetCareLimit;                // порог «беречь батарею», % (применить на железе)
     public required Func<SystemIntegration.BatteryReport> GetBatteryReport; // здоровье батареи (WMI + SOH1)

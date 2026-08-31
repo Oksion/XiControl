@@ -36,7 +36,10 @@ public sealed class AppControllerTests
             new PowerProfileGuard(_mifs, _cfg, _power, cap, auto, new FakeTimer()), cap, auto, new AlsWatcher(),
             new TravelChargeMonitor(_cfg, _power, new FakeTimer()),
             new TouchpadControl(_cfg), new TouchscreenControl(_cfg),
-            new TouchpadDeadZone(_cfg, new TouchpadControl(_cfg)))
+            new TouchpadDeadZone(_cfg, new TouchpadControl(_cfg)),
+            // краевые ползунки: действия подменены пустышками — реальные крутили бы
+            // яркость и громкость машины прямо во время прогона тестов
+            new TouchpadEdgeSliders(_cfg, new TouchpadControl(_cfg), _ => { }, _ => { }))
         {
             CareChanged = on => _events.Add($"care:{on}"),
             TravelChanged = on => _events.Add($"travel:{on}"),
