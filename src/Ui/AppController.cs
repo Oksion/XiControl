@@ -27,6 +27,7 @@ public sealed class AppController
     private readonly TouchpadControl _touchpad;
     private readonly TouchscreenControl _touchscreen;
     private readonly TouchpadDeadZone _deadZone;
+    private readonly TouchpadEdgeSliders _edges;
 
     private PerfMode[] _modes = [];
     private bool _autoStart;   // кэш состояния автозапуска (не дёргаем schtasks на каждое меню)
@@ -59,7 +60,7 @@ public sealed class AppController
         ChargeGuard charge, RefreshRateGuard hz, PowerProfileGuard profiles, BrightnessCapGuard capGuard,
         AutoBrightnessGuard autoGuard, AlsWatcher als,
         TravelChargeMonitor travel, TouchpadControl touchpad, TouchscreenControl touchscreen,
-        TouchpadDeadZone deadZone)
+        TouchpadDeadZone deadZone, TouchpadEdgeSliders edges)
     {
         _mifs = mifs;
         _cfg = cfg;
@@ -76,6 +77,7 @@ public sealed class AppController
         _touchpad = touchpad;
         _touchscreen = touchscreen;
         _deadZone = deadZone;
+        _edges = edges;
         ApplyModeVisibility();
     }
 
@@ -147,6 +149,10 @@ public sealed class AppController
         if (_cfg.AutoBrightness) SeedCurves();
         _als.Start();
 
+        // Краевые ползунки тачпада (XIC-61): реестр на старте НЕ трогаем (зоны там уже лежат
+        // с прошлого включения), поднимаем только чтение касаний.
+        _edges.Start();
+
         // «Режим совы»: восстановить после сбоя, включить заново, либо погасить, если фичу отключили
         if (_cfg.Awake && !_cfg.OwlMode) { AwakeMode.Disable(_cfg); _cfg.Awake = false; _cfg.Save(); }
         else if (_cfg.Awake) { AwakeMode.Enable(_cfg); _cfg.Save(); }
@@ -165,6 +171,7 @@ public sealed class AppController
     public void Shutdown()
     {
         if (_cfg.Awake) { AwakeMode.Disable(_cfg); _cfg.Save(); }
+        _edges.Stop();
     }
 
     // ---- Заряд и «в дорогу» ----
@@ -782,6 +789,47 @@ public sealed class AppController
         _cfg.Save();
         if (_cfg.TouchpadDeadZone) Task.Run(() => Safe(_deadZone.Apply, false));
     }
+
+    /// <summary>
+    /// Краевые ползунки тачпада вкл/выкл (XIC-61). Как и мёртвая зона, трогает реестр только
+    /// по явному переключению; перезапуск узла и подъём чтения касаний — в фоне, окно настроек
+    /// не морозим.
+    /// </summary>
+    public void SetTouchpadEdgeSliders(bool on)
+    {
+        _cfg.TouchpadEdgeSliders = on;
+        _cfg.Save();
+        Task.Run(() => Safe(_edges.Apply, false));
+    }
+
+    /// <summary>Ширина краевых полос (мм). Применяем сразу, но только при включённой фиче —
+    /// иначе выбор «про запас» молча включил бы её.</summary>
+    public void SetTouchpadEdgeWidthMm(int mm)
+    {
+        _cfg.TouchpadEdgeWidthMm = mm;
+        _cfg.Save();
+        if (_cfg.TouchpadEdgeSliders) Task.Run(() => Safe(_edges.Apply, false));
+    }
+
+    /// <summary>Чувствительность краевых ползунков (проходов на всю шкалу). Реестра не касается —
+    /// пересобираем только пересчёт шагов, поэтому ни перезапуска узла, ни перечитывания зон.</summary>
+    public void SetTouchpadEdgeSwipes(int swipes)
+    {
+        _cfg.TouchpadEdgeSwipesPerRange = swipes;
+        _cfg.Save();
+        Safe(() => { _edges.Reconfigure(); return true; }, false);
+    }
+
+    /// <summary>Поменять края местами. Реестра не касается — меняется только трактовка жеста,
+    /// поэтому ни перезапуска узла, ни перечитывания зон не нужно.</summary>
+    public void SetTouchpadEdgeSwap(bool on)
+    {
+        _cfg.TouchpadEdgeSwap = on;
+        _cfg.Save();
+    }
+
+    /// <summary>Тачпад в системе есть — иначе опция в настройках бессмысленна.</summary>
+    public bool TouchpadEdgesAvailable => Safe(() => _edges.Available, false);
 
     private static T Safe<T>(Func<T> f, T fallback,
         [System.Runtime.CompilerServices.CallerMemberName] string caller = "")

@@ -481,6 +481,12 @@ rate is set with `ChangeDisplaySettingsEx` — no driver needed):
   alias) cycles the built-in panel's available modes and shows the resulting rate in the localized
   OSD. With **Keep refresh rate** enabled, that deliberate choice becomes the configured rate for
   the current power source, so the guard does not undo it 1.5 seconds later.
+- **Touchpad edges as sliders.** Slide a finger up and down along the left edge for brightness,
+  along the right edge for volume (Settings → Touchpad). The pointer does not move inside those
+  strips: it uses the same stock Windows curtain zone as the bottom dead zone. A movement that
+  began in the middle of the pad continues into the strips as usual and never becomes a slider —
+  one gesture does one thing. Two fingers still scroll. Sensitivity has three presets, and
+  brightness and volume move in step. Requires a Windows Precision Touchpad.
 - **No such key on your model?** The same cycle is available as the assignable action `hz`
   ("Cycle screen refresh rate") in Settings → Keys, so it can be put on the Mi button or any other
   remappable key. It obeys the same **Refresh rate control** toggle: with the feature off, nothing
