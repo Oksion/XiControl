@@ -239,6 +239,9 @@ public sealed class TouchpadEdgeSliders : IDisposable
     // а лимит считал это осознанным выбором человека (см. XIC-56 про метки).
     // Уровень кэшируем на время жеста: WMI-чтение на каждый шаг и было тем, что вешало
     // ползунок при быстром движении.
+    // Запись — синхронная, прямо здесь: Drain защищён от повторного входа, значит шаги ложатся
+    // строго по порядку. Через Task.Run они разъезжались по пулу и приходили на панель вперемешку,
+    // так что движение вниз временами откатывалось назад.
     private void BrightnessStep(int percent)
     {
         // _level и _resync принадлежат воркеру (Drain защищён от повторного входа), поэтому
@@ -253,7 +256,7 @@ public sealed class TouchpadEdgeSliders : IDisposable
         int next = Math.Clamp(_level + percent, 0, 100);
         if (next == _level) return;
         _level = next;
-        Brightness.ApplyAsUser(next);
+        Brightness.SetAsUser(next);
     }
 
     public void Dispose()
