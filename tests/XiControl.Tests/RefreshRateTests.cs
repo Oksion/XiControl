@@ -94,6 +94,57 @@ public sealed class RefreshRateTests
         store.Saves.Should().Be(0);
     }
 
+    // ---- XIC-69: какие частоты участвуют в переборе по клавише ----
+
+    // набор панели Stavorsky (4PDA) — ровно тот случай, ради которого настройка и делалась
+    private static readonly int[] Panel = [48, 60, 75, 100, 120];
+    private static readonly int[] Panel60120 = [60, 120];
+    private static readonly int[] Pick60120 = [60, 120];
+    private static readonly int[] Pick60 = [60];
+    private static readonly int[] PickUnknown = [144];
+    private static readonly int[] PickWithUnknown = [60, 120, 144];
+    private static readonly int[] PanelSmall = [48, 60, 120];
+
+    [Fact]
+    public void CycleRates_ВыборПуст_ЗначитВсе()
+    {
+        // поведение до появления настройки: панель отдаёт всё, перебираем всё
+        RefreshRate.CycleRates(Panel, null).Should().Equal(48, 60, 75, 100, 120);
+        RefreshRate.CycleRates(Panel60120, []).Should().Equal(60, 120);
+    }
+
+    [Fact]
+    public void CycleRates_ОставляемТолькоВыбранные()
+    {
+        RefreshRate.CycleRates(Panel, Pick60120).Should().Equal(60, 120);
+    }
+
+    [Fact]
+    public void CycleRates_ВыбранноеЧегоПанельНеУмеет_Игнорируется()
+    {
+        // конфиг мог приехать с другой машины или пережить смену монитора
+        RefreshRate.CycleRates(Panel60120, PickWithUnknown).Should().Equal(60, 120);
+    }
+
+    [Fact]
+    public void CycleRates_ОсталосьМеньшеДвух_ВозвращаемсяКоВсем()
+    {
+        // клавиша, которая молча перестала переключать, читается как поломка приложения,
+        // а не как следствие настройки — поэтому вырожденный выбор игнорируем
+        RefreshRate.CycleRates(PanelSmall, Pick60).Should().Equal(48, 60, 120);
+        RefreshRate.CycleRates(PanelSmall, PickUnknown).Should().Equal(48, 60, 120);
+    }
+
+    [Fact]
+    public void CycleRates_ТекущаяЧастотаВнеНабора_СледующаяБерётсяИзНабора()
+    {
+        // человек сидит на 75 Гц, а в переборе оставил 60 и 120: следующий шаг — 120,
+        // дальше по кругу 60. Ни одного «застревания» на исключённом значении
+        int[] chosen = RefreshRate.CycleRates(Panel, Pick60120);
+        RefreshRate.NextRate(75, chosen).Should().Be(120);
+        RefreshRate.NextRate(120, chosen).Should().Be(60);
+    }
+
     private sealed class CountingStore : IConfigStore
     {
         public int Saves { get; private set; }

@@ -108,8 +108,13 @@ public static class RefreshRate
     public static bool Apply(int hz) => ApplyCore(hz) == ApplyResult.Ok;
 
     /// <summary>Переключить встроенную панель на следующую поддерживаемую частоту и вернуть
-    /// реально установленное значение. null — панель не активна или смена не удалась.</summary>
-    public static int? Cycle()
+    /// реально установленное значение. null — панель не активна или смена не удалась.
+    ///
+    /// <paramref name="chosen"/> — какие частоты участвуют в переборе (null/пусто = все).
+    /// Панель отдаёт все режимы подряд, и на экране с 48/60/75/100/120 Гц до нужного значения
+    /// приходится жать клавишу четырежды, каждый раз проходя настоящую смену видеорежима
+    /// с чёрным кадром (XIC-69).</summary>
+    public static int? Cycle(IReadOnlyCollection<int>? chosen = null)
     {
         lock (Sync)
         {
@@ -119,7 +124,7 @@ public static class RefreshRate
                 var cur = NewDevmode();
                 if (!EnumDisplaySettingsExW(panel, EnumCurrentSettings, ref cur, 0)) return null;
 
-                var rates = SupportedRates(panel, cur);
+                var rates = CycleRates(SupportedRates(panel, cur), chosen);
                 if (NextRate((int)cur.dmDisplayFrequency, rates) is not int next) return null;
                 if ((int)cur.dmDisplayFrequency == next) return next;
 
@@ -130,6 +135,22 @@ public static class RefreshRate
             }
             catch (Exception ex) { Log.Ex("RefreshRate.Cycle", ex); return null; }
         }
+    }
+
+    /// <summary>
+    /// Какие частоты реально участвуют в переборе: пересечение поддерживаемых панелью с
+    /// выбором пользователя. Выбор пуст или вырожден (меньше двух реальных частот) — берём все.
+    ///
+    /// Вырожденный случай специально не оставляем «как выбрано»: клавиша, которая молча
+    /// перестала переключать, читается как поломка приложения, а не как следствие настройки.
+    /// </summary>
+    internal static int[] CycleRates(IEnumerable<int> supported, IReadOnlyCollection<int>? chosen)
+    {
+        int[] all = supported.Where(x => x > 1).Distinct().Order().ToArray();
+        if (chosen is null || chosen.Count == 0) return all;
+
+        int[] picked = all.Where(chosen.Contains).ToArray();
+        return picked.Length >= 2 ? picked : all;
     }
 
     /// <summary>Следующая частота по возрастанию; после максимальной — минимальная.</summary>

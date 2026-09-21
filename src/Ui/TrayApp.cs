@@ -443,7 +443,9 @@ public sealed class TrayApp : IDisposable
     {
         try
         {
-            int? hz = await Task.Run(RefreshRate.Cycle);
+            // снимок выбора: список читается в фоне, а править его могут из настроек
+            int[]? chosen = _cfg.CycleRefreshRates?.ToArray();
+            int? hz = await Task.Run(() => RefreshRate.Cycle(chosen));
             if (hz is not int current)
             {
                 // Закрытая крышка / «только внешний экран» штатны: не рисуем ложную ошибку.
@@ -710,6 +712,7 @@ public sealed class TrayApp : IDisposable
                 SetRefreshRateFeature = _controller.ToggleRefreshRateFeature,
                 SetHoldRefreshRate = _controller.SetHoldRefreshRate,
                 SetRefreshRates = _controller.SetRefreshRates,
+                SetCycleRate = _controller.SetCycleRate,
                 SetCheckUpdates = _controller.SetCheckUpdates,
                 GetUpdate = () => _controller.Update,
                 GetUpdateStatus = () => _controller.LastUpdateCheck,

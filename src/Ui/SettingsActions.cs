@@ -45,6 +45,7 @@ public sealed class SettingsActions
     public required Action<bool> SetHoldRefreshRate;         // возвращать частоту после чужих изменений
     public required Action<bool> SetRefreshRateFeature;      // «управление частотой» как фича вкл/выкл
     public required Action<int, int> SetRefreshRates;        // ac, batt
+    public required Action<int, bool> SetCycleRate;          // участвует ли частота в переборе по клавише
     public required Action<bool> SetCheckUpdates;            // «проверять обновления» вкл/выкл
     public required Func<ReleaseInfo?> GetUpdate;            // найденный релиз (из проверки на старте)
     public required Func<UpdateStatus> GetUpdateStatus;      // чем кончилась последняя проверка

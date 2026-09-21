@@ -493,6 +493,13 @@ rate is set with `ChangeDisplaySettingsEx` — no driver needed):
   ("Cycle screen refresh rate") in Settings → Keys, so it can be put on the Mi button or any other
   remappable key. It obeys the same **Refresh rate control** toggle: with the feature off, nothing
   touches the display.
+- **Rates you never use can be left out of the cycle.** The panel reports every mode it has, so on
+  a 48/60/75/100/120 Hz screen you press the key four times to reach the one you want — each press
+  a real display mode change with a black frame. Settings → Display → "Cycling by key" lists the
+  rates of **this** panel with toggles: keep the ones you actually switch between. Keep fewer than
+  two and cycling falls back to all of them — a key that silently stopped working looks like a
+  bug, not like a setting. Panels with only two modes (60/120 on the Book Pro 14, for one) don't
+  get the section at all: there is nothing to choose.
 
 When editing `AcRefreshRate`/`BatteryRefreshRate` directly in the config, restart the app
 (a choice in the settings window applies immediately; a non-standard value from the config is shown too).
