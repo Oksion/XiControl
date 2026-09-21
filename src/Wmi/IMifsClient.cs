@@ -17,8 +17,10 @@ public interface IMifsClient : IDisposable
     int? GetChargeLimit();
 
     /// <summary>Ставит порог заряда (%): пишет код по таблице уровней (с ре-армом off→on для «беречь»).
-    /// true — прошивка приняла; неподдержанный/отвергнутый прошивкой % → false (не применено).</summary>
-    bool SetChargeLimit(int percent);
+    /// true — прошивка приняла; неподдержанный/отвергнутый прошивкой % → false (не применено).
+    /// <paramref name="resetFirst"/> = false — одна запись без сброса в «выкл»: между двумя
+    /// записями защиты нет вовсе, и перед сном это окно опасно (XIC-64).</summary>
+    bool SetChargeLimit(int percent, bool resetFirst = true);
 
     /// <summary>Мощность адаптера в ваттах; 0 — не подключён или не-PD.</summary>
     int GetAdapterWatts();

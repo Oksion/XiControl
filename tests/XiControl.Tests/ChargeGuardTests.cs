@@ -102,4 +102,64 @@ public sealed class ChargeGuardTests
 
         _mifs.ChargeLimitCalls.Should().BeEmpty();
     }
+
+    // ---- XIC-64: перед сном защиту не снимаем ----
+
+    [Fact]
+    public void Порог_уже_стоит_в_прошивке_значит_не_переписываем()
+    {
+        // Запись — это ре-арм off→on, то есть промежуток совсем без защиты. Если EC и так
+        // держит нужный порог, трогать его незачем: бессмысленный риск на ровном месте.
+        _mifs.ChargeLimit = 80;
+        using var guard = Create();
+
+        guard.Reapply();
+
+        _mifs.ChargeLimitCalls.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Перед_сном_пишем_одной_командой_без_сброса_в_выкл()
+    {
+        // Суть бага: SetChargeLimit сначала пишет «выкл» (=100%), спит 80 мс и лишь потом
+        // ставит код. Уснуть ровно в этом окне — значит остаться без защиты на всю ночь;
+        // владелец находил ноутбук заряженным до 92% при пороге 60%.
+        _mifs.ChargeLimit = 100;
+        using var guard = Create();
+
+        _power.RaisePower(PowerModes.Suspend);
+
+        _mifs.ChargeLimitCalls.Should().Equal(80);
+        _mifs.ChargeLimitResets.Should().Equal(false);
+    }
+
+    [Fact]
+    public void Обычный_ре_арм_сбрасывает_стейт_машину_как_раньше()
+    {
+        // Вне спешки поведение прежнее: off→on. Времени достаточно, а сброс лечит EC,
+        // застрявший в непонятном состоянии.
+        _mifs.ChargeLimit = 100;
+        using var guard = Create();
+
+        guard.Reapply();
+
+        _mifs.ChargeLimitResets.Should().Equal(true);
+    }
+
+    [Fact]
+    public void Прошивка_сказала_принято_но_порог_не_удержался()
+    {
+        // Команда отвечает «ок» и тогда, когда EC значение не сохранил. Без чтения-назад
+        // такой отказ выглядел бы успехом, а батарея тихо уходила бы выше порога.
+        _mifs.ChargeLimit = 100;
+        _mifs.SetChargeLimitResult = true;
+        using var guard = Create();
+
+        guard.Reapply();
+        _mifs.ChargeLimit = 100;   // EC «забыл» сразу после записи
+
+        guard.Reapply();           // второй заход видит расхождение и пишет о нём
+
+        _mifs.ChargeLimitCalls.Should().Equal(80, 80);
+    }
 }

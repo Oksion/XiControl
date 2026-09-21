@@ -40,6 +40,8 @@ public sealed class ChargeGuard : IDisposable
         if (mode is PowerModes.Resume or PowerModes.StatusChange)
         {
             _debounce.Stop();
+            _debounce.Interval = 1500;
+            _reason = mode == PowerModes.Resume ? "после сна" : "смена питания";
             _debounce.Start();
         }
         // Suspend — вход в сон/гибернацию/«выключение» с быстрым запуском: ре-арм сразу,
@@ -47,27 +49,59 @@ public sealed class ChargeGuard : IDisposable
         else if (mode == PowerModes.Suspend)
         {
             _debounce.Stop();
-            Reapply();
+            Reapply("перед сном", hurry: true);
         }
     }
 
     // Завершение сеанса (shutdown/restart/logoff) — последняя возможность заармить EC
     // перед периодом «выключено»; заодно закрывает окно, когда дебаунс (1.5 с) не успел
-    private void OnSessionEnding() => Reapply();
+    private void OnSessionEnding() => Reapply("завершение сеанса", hurry: true);
+
+    private string _reason = "старт";
 
     /// <summary>Применить желаемый порог заряда прямо сейчас (напр. при старте).</summary>
-    public void Reapply()
+    public void Reapply() => Reapply(_reason);
+
+    /// <summary>
+    /// Переармить EC. <paramref name="hurry"/> — времени почти нет (уход в сон, завершение
+    /// сеанса): пишем одной командой, без сброса в «выкл» и без чтения-назад.
+    ///
+    /// Сначала СПРАШИВАЕМ, что стоит сейчас. Раньше писали всегда и вслепую, а запись — это
+    /// ре-арм off→on, то есть короткий промежуток совсем без защиты. Перед сном такая
+    /// «профилактика» могла обернуться ночью на 100%: система засыпает ровно в промежутке.
+    /// Совпало с желаемым — ничего не трогаем, это и быстрее, и безопаснее (XIC-64).
+    /// </summary>
+    public void Reapply(string reason, bool hurry = false)
     {
         try
         {
-            // ре-арм только когда «беречь» включено (порог < 100); отказ прошивки — в лог:
-            // молча оставить батарею на 100% хуже, чем след в log.txt
+            // ре-арм только когда «беречь» включено (порог < 100)
             int pct = _limitWanted();
-            if (pct < 100 && !_mifs.SetChargeLimit(pct))
-                Log.Write($"ChargeGuard.Reapply: прошивка отвергла порог {pct}%");
+            if (pct >= 100) return;
+
+            int? now = _mifs.GetChargeLimit();
+            if (now == pct) return;   // EC уже держит нужный порог — молча и не трогая
+
+            if (!_mifs.SetChargeLimit(pct, resetFirst: !hurry))
+            {
+                Log.Write($"ChargeGuard ({reason}): прошивка отвергла порог {pct}% (было {Show(now)})");
+                return;
+            }
+
+            // Спешка — верить на слово: лишний WMI-вызов в момент засыпания дороже проверки.
+            if (hurry) { Log.Write($"ChargeGuard ({reason}): {Show(now)} → {pct}%"); return; }
+
+            // Чтение-назад. Прошивка отвечает «принято» и на команду, которую EC не удержал:
+            // без сверки такой отказ выглядел бы успехом, и батарея тихо уходила бы выше порога.
+            int? after = _mifs.GetChargeLimit();
+            if (after == pct) Log.Write($"ChargeGuard ({reason}): {Show(now)} → {pct}%");
+            else Log.Write($"ChargeGuard ({reason}): порог не удержался — просили {pct}%, " +
+                           $"в прошивке {Show(after)} (было {Show(now)})");
         }
         catch (Exception ex) { Log.Ex("ChargeGuard.Reapply", ex); /* железо могло быть недоступно */ }
     }
+
+    private static string Show(int? pct) => pct is int v ? $"{v}%" : "неизвестно";
 
     public void Dispose()
     {
