@@ -17,14 +17,26 @@ public interface IAppTimer : IDisposable
 /// <summary>Прод-реализация на System.Threading.Timer: тикает в пуле потоков, Start/Stop
 /// потокобезопасны и работают с любого потока. Для логики, живущей вне UI-потока
 /// (BrightnessCapGuard: события яркости приходят с пула, WinForms-таймер оттуда не тикает
-/// никогда — см. UiTimer ниже). Подписчик Tick сам отвечает за свою потокобезопасность.</summary>
+/// никогда — см. UiTimer ниже). Подписчик Tick сам отвечает за свою потокобезопасность.
+///
+/// <b>Исключение подписчика ловится здесь и никуда не выпускается.</b> Тик исполняется в потоке
+/// пула, а необработанное исключение оттуда убивает процесс целиком — молча, без диалога и без
+/// строки в журнале. Так и выглядела жалоба из XIC-63: «сначала перестали работать жесты, потом
+/// зависла и закрылась». Ловить в каждом подписчике по отдельности — значит однажды забыть;
+/// здесь одна точка на все таймеры пула.</summary>
 public sealed class WorkerTimer : IAppTimer
 {
     private readonly System.Threading.Timer _t;
 
     public event Action? Tick;
 
-    public WorkerTimer() => _t = new System.Threading.Timer(_ => Tick?.Invoke());
+    public WorkerTimer() => _t = new System.Threading.Timer(_ => Fire());
+
+    private void Fire()
+    {
+        try { Tick?.Invoke(); }
+        catch (Exception ex) { Log.Ex("WorkerTimer.Tick", ex); }
+    }
 
     public int Interval { get; set; } = 100;
     public void Start() => _t.Change(Interval, Interval);
@@ -42,7 +54,13 @@ public sealed class UiTimer : IAppTimer
 
     public event Action? Tick;
 
-    public UiTimer() => _t.Tick += (_, _) => Tick?.Invoke();
+    // как и у WorkerTimer, исключение подписчика не выпускаем: в UI-потоке оно всплыло бы
+    // диалогом «Необработанное исключение» поверх работы пользователя
+    public UiTimer() => _t.Tick += (_, _) =>
+    {
+        try { Tick?.Invoke(); }
+        catch (Exception ex) { Log.Ex("UiTimer.Tick", ex); }
+    };
 
     public int Interval { get => _t.Interval; set => _t.Interval = value; }
     public void Start() => _t.Start();

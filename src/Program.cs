@@ -17,6 +17,7 @@ internal static class Program
         if (!created) return;
 
         ApplicationConfiguration.Initialize();
+        WatchForCrashes();
 
         // Граф объектов: все singleton, провайдер владеет Dispose (в обратном порядке создания).
         var services = new ServiceCollection();
@@ -82,5 +83,36 @@ internal static class Program
 
         provider.GetRequiredService<TrayApp>().Start();
         Application.Run();
+    }
+
+    /// <summary>
+    /// Последняя сеть перед смертью процесса. Сама по себе она ничего не чинит — исключение,
+    /// дошедшее сюда, приложение уже не переживёт, — но превращает «зависла и закрылась» в
+    /// строку с местом падения. До XIC-63 такие падения не оставляли вообще ничего: тестер
+    /// сообщал о вылете, а в журнале была тишина, и разбирать было нечего.
+    ///
+    /// Сами исключения ловятся там, где возникают (таймеры пула, поток чтения касаний,
+    /// WMI-вызовы); сюда доходит только то, что мы не предусмотрели.
+    /// </summary>
+    private static void WatchForCrashes()
+    {
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            if (e.ExceptionObject is Exception ex) Log.Ex("Необработанное исключение", ex);
+            else Log.Write($"Необработанное исключение: {e.ExceptionObject}");
+        };
+
+        // исключение из Task, которое никто не дождался: процесс не падает, но проблему
+        // видеть надо — иначе ошибки фоновых операций пропадают бесследно
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            Log.Ex("Необработанное исключение в задаче", e.Exception);
+            e.SetObserved();
+        };
+
+        // UI-поток: без этого WinForms показал бы поверх экрана диалог с трассировкой стека.
+        // Пишем в журнал и живём дальше — трей-утилита не должна пугать человека простынёй.
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += (_, e) => Log.Ex("Исключение в UI-потоке", e.Exception);
     }
 }

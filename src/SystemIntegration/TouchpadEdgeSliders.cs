@@ -54,6 +54,10 @@ public sealed class TouchpadEdgeSliders : IDisposable
     private int _level;               // кэш яркости; трогает только воркер — замок не нужен
     private volatile bool _resync = true;  // перечитать яркость: жест начался заново
     private int _busy;                // тик воркера уже идёт (WorkerTimer умеет входить повторно)
+    private int _skipped;             // пропущено тиков подряд из-за занятости — сторож застрявшего WMI
+
+    /// <summary>Сколько пропусков подряд считаем зависанием: 100 × 50 мс = 5 с.</summary>
+    private const int StuckTicks = 100;
 
     public TouchpadEdgeSliders(AppConfig cfg, TouchpadControl pad,
         Action<int>? volume = null, Action<int>? brightness = null, IAppTimer? pump = null)
@@ -188,7 +192,17 @@ public sealed class TouchpadEdgeSliders : IDisposable
     // изредка занимает больше 50 мс. Пропускаем такой тик — накопленное дождётся следующего.
     private void Drain()
     {
-        if (Interlocked.Exchange(ref _busy, 1) != 0) return;
+        if (Interlocked.Exchange(ref _busy, 1) != 0)
+        {
+            // Пропуск тика — норма: запись яркости изредка дольше 50 мс. А вот сотня пропусков
+            // подряд (5 с) означает, что предыдущий вызов застрял в WMI и ползунок стоит.
+            // Раньше это выглядело как «жесты просто перестали работать» и не оставляло следа
+            // в журнале — теперь оставляет, один раз за эпизод (XIC-63).
+            if (Interlocked.Increment(ref _skipped) == StuckTicks)
+                Log.Write("TouchpadEdges: применение зависло — жду ответа от WMI дольше 5 с");
+            return;
+        }
+        Interlocked.Exchange(ref _skipped, 0);
         try
         {
             int percent, taps;

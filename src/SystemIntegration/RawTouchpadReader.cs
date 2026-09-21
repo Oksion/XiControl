@@ -114,6 +114,14 @@ public sealed class RawTouchpadReader : IDisposable
             foreach (var d in _devices.Values) Marshal.FreeHGlobal(d.Preparsed);
             _devices.Clear();
             _hwnd = IntPtr.Zero;
+
+            // Поток кончился сам — из-за ошибки регистрации, исключения или закрытия окна.
+            // Снимаем за собой ссылку, иначе Running остаётся true навсегда: чтения нет, а
+            // Start() считает, что всё поднято, и молча ничего не делает. Ровно так фича
+            // «перестаёт работать до перезапуска приложения» (XIC-63). CompareExchange —
+            // чтобы не затереть ссылку на поток, который поднял уже следующий Start.
+            if (Interlocked.CompareExchange(ref _thread, null, Thread.CurrentThread) == Thread.CurrentThread)
+                Log.Write($"RawTouchpad: чтение касаний остановлено{(_stopping ? "" : " (не по нашей команде)")}");
         }
     }
 
