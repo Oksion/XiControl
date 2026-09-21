@@ -378,6 +378,23 @@ public sealed class AppConfig
     /// <summary>Сколько OSD висит до затухания. Дефолт 2800 мс («Авто»-режим — на 600 мс дольше).</summary>
     public int OsdDurationMs { get; set; } = 2800;
 
+    /// <summary>
+    /// Где на экране показывать OSD. <see cref="Ui.OsdPosition.Center"/> — как было всегда:
+    /// по центру ширины, чуть ниже середины по высоте. Остальные восемь позиций прижимают
+    /// карточку к краю рабочей области с отступом.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public Ui.OsdPosition OsdPosition { get; set; } = Ui.OsdPosition.Center;
+
+    /// <summary>
+    /// Уведомления клавиш-фиксаторов, которые показывать НЕ надо (Caps Lock, Num Lock,
+    /// Fn-Lock, блокировка клавиши Windows). Пустой список — показываем все, как раньше.
+    ///
+    /// Список скрытых, а не показываемых: новый фиксатор, если такой появится, по умолчанию
+    /// виден, и старый конфиг его не прячет молча.
+    /// </summary>
+    public List<Ui.LockOsd> HiddenLockOsd { get; set; } = [];
+
     // ---- Действия клавиш ----
     // На каждый слот — своё действие из общего списка: "modes" (цикл режимов), "charge"
     // (заряд 80/100), "panel" (быстрая панель), "owl", "monitor", "travel",

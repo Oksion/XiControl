@@ -116,13 +116,14 @@ xi_control/
  │   ├─ Input/              — MiButtonGesture (жесты Mi-кнопки), KeyRouter (клавиша → действие)
  │   ├─ Ui/                 — AppController (командный слой — все Set*/Toggle*, честные ошибки),
  │   │                         TrayApp (тонкий монтажник), TrayMenuBuilder, TrayIconController,
- │   │                         QuickPanelForm, OsdForm, MonitorForm, FlyoutForm(+FlyoutPalette),
+ │   │                         QuickPanelForm, OsdForm (+OsdPlacement — сетка 3×3, под тестами),
+ │   │                         MonitorForm, FlyoutForm(+FlyoutPalette),
  │   │                         FormChrome, ModeUi, UiNav (чистая навигация — под тестами),
  │   │                         SettingsForm, SettingsActions, ToggleSwitch,
  │   │                         ScaledFonts, SvgIcons, FlyoutTip, Draw, TrayIcons, DarkMenu
  │   ├─ Ui/Settings/        — SettingsToolkit (фабрика виджетов), SettingsTheme, NavStrip,
  │   │                         SettingsPane (база вкладок), вкладки-контролы
- │   │                         General/Features/Battery/Display/Touchpad/Perf/Keys/Api/AboutTab
+ │   │                         General/Features/Battery/Display/Touchpad/Perf/Keys/Osd/Api/AboutTab
  │   ├─ SystemIntegration/  — ChargeGuard, RefreshRate(+Guard), PowerProfileGuard,
  │   │                         BrightnessCapGuard (лимит яркости, XIC-29),
  │   │                         AutoBrightnessGuard + BrightnessCurve/MedianWindow +

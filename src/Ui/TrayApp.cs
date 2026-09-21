@@ -259,16 +259,16 @@ public sealed class TrayApp : IDisposable
                 value != 0 ? OsdKind.TouchpadOn : OsdKind.TouchpadOff,
                 value != 0 ? "osd.touchpad.on" : "osd.touchpad.off"),
             LowPowerKey = _ => WeakChargerOsd(),
-            NumLockKey = value => ShowToggleOsd(
+            NumLockKey = value => ShowLockOsd(LockOsd.NumLock,
                 value != 0 ? OsdKind.NumLockOn : OsdKind.NumLockOff,
                 "osd.numlock", value != 0),
             RefreshRateKey = OnRefreshRateKey,
-            WinKeyLockKey = value => ShowToggleOsd(
+            WinKeyLockKey = value => ShowLockOsd(LockOsd.WinKeyLock,
                 value != 0 ? OsdKind.WinKeyLockOn : OsdKind.WinKeyLockOff,
                 value != 0 ? "osd.winkey.locked" : "osd.winkey.unlocked"),
             CameraPrivacyKey = value => Log.Write($"Key: camera/privacy 0xA0 value=0x{value:X2}"),
             FnLockKey = OnFnLockKey,
-            CapsLockKey = value => ShowToggleOsd(
+            CapsLockKey = value => ShowLockOsd(LockOsd.CapsLock,
                 value != 0 ? OsdKind.CapsLockOn : OsdKind.CapsLockOff,
                 "osd.capslock", value != 0),
             PerformanceKey = OnPerformanceKey,
@@ -286,7 +286,7 @@ public sealed class TrayApp : IDisposable
     /// </summary>
     public void Start()
     {
-        _osd.DurationMs = _cfg.OsdDurationMs; // настраиваемая длительность (config.json) — до первых OSD
+        OsdApplied(); // длительность и позиция — до первых OSD
 
         _controller.Startup();
 
@@ -391,6 +391,7 @@ public sealed class TrayApp : IDisposable
     // value=1 (замок закрыт) = классические F1–F12, мультимедиа отключены (проверено на TM2424).
     private void OnFnLockKey(byte value)
     {
+        if (_cfg.HiddenLockOsd.Contains(LockOsd.FnLock)) return;
         bool on = value != 0;
         _osd.Flash(on ? OsdKind.FnLockOn : OsdKind.FnLockOff,
                    Loc.T("osd.fnlock"), Loc.T(on ? "osd.fnlock.on" : "osd.fnlock.off"));
@@ -510,6 +511,17 @@ public sealed class TrayApp : IDisposable
 
     private void ShowToggleOsd(OsdKind kind, string titleKey, bool? on = null) =>
         _osd.Flash(kind, Loc.T(titleKey), on is bool state ? Loc.T(state ? "osd.on" : "osd.off") : null);
+
+    /// <summary>
+    /// То же, но для клавиш-фиксаторов: их уведомление можно выключить по отдельности.
+    /// Caps Lock жмут часто и не всегда нарочно (в играх он бывает игровой клавишей), а плашка
+    /// висит секунды — поэтому выключатель нужен именно здесь, а не у OSD вообще.
+    /// </summary>
+    private void ShowLockOsd(LockOsd lockKey, OsdKind kind, string titleKey, bool? on = null)
+    {
+        if (_cfg.HiddenLockOsd.Contains(lockKey)) return;
+        ShowToggleOsd(kind, titleKey, on);
+    }
 
     // Флаг «сессия заблокирована»: прочие типы SessionSwitch (logon/logoff/remote) не трогают —
     // logoff и так завершает приложение, а RDP-переключения к видимости OSD отношения не имеют
@@ -719,6 +731,10 @@ public sealed class TrayApp : IDisposable
                 GetApiSettings = () => _api,
                 ApiApplied = ApiApplied,
                 TrayMetricApplied = TrayMetricApplied,
+                SetOsdPosition = p => { _cfg.OsdPosition = p; _cfg.Save(); OsdApplied(); },
+                SetOsdDuration = ms => { _cfg.OsdDurationMs = ms; _cfg.Save(); OsdApplied(); },
+                SetLockOsd = SetLockOsd,
+                PreviewOsd = PreviewOsd,
             };
             _settings = new SettingsForm(_cfg, act);
         }
@@ -749,6 +765,33 @@ public sealed class TrayApp : IDisposable
         if (!_cfg.TrayMetricEnabled) { _metric?.Dispose(); _metric = null; return; }
         if (_metric is null) StartMetric();
         else _metric.SettingsChanged();
+    }
+
+    // ---- Уведомления (XIC-67) ----
+
+    // Вкладка изменила вид OSD: переносим в форму. Видимость самих плашек-фиксаторов
+    // спрашивается из конфига в момент показа, переносить её никуда не нужно.
+    private void OsdApplied()
+    {
+        _osd.DurationMs = _cfg.OsdDurationMs;
+        _osd.Position = _cfg.OsdPosition;
+    }
+
+    // Показывать ли плашку этого фиксатора. Храним СКРЫТЫЕ (как HiddenModes у режимов):
+    // фиксатор, о котором конфиг не знает, виден по умолчанию.
+    private void SetLockOsd(LockOsd lockKey, bool show)
+    {
+        if (show) _cfg.HiddenLockOsd.Remove(lockKey);
+        else if (!_cfg.HiddenLockOsd.Contains(lockKey)) _cfg.HiddenLockOsd.Add(lockKey);
+        _cfg.Save();
+    }
+
+    // «Показать пример» — позицию и длительность вслепую не настраивают. Показываем настоящий
+    // OSD настоящим путём: что увидел человек в примере, то и увидит в работе.
+    private void PreviewOsd()
+    {
+        OsdApplied();
+        _osd.Flash(OsdKind.CapsLockOn, Loc.T("osd.capslock"), Loc.T("osd.on"));
     }
 
     // Для действия клавиши "monitor": повторное нажатие прячет виджет

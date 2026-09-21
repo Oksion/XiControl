@@ -25,6 +25,10 @@ public sealed class OsdForm : Form
     // чтобы всплывашка не мигала мгновенно. TrayApp выставляет её на старте.
     private int _displayMs = 2800;
     public int DurationMs { get => _displayMs; set => _displayMs = Math.Max(500, value); }
+
+    /// <summary>Где показывать карточку (сетка 3×3). Настраивается на вкладке «Уведомления»,
+    /// TrayApp выставляет её на старте и после каждой правки.</summary>
+    public OsdPosition Position { get; set; } = OsdPosition.Center;
     private int DisplayMsAuto => _displayMs + 600;
 
     private readonly System.Windows.Forms.Timer _display = new() { Interval = 2800 };
@@ -127,8 +131,8 @@ public sealed class OsdForm : Form
         var (w, h, _, _) = Measure();
         Size = new Size(w, h);
 
-        var wa = Screen.PrimaryScreen!.WorkingArea;
-        Location = new Point(wa.Left + (wa.Width - w) / 2, wa.Top + (int)(wa.Height * 0.60));
+        var wa = OsdPlacement.TargetScreen().WorkingArea;
+        Location = OsdPlacement.Locate(wa, new Size(w, h), Position, Sc(OsdPlacement.Margin));
 
         _display.Stop(); _fade.Stop();
         Opacity = 1.0;
