@@ -118,6 +118,26 @@ public sealed class DisplayTab : SettingsPane
         ui.AddRow(this, "settings.hz.battery", "settings.hz.battery.desc",
             HzCombo(cfg.BatteryRefreshRate, hz => act.SetRefreshRates(cfg.AcRefreshRate, hz)));
         ui.AddNote(this, "settings.hz.note");
+
+        // Какие частоты перебирать клавишей (XIC-69). Показываем ровно то, что отдала панель:
+        // список пресетов здесь был бы враньём — у каждой модели свой набор. Меньше двух
+        // режимов — перебирать нечего, и раздела нет.
+        int[] supported = SystemIntegration.RefreshRate.Supported();
+        if (supported.Length >= 2)
+        {
+            ui.AddGroup(this, "settings.hz.cycle");
+            ui.AddNote(this, "settings.hz.cycle.note");
+            var chosen = cfg.CycleRefreshRates;
+            foreach (int hz in supported)
+            {
+                int rate = hz;   // замыкание на переменную цикла
+                bool on = chosen is null || chosen.Count == 0 || chosen.Contains(rate);
+                string title = Loc.T("settings.hz.cycle.rate", rate);
+                var toggle = ui.Toggle(on, v => act.SetCycleRate(rate, v));
+                toggle.AccessibleName = title;   // AddRow делает это сам, Row — нет
+                Controls.Add(ui.Row(title, Loc.T("settings.hz.cycle.rate.desc"), toggle));
+            }
+        }
     }
 
     protected override void Dispose(bool disposing)

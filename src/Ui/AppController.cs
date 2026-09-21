@@ -639,6 +639,20 @@ public sealed class AppController
         if (_cfg.AutoRefreshRate) _hz.Reapply();
     }
 
+    /// <summary>
+    /// Включить/исключить частоту из перебора по клавише (XIC-69). Храним ВЫБРАННЫЕ, а не
+    /// исключённые: набор режимов зависит от панели, и на другом экране список «исключить»
+    /// означал бы неизвестно что. Пустой список = «все» — ровно поведение до настройки.
+    /// </summary>
+    public void SetCycleRate(int hz, bool on)
+    {
+        var rates = _cfg.CycleRefreshRates ??= [.. RefreshRate.Supported()];
+        if (on) { if (!rates.Contains(hz)) rates.Add(hz); }
+        else rates.Remove(hz);
+        rates.Sort();
+        _cfg.Save();
+    }
+
     // ---- «Сова», автозапуск, язык ----
 
     /// <summary>Показ/скрытие «режима совы» как фичи; при скрытии активный режим гасится.</summary>
