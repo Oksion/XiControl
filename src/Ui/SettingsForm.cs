@@ -230,6 +230,7 @@ public sealed class SettingsForm : Form
         AddTab("settings.tab.touchpad", NavGlyph.Touchpad, () => new TouchpadTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.perf", NavGlyph.Perf, () => new PerfTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.keys", NavGlyph.Keys, () => new KeysTab(_ui, _cfg, rebuild));
+        AddTab("settings.tab.osd", NavGlyph.Osd, () => new OsdTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.api", NavGlyph.Api, () => new ApiTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.about", NavGlyph.About, () => new AboutTab(_ui, _act, rebuild));
 

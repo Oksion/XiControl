@@ -92,6 +92,9 @@ public sealed class SettingsToolkit
             ? 0
             : TextRenderer.MeasureText(desc, DescFont, new Size(textW, 0), TextFormatFlags.WordBreak).Height;
         int h = string.IsNullOrEmpty(desc) ? Sc(52) : Sc(29) + descH + Sc(14);
+        // карточка обрезана по Region — контрол выше текста (например сетка позиций OSD)
+        // иначе молча теряет нижний ряд. Тумблеры и комбо ниже этой планки, их не задевает
+        h = Math.Max(h, ctl.Height + Sc(16));
 
         var card = new Panel { Width = RowW, Height = h, BackColor = T.Card, Margin = new Padding(0, 0, 0, Sc(4)), Tag = "cardrow" };
         card.Region = new Region(Draw.Rounded(new RectangleF(0, 0, RowW, h), Sc(6)));

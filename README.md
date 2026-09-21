@@ -105,7 +105,8 @@ double-click; current direction is shown by color (charging green / discharging 
   run `winget upgrade Oksion.XiControl`). With the toggle off the app makes **no network requests at
   all**, and a one-off check is available on a button.
 - ⚙️ **Settings window** in Windows 11 style — all options across tabs (General / Features /
-  Battery / Display / Touchpad / Performance / Keys / HTTP API / About), dark and light themes.
+  Battery / Display / Touchpad / Performance / Keys / Notifications / HTTP API / About),
+  dark and light themes.
   The **Features** tab controls what to show: "Owl mode", touchpad, touchscreen and refresh-rate
   control; a disabled feature disappears from the menu and panel entirely.
 - 🎨 The tray icon changes with the mode, monochrome to match a light/dark taskbar;
@@ -256,7 +257,8 @@ touchscreen, refresh-rate control), Battery (charge threshold with a hint, "trav
 lock-screen sound and toast, charger-wattage OSD, "weak PSU" threshold, battery health), Display
 (brightness limit and memory; auto refresh rate, "Keep refresh rate" and the rates — the section is
 hidden if refresh-rate control is off), Touchpad (bottom dead zone), Performance (mode visibility,
-startup mode, power profiles), Keys (remapping), HTTP API (port, token, permissions) and About
+startup mode, power profiles), Keys (remapping), Notifications (where popups appear, how long
+they stay, which lock-key popups to show), HTTP API (port, token, permissions) and About
 (version, model with the board code, BIOS, serial number — masked by default, click to reveal).
 The quick toggles (charge, "travel", owl, refresh rate, Monitor,
 mode) stay in the tray menu and the panel.
