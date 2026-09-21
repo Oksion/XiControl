@@ -35,10 +35,16 @@ internal sealed class FakeMifsClient : IMifsClient
 
     public int? GetChargeLimit() => ChargeLimit;
 
-    public bool SetChargeLimit(int percent)
+    public readonly List<bool> ChargeLimitResets = [];  // с каким resetFirst звали (XIC-64)
+
+    public bool SetChargeLimit(int percent, bool resetFirst = true)
     {
         if (ThrowOnSetChargeLimit) throw new InvalidOperationException("прошивка не ответила");
         ChargeLimitCalls.Add(percent);
+        ChargeLimitResets.Add(resetFirst);
+        // железо приняло — значит и читаться должно то же самое: без этого фейк врал бы
+        // о самом интересном случае, ради которого чтение-назад и добавлено
+        if (SetChargeLimitResult) ChargeLimit = percent;
         return SetChargeLimitResult;
     }
 

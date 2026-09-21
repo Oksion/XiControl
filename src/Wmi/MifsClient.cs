@@ -119,7 +119,7 @@ public sealed class MifsClient : IMifsClient
     /// с ре-армом off→on (сброс стейт-машины EC, как в референсе). Неподдержанный % — не пишем
     /// вслепую (false); прошивка сама валидирует набор — отвергла код → false (сигнал для фолбэка).
     /// </summary>
-    public bool SetChargeLimit(int percent)
+    public bool SetChargeLimit(int percent, bool resetFirst = true)
     {
         // Диалект без данных этой группы — писать некуда: на TM2113 измерено, что запись кодов
         // не меняет ответ вовсе. Честное false (интерфейс покажет «не сработало») лучше, чем
@@ -128,9 +128,18 @@ public sealed class MifsClient : IMifsClient
 
         var code = Mifs.ChargeCodeForPercent(percent);
         if (code is null) return false;
-        var off = Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, 0);   // «выкл» = 100%
-        if (code.Value == 0) return off.Ok;             // сам 100% — второй записи не нужно
-        Thread.Sleep(80);
+        if (code.Value == 0) return Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, 0).Ok; // 100% = «выкл»
+
+        // Ре-арм off→on сбрасывает стейт-машину EC (так делает референс), но между двумя
+        // записями защиты НЕТ ВООБЩЕ: EC стоит на «выкл» = 100%. На обычной смене порога это
+        // неощутимо, а вот перед уходом в сон окно опасно — система может уснуть ровно в нём,
+        // и тогда мы своими руками оставили батарею заряжаться до 100% на всю ночь (XIC-64).
+        // Поэтому вызывающий, у которого нет времени, просит одну запись без сброса.
+        if (resetFirst)
+        {
+            Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, 0);
+            Thread.Sleep(80);
+        }
         return Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, code.Value).Ok;
     }
 
