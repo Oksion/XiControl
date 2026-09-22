@@ -267,6 +267,62 @@ public sealed class SettingsToolkit
         return host;
     }
 
+
+    /// <summary>
+    /// Сегментный переключатель на два положения — «какой из двух наборов настроек я сейчас
+    /// правлю» (источник питания на вкладках «Производительность» и «Экран»). Появился в
+    /// XIC-65: два тумблера в строке требовали читать подписи, а не смотреть на контрол.
+    ///
+    /// Переключатель перекрашивает себя САМ и только потом зовёт <paramref name="pick"/>.
+    /// Так вызывающий волен не пересобирать вкладку, если от выбора меняется один контрол
+    /// (вкладка «Экран»: другая кривая на графике) — а пересборка стоит дорого: она уносит
+    /// фокус и прокрутку, и следующий клик попадает уже не туда, куда целились.
+    /// </summary>
+    public Panel SegmentPicker(string keyFirst, string keySecond, bool first, Action<bool> pick)
+    {
+        var host = new Panel { Width = RowW, Height = Sc(34), BackColor = T.WinBg, Margin = new Padding(0, 0, 0, Sc(8)) };
+        Button a = null!, b = null!;
+        void Choose(bool isFirst)
+        {
+            Paint(a, isFirst);
+            Paint(b, !isFirst);
+            pick(isFirst);
+        }
+        a = Segment(keyFirst, isFirst: true, first, Choose, 0);
+        b = Segment(keySecond, isFirst: false, first, Choose, RowW / 2);
+        host.Controls.Add(a);
+        host.Controls.Add(b);
+        return host;
+    }
+
+    private Button Segment(string key, bool isFirst, bool first, Action<bool> choose, int x)
+    {
+        var b = new Button
+        {
+            Text = Loc.T(key),
+            Width = RowW / 2,
+            Height = Sc(34),
+            Location = new Point(x, 0),
+            FlatStyle = FlatStyle.Flat,
+            Font = CtlFont,
+            Cursor = Cursors.Hand,
+            Tag = isFirst,
+        };
+        Paint(b, isFirst == first);
+        b.Click += (_, _) => { if (b.Tag is bool mine && !Active(b)) choose(mine); };
+        return b;
+    }
+
+    // активный сегмент акцентом, неактивный — как обычная карточка: разница видна сразу,
+    // без второго взгляда на положение переключателей
+    private void Paint(Button b, bool active)
+    {
+        b.BackColor = active ? T.Accent : T.Card;
+        b.ForeColor = active ? (T.Dark ? Color.FromArgb(0, 45, 74) : Color.White) : T.Text;
+        b.FlatAppearance.BorderColor = active ? T.Accent : T.Border;
+    }
+
+    private bool Active(Button b) => b.BackColor == T.Accent;
     public Button LinkButton(string keyOrText, Action click)
     {
         var b = new Button

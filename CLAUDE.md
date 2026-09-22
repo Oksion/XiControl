@@ -177,7 +177,8 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   `NavStrip` (левая навигация, доступна с клавиатуры), вкладки-контролы `GeneralTab` /
   `FeaturesTab` (доступность фич: сова/тачпад/тачскрин/`RefreshRateFeature`) / `BatteryTab` /
   `DisplayTab` (яркость: лимит + запоминание, и частота; видна всегда — `RefreshRateFeature=false`
-  скрывает только раздел частоты, XIC-29) / `TouchpadTab` (поведение панели:
+  скрывает только раздел частоты, XIC-29; график кривой авто-яркости — `CurveEditor`: точки
+  тащатся мышью и клавиатурой, правила правки — чистый `CurveEdit` под тестами, XIC-33/XIC-66) / `TouchpadTab` (поведение панели:
   мёртвая зона снизу — в отличие от «Функций», где только видимость) / `PerfTab` / `KeysTab` /
   `ApiTab` (HTTP API: тумблеры, порт, токен, пер-командные разрешения) / `AboutTab`
   (собирают себя в ctor).
@@ -192,7 +193,7 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   `Brightness.Own` и раздаёт запоминанию, лимиту и авто-яркости), `BrightnessCapGuard` (лимит
   яркости XIC-29: схождение половинками раз в минуту, пауза 2 ч после повторного подъёма, стоп при
   адаптивной яркости; целиком на потоках пула, таймеры — `WorkerTimer`),
-  `AutoBrightnessGuard` + `BrightnessCurve`/`MedianWindow` + `AlsWatcher` (авто-яркость XIC-30:
+  `AutoBrightnessGuard` + `BrightnessCurve`/`CurveEdit`/`MedianWindow` + `AlsWatcher` (авто-яркость XIC-30:
   обучаемая кривая lux→% в лог-шкале, две — сеть/батарея; медиана окна против бликов, гистерезис,
   дебаунс; обучение можно выключить (XIC-37) — тогда правки временные и идёт торг к предсказанию
   по механике лимита; датчик — WinRT LightSensor сырой активацией на выделенном MTA-потоке,
