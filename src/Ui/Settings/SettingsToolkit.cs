@@ -323,6 +323,46 @@ public sealed class SettingsToolkit
     }
 
     private bool Active(Button b) => b.BackColor == T.Accent;
+    /// <summary>
+    /// Карточка в два этажа: сверху как обычная строка (заголовок с пояснением слева, кнопка
+    /// справа), снизу — поле во всю ширину карточки. Нужна там, где значение физически не
+    /// влезает в правый столбец: 64-hex токен, адрес вебхука, готовая команда curl.
+    /// Пояснение необязательно (<paramref name="desc"/> = null) — у примеров команд хватает
+    /// одного заголовка.
+    /// </summary>
+    public Panel FieldCard(string title, string? desc, Control field, Control? right = null)
+    {
+        int rightW = right is null ? 0 : right.Width + Sc(16);
+        int textW = Math.Max(Sc(120), RowW - rightW - Sc(32)); // текст не лезет под кнопку
+        int descH = desc is null ? 0
+            : TextRenderer.MeasureText(desc, DescFont, new Size(textW, 0), TextFormatFlags.WordBreak).Height;
+        int fieldY = Sc(29) + (desc is null ? Sc(0) : descH + Sc(10));
+        int cardH = fieldY + field.Height + Sc(14);
+
+        var card = new Panel { Width = RowW, Height = cardH, BackColor = T.Card, Margin = new Padding(0, 0, 0, Sc(4)) };
+        card.Region = new Region(Draw.Rounded(new RectangleF(0, 0, RowW, cardH), Sc(6)));
+        card.Paint += (_, e) => PaintCardBorder(e.Graphics, RowW, cardH);
+        card.Controls.Add(new Label
+        {
+            Text = title, AutoSize = false, Width = textW, Height = Sc(20), AutoEllipsis = true,
+            ForeColor = T.Text, BackColor = Color.Transparent, Font = TitleFont, Location = new Point(Sc(16), Sc(9)),
+        });
+        if (desc is not null)
+            card.Controls.Add(new Label
+            {
+                Text = desc, AutoSize = false, Width = textW, Height = descH + Sc(2),
+                ForeColor = T.Text2, BackColor = Color.Transparent, Font = DescFont, Location = new Point(Sc(16), Sc(29)),
+            });
+        if (right is not null)
+        {
+            right.Location = new Point(RowW - right.Width - Sc(16), (fieldY - right.Height) / 2); // по центру текстового блока
+            card.Controls.Add(right);
+        }
+        field.Location = new Point(Sc(16), fieldY);
+        card.Controls.Add(field);
+        return card;
+    }
+
     public Button LinkButton(string keyOrText, Action click)
     {
         var b = new Button

@@ -50,6 +50,9 @@ public sealed class TrayApp : IDisposable
     // «В дорогу»: наблюдение за 100% вынесено в TravelChargeMonitor
     private readonly TravelChargeMonitor _travel;
 
+    // «Заряд дошёл до порога» — источник события для вебхука (XIC-75)
+    private readonly ChargeLimitWatcher _chargeLimit;
+
     // Жесты Mi-кнопки и роутинг клавиш — вынесены в Input/ (MiButtonGesture, KeyRouter)
     private readonly MiButtonGesture _mi;
     private readonly KeyRouter _router;
@@ -64,13 +67,15 @@ public sealed class TrayApp : IDisposable
     // панель, подписки, колбэки контроллера). Стартовая бизнес-логика — в Start().
     public TrayApp(IMifsClient mifs, AppConfig cfg, IKeyEventSource events, IPowerEvents power,
         PowerProfileGuard powerGuard, TouchpadControl touchpad, TouchscreenControl touchscreen,
-        TravelChargeMonitor travel, TrayIconController icon, AppController controller, ApiSettings api)
+        TravelChargeMonitor travel, TrayIconController icon, AppController controller, ApiSettings api,
+        ChargeLimitWatcher chargeLimit)
     {
         _mifs = mifs;
         _cfg = cfg;
         _events = events;
         _power = power;
         _travel = travel;
+        _chargeLimit = chargeLimit;
         _icon = icon;
         _controller = controller;
         _api = api;
@@ -111,6 +116,17 @@ public sealed class TrayApp : IDisposable
             if (_cfg.TravelSound) Sound.PlayTravelReady(_cfg.TravelSoundFile);
         };
 
+        // Заряд дошёл до порога → вебхук наружу (XIC-75). Не настроен — ни одного запроса:
+        // сюда мы попадаем, только если пользователь сам вписал адрес и включил событие.
+        _chargeLimit.Reached = (pct, limit) =>
+        {
+            if (!_api.WebhookOnChargeLimit || !Webhook.IsAllowed(_api.WebhookUrl)) return;
+            string url = _api.WebhookUrl!;
+            string json = Webhook.Payload("chargeLimit", limit, ApiStatusSnapshot());
+            Log.Write($"ChargeLimit: {pct}% ≥ {limit}% — шлём вебхук");
+            _ = Task.Run(() => Webhook.SendAsync(url, json));
+        };
+
         // OSD на смену питания. Подписка через IPowerEvents (не SystemEvents напрямую):
         // прод-реализация маршалит Resume/StatusChange в UI-поток — иначе Rearm «в дорогу»
         // стартовал бы таймер с фонового потока SystemEvents, где тот не тикает
@@ -137,6 +153,7 @@ public sealed class TrayApp : IDisposable
         // иначе OSD; значок обновляем после смены режима. Сама логика — в AppController.
         _controller.CareChanged = on =>
         {
+            _chargeLimit.Rearm(); // порог включили/выключили/сменили — пересмотреть наблюдение
             if (_panel.Visible) _panel.RefreshUi();
             else _osd.Flash(on ? OsdKind.CareOn : OsdKind.CareOff,
                             on ? Loc.T("osd.care.on") : Loc.T("osd.care.off"));
@@ -296,6 +313,10 @@ public sealed class TrayApp : IDisposable
 
         // индикатор-метрика (XIC-35): только при включённой опции
         if (_cfg.TrayMetricEnabled) StartMetric();
+
+        // наблюдение за порогом заряда: таймер стартует, только если «беречь» включено и мы
+        // на зарядке (сам вебхук — ещё и по настройке; без адреса событие никуда не идёт)
+        _chargeLimit.Rearm();
 
         // HTTP API: поднять хост, если фича включена (api.json); firewall на старте не трогаем —
         // правило создаётся/удаляется только явным тумблером во вкладке (как schtasks у автозапуска)
@@ -550,6 +571,9 @@ public sealed class TrayApp : IDisposable
             else _travel.Rearm(); // подключили при активном режиме — заново ждём 100%
         }
 
+        // порог заряда: на отключении взводимся заново, на подключении начинаем следить
+        _chargeLimit.Rearm();
+
         // Видимость режимов своя у сети и у батареи (XIC-65) — на переходе пересобираем
         // набор, иначе меню и панель показывали бы состав от прошлого источника
         _controller.ReloadModeVisibility();
@@ -640,6 +664,23 @@ public sealed class TrayApp : IDisposable
         bool fw = _api.Enabled && _api.LanAccess;
         int port = _api.Port;
         Task.Run(() => ApiFirewall.Set(fw, port)); // netsh с WaitForExit — не на UI-потоке
+    }
+
+    // «Проверить» на вкладке: послать событие прямо сейчас — тем же путём и с тем же телом,
+    // что и настоящее (иначе проверка проверяла бы не то). Результат возвращаем в UI-поток:
+    // вкладка пишет его на самой кнопке, как это делает «Проверить обновления».
+    private void TestWebhook(Action<bool> done)
+    {
+        if (!Webhook.IsAllowed(_api.WebhookUrl)) { done(false); return; }
+        string url = _api.WebhookUrl!;
+        string json = Webhook.Payload("test", _cfg.CarePercent(), ApiStatusSnapshot());
+        _ = Task.Run(async () =>
+        {
+            bool ok = await Webhook.SendAsync(url, json).ConfigureAwait(false);
+            // окно настроек могли закрыть, пока мы ждали ответ — тогда результат некому показать
+            try { _osd.BeginInvoke(new Action(() => done(ok))); }
+            catch (ObjectDisposedException) { /* уходим молча: в лог уже записано */ }
+        });
     }
 
     // Снимок для GET /status: конфиг + PowerStatus (мгновенно), режим/здоровье — WMI/MIFS
@@ -740,6 +781,7 @@ public sealed class TrayApp : IDisposable
                 GetBatteryReport = BatteryReportCached,
                 GetApiSettings = () => _api,
                 ApiApplied = ApiApplied,
+                TestWebhook = TestWebhook,
                 TrayMetricApplied = TrayMetricApplied,
                 SetOsdPosition = p => { _cfg.OsdPosition = p; _cfg.Save(); OsdApplied(); },
                 SetOsdDuration = ms => { _cfg.OsdDurationMs = ms; _cfg.Save(); OsdApplied(); },

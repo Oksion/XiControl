@@ -54,6 +54,7 @@ internal static class Program
             clamp: (level, online) => sp.GetRequiredService<BrightnessCapGuard>().ClampRestore(level, online)));
         services.AddSingleton<PowerProfileGuard>();
         services.AddSingleton<TravelChargeMonitor>();
+        services.AddSingleton<ChargeLimitWatcher>();   // «заряд дошёл до порога» → вебхук (XIC-75)
         services.AddSingleton<TrayIconController>();
         services.AddSingleton<AppController>();
         services.AddSingleton<TrayApp>();

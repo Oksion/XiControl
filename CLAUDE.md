@@ -235,6 +235,11 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   проверка владельца при чтении — правкой config.json API не включить), `ApiFirewall` (правило
   netsh `LocalSubnet` только по явному LAN-тумблеру). Команды идут в тот же `AppController`,
   маршалятся в UI-поток; bind `127.0.0.1` по умолчанию, LAN — отдельным тумблером.
+  **Исходящее событие (XIC-75)** — `ChargeLimitWatcher` (опрос заряда, решение `Decide` чистое
+  и под тестами: «один раз за зарядку», взвод заново на отключении зарядника) + `Webhook`
+  (`HttpClient`-POST, только http/https, без редиректов, ответ не читаем, три попытки).
+  Адрес и тумблер — в том же `api.json`; не настроен = сетевого кода нет вовсе, как у
+  проверки обновлений. От `Enabled` НЕ зависит: слушающий сокет для исходящего POST не нужен.
 - `src/Config/` — `AppConfig` (POCO: config.json + миграции в `MigrateKeyActions`; `Save()`
   остался на объекте, но persistence — за `IConfigStore`/`JsonConfigStore`; `LegacyLanguageConverter`
   — миграция старого формата языка), `AppPaths` (каталог данных и портативный режим XIC-34:

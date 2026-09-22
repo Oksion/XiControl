@@ -663,6 +663,25 @@ curl -X POST http://192.168.1.50:58125/travel \
   -H "Authorization: Bearer <token>" -d '{"on":true}'
 ```
 
+Ready-made commands carrying your own port live right on the tab, at the bottom under "Example
+requests": copy one, drop in your token, done.
+
+**Webhook: an outgoing event.** The flip side of the API — XiControl tells another system that the
+**battery reached its limit**: a smart plug cuts the power with nobody in the room, and Home
+Assistant stops polling us in a loop. The recipient address and the toggle are on the same tab; the
+"Test" button sends a test event down the same path and with the same body as the real one. The body
+carries the same fields as `GET /status`, plus the reason and the limit:
+
+```json
+{"event":"chargeLimit","limit":60,"time":"2026-09-22T15:20:05Z","mode":"Auto","care":true,
+ "travel":false,"owl":false,"batteryPercent":60,"charging":true,"watts":null,"health":100}
+```
+
+It fires **once per charge** and re-arms when the charger is unplugged. It works independently of
+the server itself: no listening socket is needed for an outgoing event. With no address set, not a
+single network request is made — the same promise the update check makes. We only speak `http`/
+`https`, never follow redirects and never read the response — the status code is enough.
+
 Security (the utility runs as administrator, so — deliberately and with caveats):
 
 - **`127.0.0.1` only by default** — unreachable from the network even with a token. LAN access is a
