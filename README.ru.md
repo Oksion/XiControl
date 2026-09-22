@@ -721,7 +721,8 @@ curl -X POST http://192.168.1.50:58125/travel \
 - [02-feature-catalog.md](docs/02-feature-catalog.md) — каталог функций;
 - [03-architecture.md](docs/03-architecture.md) — архитектура приложения;
 - [07-keymap.md](docs/07-keymap.md) — карта кодов клавиш;
-- [13-auto-brightness.md](docs/13-auto-brightness.md) — математика обучаемой кривой авто-яркости 🤓.
+- [13-auto-brightness.md](docs/13-auto-brightness.md) — математика обучаемой кривой авто-яркости 🤓;
+- [15-http-api.md](docs/15-http-api.md) — протокол HTTP API целиком: маршруты, коды ответов, вебхук и сценарий для Home Assistant.
 
 Коротко: метод `MiInterface` принимает 32-байтовый буфер
 (`[1]` — GET `0xFA` / SET `0xFB`, `[3]` — команда, `[4]/[6]` — аргументы) и возвращает
