@@ -267,8 +267,26 @@ public sealed class AppConfig
     /// игнорируется (см. <see cref="ModeVisibility"/>).
     ///
     /// null — конфиг ещё не мигрирован со старых <c>EcoMode</c>/<c>FullSpeedMode</c>.
+    ///
+    /// Устаревшее с XIC-65: видимость разрезана по источнику питания, см.
+    /// <see cref="HiddenModesBySource"/>. Поле читается только для миграции.
     /// </summary>
     public List<PerfMode>? HiddenModes { get; set; }
+
+    /// <summary>
+    /// Режимы, убранные из меню и панели, ОТДЕЛЬНО для сети и для батареи («ac»/«battery» —
+    /// те же ключи, что у <see cref="RejectedModes"/>, см. <see cref="ModeLearning"/>).
+    ///
+    /// Разрез по питанию просил тестер: от сети нужны «Тихий/Авто/Полная мощность», от
+    /// батареи — «Эко/Авто/Турбо», и держать в панели то, что в текущем состоянии всё равно
+    /// не выберешь, незачем. Ключи строковые ради того же, ради чего у выученных отказов:
+    /// третий вид питания добавится без ломки формата.
+    ///
+    /// Живёт рядом с <see cref="RejectedModes"/> намеренно — это два разных смысла одного
+    /// вопроса «что показывать»: «железо отвергло» (факт) и «человек спрятал» (намерение).
+    /// Намерение главнее: спрятанное не показываем, даже если прошивка режим принимает.
+    /// </summary>
+    public Dictionary<string, List<PerfMode>>? HiddenModesBySource { get; set; }
 
     /// <summary>
     /// Режимы, которые прошивка ЯВНО отвергла, по источникам питания («ac»/«battery», см.
@@ -590,11 +608,19 @@ public sealed class AppConfig
     /// </summary>
     private void MigrateModeVisibility()
     {
+        // XIC-65: общий список разъезжается на два — по источникам питания. Скрытое раньше
+        // остаётся скрытым и от сети, и от батареи: человек прятал режим вообще, а не
+        // «при питании от розетки», и внезапно вернувшаяся ячейка выглядела бы поломкой.
+        if (HiddenModesBySource is null)
+            HiddenModesBySource = ModeVisibility.Split(HiddenModes);
+
         if (HiddenModes is not null) return;
 
         HiddenModes = [];
         if (!EcoMode) HiddenModes.Add(PerfMode.Eco);
         if (!FullSpeedMode) HiddenModes.Add(PerfMode.FullSpeed);
+        // старый конфиг мог прийти сразу с EcoMode/FullSpeedMode — разложим и его
+        HiddenModesBySource = ModeVisibility.Split(HiddenModes);
         // Balance намеренно НЕ прячем: его отвергает прошивка Book Pro 14, но на Redmi Book
         // Pro 15 2022 это один из двух рабочих режимов, и спрятанный дефолтом он там не
         // перебирается вовсе — то есть никогда себя и не покажет. Пусть решает автоопределение

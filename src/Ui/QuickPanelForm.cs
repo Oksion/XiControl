@@ -131,7 +131,9 @@ public sealed class QuickPanelForm : FlyoutForm
     /// </summary>
     public void ReloadModes()
     {
-        _modes = ModeVisibility.Visible(AppController.AllModes, _cfg.HiddenModes)
+        // набор свой у сети и у батареи (XIC-65) — смотрим на текущий источник
+        _modes = ModeVisibility.Visible(AppController.AllModes,
+                ModeVisibility.For(_cfg.HiddenModesBySource, PowerLine.IsOnline()))
             .Select(m => (m, ModeUi.Key(m) ?? "mode.auto", ModeUi.Accent(m)))
             .ToArray();
         _modeRects = new Rectangle[_modes.Length];

@@ -383,7 +383,9 @@ public sealed class AppControllerTests
         _power.IsOnline = false;
         _c.SetMode(PerfMode.Balance);
 
-        _cfg.HiddenModes.Should().Contain(PerfMode.Balance);
+        // прячем у ОБОИХ источников: режима на этой машине нет вовсе (XIC-65)
+        _c.HiddenModesFor(online: true).Should().Contain(PerfMode.Balance);
+        _c.HiddenModesFor(online: false).Should().Contain(PerfMode.Balance);
         _c.VisibleModes.Should().NotContain(PerfMode.Balance);
     }
 
@@ -409,8 +411,61 @@ public sealed class AppControllerTests
 
         _c.VisibleModes.Should().Equal(
             PerfMode.Quiet, PerfMode.Balance, PerfMode.Auto, PerfMode.Turbo, PerfMode.FullSpeed);
-        _cfg.HiddenModes.Should().Equal(PerfMode.Eco);
+        _c.HiddenModesFor(_power.IsOnline).Should().Equal(PerfMode.Eco);
         _events.Should().Equal("modes-reloaded");
+    }
+
+    // ---- XIC-65: видимость своя у сети и у батареи ----
+
+    [Fact]
+    public void Скрытие_ОтБатареи_НеТрогаетНаборОтСети()
+    {
+        // ровно просьба тестера: «Полная мощность» от батареи всё равно не включится,
+        // а в розетке она нужна — значит прятать её надо только у одного источника
+        _power.IsOnline = false;
+        _c.SetModeVisible(PerfMode.FullSpeed, visible: false);
+
+        _c.HiddenModesFor(online: false).Should().Equal(PerfMode.FullSpeed);
+        _c.HiddenModesFor(online: true).Should().BeEmpty();
+        _c.VisibleModes.Should().NotContain(PerfMode.FullSpeed);
+    }
+
+    [Fact]
+    public void СменаПитания_ПересобираетНабор()
+    {
+        _power.IsOnline = false;
+        _c.SetModeVisible(PerfMode.FullSpeed, visible: false);
+        _events.Clear();
+
+        _power.IsOnline = true;
+        _c.ReloadModeVisibility();
+
+        _c.VisibleModes.Should().Contain(PerfMode.FullSpeed, "в розетке этот режим виден");
+        _events.Should().Equal("modes-reloaded");
+    }
+
+    [Fact]
+    public void СменаПитания_БезИзмененийНабора_НеДёргаетUi()
+    {
+        _power.IsOnline = true;
+        _events.Clear();
+
+        _c.ReloadModeVisibility();
+
+        _events.Should().BeEmpty("состав тот же — перерисовывать меню и панель незачем");
+    }
+
+    [Fact]
+    public void Минимум_ДваРежима_СчитаетсяОтдельноДляКаждогоИсточника()
+    {
+        // от батареи прячем всё, что можно: должны остаться два
+        _power.IsOnline = false;
+        foreach (var m in AppController.AllModes) _c.SetModeVisible(m, visible: false);
+
+        _c.VisibleModes.Count.Should().Be(ModeVisibility.Minimum);
+        _c.HiddenModesFor(online: true).Should().BeEmpty("от сети мы ничего не прятали");
+        _c.CanHideModeFor(online: true).Should().BeTrue();
+        _c.CanHideModeFor(online: false).Should().BeFalse();
     }
 
     // Минимум два: последние два режима скрыть нельзя — иначе переключать не на что.

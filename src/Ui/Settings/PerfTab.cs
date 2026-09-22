@@ -30,13 +30,25 @@ public sealed class PerfTab : SettingsPane
         // из которого нечего выбирать, бессмысленен. Тумблер последних двух гасим, а не даём
         // нажать вхолостую. После смены видимости пересобираем окно (после выхода из
         // обработчика): комбо профилей ниже предлагают только видимые режимы.
-        bool canHide = act.CanHideMode();
+        // Видимость своя у сети и у батареи (XIC-65). Просил тестер: от сети нужны
+        // «Тихий/Авто/Полная мощность», от батареи — «Эко/Авто/Турбо», и держать в панели то,
+        // что в текущем состоянии всё равно не выбрать, незачем.
+        //
+        // Показываем по одному набору за раз, с переключателем контекста сверху. Два тумблера
+        // в строке (первый заход) читались плохо: одинаковые кружки подряд, и какой из них
+        // «сеть», а какой «батарея», приходилось угадывать или лезть в подсказку.
+        bool ac = _editingAc ??= act.IsOnlineNow();
+        ui.AddNote(this, "settings.perf.modes.note");
+        Controls.Add(SourcePicker(ac, rebuild));
+
+        bool canHide = act.CanHideModeFor(ac);
+        var hidden = act.HiddenModesFor(ac);
         foreach (var mode in AppController.AllModes)
         {
             var m = mode;                                   // замыкание на копию
-            bool visible = cfg.HiddenModes?.Contains(m) != true;
-            var toggle = ui.Toggle(visible, on => { act.SetModeVisible(m, on); rebuild(); });
-            toggle.Enabled = visible ? canHide : true;       // снять можно, вернуть — всегда
+            bool visible = !hidden.Contains(m);
+            var toggle = ui.Toggle(visible, on => { act.SetModeVisibleFor(m, on, ac); rebuild(); });
+            toggle.Enabled = visible ? canHide : true;      // снять можно, вернуть — всегда
             ui.AddRow(this, ModeUi.Key(m) ?? "mode.auto", ModeVisibilityHint(m), toggle);
         }
 
@@ -141,13 +153,54 @@ public sealed class PerfTab : SettingsPane
         foreach (var r in _profileRows) r.Visible = prof;
     }
 
+    /// <summary>
+    /// Какой набор сейчас правим. Статика, а не поле экземпляра: окно настроек пересобирает
+    /// вкладки на каждое изменение, и выбор «от батареи» иначе слетал бы после первого же
+    /// переключённого тумблера. Первый показ открывает набор текущего питания — человек
+    /// обычно настраивает то, что видит перед собой.
+    /// </summary>
+    private static bool? _editingAc;
+
+    /// <summary>Переключатель контекста: два сегмента во всю ширину строки.</summary>
+    private Panel SourcePicker(bool ac, Action rebuild)
+    {
+        var host = new Panel { Width = Ui.RowW, Height = Ui.Sc(34), BackColor = Ui.T.WinBg, Margin = new Padding(0, 0, 0, Ui.Sc(8)) };
+        host.Controls.Add(Segment("settings.perf.modes.ac", isAc: true, ac, rebuild, 0));
+        host.Controls.Add(Segment("settings.perf.modes.battery", isAc: false, ac, rebuild, Ui.RowW / 2));
+        return host;
+    }
+
+    private Button Segment(string key, bool isAc, bool ac, Action rebuild, int x)
+    {
+        bool active = isAc == ac;
+        var b = new Button
+        {
+            Text = Loc.T(key),
+            Width = Ui.RowW / 2,
+            Height = Ui.Sc(34),
+            Location = new Point(x, 0),
+            FlatStyle = FlatStyle.Flat,
+            // активный сегмент акцентом, неактивный — как обычная карточка: разница видна
+            // сразу, без второго взгляда на положение переключателей
+            BackColor = active ? Ui.T.Accent : Ui.T.Card,
+            ForeColor = active ? (Ui.T.Dark ? Color.FromArgb(0, 45, 74) : Color.White) : Ui.T.Text,
+            Font = Ui.CtlFont,
+            Cursor = Cursors.Hand,
+        };
+        b.FlatAppearance.BorderColor = active ? Ui.T.Accent : Ui.T.Border;
+        b.Click += (_, _) => { if (!active) { _editingAc = isAc; rebuild(); } };
+        return b;
+    }
+
     // Только видимые режимы (скрытый из приложения включить нельзя) плюс текущий выбор, даже
     // если его успели скрыть. Правило — из общего ModeVisibility, чтобы список не разъезжался
     // с панелью и меню: свой фильтр здесь знал только про Эко и Полную мощность.
     private ComboBox ProfileCombo(bool ac)
     {
         var cur = ac ? _cfg.AcPerfMode : _cfg.BatteryPerfMode;
-        var visible = ModeVisibility.Visible(AppController.AllModes, _cfg.HiddenModes);
+        // видимость своя у источника — профиль «от батареи» предлагает то, что видно от батареи
+        var visible = ModeVisibility.Visible(AppController.AllModes,
+            ModeVisibility.For(_cfg.HiddenModesBySource, ac));
         var modes = AppController.AllModes.Where(m => m == cur || visible.Contains(m)).ToArray();
         var items = new List<string> { Loc.T("settings.profile.nochange") };
         items.AddRange(modes.Select(m => Loc.T(ModeUi.Key(m) ?? "mode.auto")));

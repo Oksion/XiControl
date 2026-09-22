@@ -257,7 +257,8 @@ touchscreen, refresh-rate control), Battery (charge threshold with a hint, "trav
 lock-screen sound and toast, charger-wattage OSD, "weak PSU" threshold, battery health), Display
 (brightness limit and memory; auto refresh rate, "Keep refresh rate" and the rates — the section is
 hidden if refresh-rate control is off), Touchpad (bottom dead zone), Performance (mode visibility,
-startup mode, power profiles), Keys (remapping), Notifications (where popups appear, how long
+separately for AC and battery, with a switch above the list; startup mode, power profiles),
+Keys (remapping), Notifications (where popups appear, how long
 they stay, which lock-key popups to show), HTTP API (port, token, permissions) and About
 (version, model with the board code, BIOS, serial number — masked by default, click to reveal).
 The quick toggles (charge, "travel", owl, refresh rate, Monitor,

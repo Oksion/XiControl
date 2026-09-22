@@ -550,6 +550,10 @@ public sealed class TrayApp : IDisposable
             else _travel.Rearm(); // подключили при активном режиме — заново ждём 100%
         }
 
+        // Видимость режимов своя у сети и у батареи (XIC-65) — на переходе пересобираем
+        // набор, иначе меню и панель показывали бы состав от прошлого источника
+        _controller.ReloadModeVisibility();
+
         ShowPowerOsd(online);
     }
 
@@ -689,8 +693,10 @@ public sealed class TrayApp : IDisposable
                 CurrentLanguage = () => _controller.CurrentLanguage,
                 SetLanguage = _controller.SetLanguage,
                 SetFlyoutTheme = _controller.SetFlyoutTheme,
-                SetModeVisible = _controller.SetModeVisible,
-                CanHideMode = () => _controller.CanHideMode,
+                SetModeVisibleFor = (m, on, online) => _controller.SetModeVisible(m, on, online),
+                HiddenModesFor = _controller.HiddenModesFor,
+                CanHideModeFor = _controller.CanHideModeFor,
+                IsOnlineNow = PowerLine.IsOnline,
                 GetStartStrategy = () => _controller.CurrentStartStrategy,
                 SetStartStrategy = _controller.SetStartStrategy,
                 SetProfileMode = _controller.SetProfileMode,
