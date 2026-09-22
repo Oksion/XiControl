@@ -47,8 +47,14 @@ public class WorkerTimerTests
         await Task.Delay(120);
         t.Stop();
 
+        // Stop снимает РАСПИСАНИЕ, но не выдёргивает тик, уже начавшийся на потоке пула:
+        // System.Threading.Timer так не умеет, и это нормально. Поэтому базу снимаем не сразу,
+        // а дав такому тику дотикать — иначе тест ловит собственную гонку и падает на CI
+        // «ожидалось 7, получено 8». Пауза заведомо длиннее интервала таймера.
+        await Task.Delay(150);
         int afterStop = Volatile.Read(ref calls);
-        await Task.Delay(120);
-        Volatile.Read(ref calls).Should().Be(afterStop);
+
+        await Task.Delay(150);
+        Volatile.Read(ref calls).Should().Be(afterStop, "после Stop новых тиков быть не должно");
     }
 }
