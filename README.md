@@ -678,9 +678,16 @@ Assistant stops polling us in a loop. The recipient address and the toggle are o
 carries the same fields as `GET /status`, plus the reason and the limit:
 
 ```json
-{"event":"chargeLimit","limit":60,"time":"2026-09-22T15:20:05Z","mode":"Auto","care":true,
- "travel":false,"owl":false,"batteryPercent":60,"charging":true,"watts":null,"health":100}
+{"event":"chargeLimit","limit":60,"hardwareLimit":true,"time":"2026-09-22T15:20:05Z",
+ "mode":"Auto","care":true,"travel":false,"owl":false,"batteryPercent":60,"charging":true,
+ "watts":null,"health":100}
 ```
+
+`hardwareLimit` tells you whose limit it was, and the difference matters for a scenario: `true` —
+the firmware has already stopped charging (switching the plug off is useful but not urgent),
+`false` — the limit is a **software** one and charging **continues** until the plug goes off. The
+event name is the same in both cases: an automation written for `chargeLimit` must not silently
+stop seeing the second one — which is the more dangerous of the two.
 
 It fires **once per charge** and re-arms when the charger is unplugged. It works independently of
 the server itself: no listening socket is needed for an outgoing event. With no address set, not a

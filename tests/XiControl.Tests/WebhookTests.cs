@@ -84,8 +84,22 @@ public sealed class WebhookTests
         string json = Webhook.Payload("chargeLimit", 80, st);
 
         json.Should().Contain("\"event\":\"chargeLimit\"").And.Contain("\"limit\":80");
+        json.Should().Contain("\"hardwareLimit\":true", "по умолчанию порог держит прошивка");
         // имена — те же, что у GET /status: получателю не нужна вторая раскладка полей
         json.Should().Contain("\"batteryPercent\":80").And.Contain("\"charging\":true")
             .And.Contain("\"mode\":\"Turbo\"").And.Contain("\"health\":97");
+    }
+
+    [Fact]
+    public void Программный_порог_помечен_в_теле_события()
+    {
+        var st = new ApiStatus("Auto", Care: true, Travel: false, Owl: false,
+            BatteryPercent: 82, Charging: true, Watts: null, Health: 100);
+
+        string json = Webhook.Payload("chargeLimit", 80, st, hardwareLimit: false);
+
+        json.Should().Contain("\"hardwareLimit\":false",
+            "здесь заряд ПРОДОЛЖАЕТСЯ, и розетка — единственное, что его остановит: " +
+            "получателю эту разницу надо знать, а из одного limit её не вывести");
     }
 }

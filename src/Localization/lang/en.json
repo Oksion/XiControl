@@ -295,7 +295,7 @@
   "settings.api.webhook": "Report reaching the limit",
   "settings.api.webhook.desc": "A JSON POST to the address below once the charge reaches the “protect battery” limit. Once per charge; plugging the charger in again re-arms the event.",
   "settings.api.webhook.url": "Recipient address",
-  "settings.api.webhook.url.desc": "http or https — a Home Assistant webhook, for instance. An empty field turns sending off. “Test” sends a test event down the same path and with the same body as the real one.",
+  "settings.api.webhook.url.desc": "http or https — a Home Assistant webhook, for instance. An empty field turns sending off. “Test” sends a test event down the same path and with the same body as the real one, and works regardless of the toggle above so you can check the address before turning sending on. Real events are sent only while that toggle is on.",
   "settings.api.webhook.test": "Test",
   "settings.api.webhook.testing": "Sending…",
   "settings.api.webhook.ok": "Delivered",

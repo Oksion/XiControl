@@ -295,7 +295,7 @@
   "settings.api.webhook": "达到阈值时通知",
   "settings.api.webhook.desc": "电量达到“保护电池”阈值时，向下方地址发送 JSON POST。每次充电只发一次；重新接上充电器后重新待命。",
   "settings.api.webhook.url": "接收地址",
-  "settings.api.webhook.url.desc": "http 或 https——例如 Home Assistant 的 webhook。留空则关闭发送。“测试”会按真实事件的同一路径和内容发送一个测试事件。",
+  "settings.api.webhook.url.desc": "http 或 https——例如 Home Assistant 的 webhook。留空则关闭发送。“测试”会按真实事件的同一路径和内容发送测试事件，并且不受上面开关的影响，便于在启用前先验证地址。真实事件只有在该开关开启时才会发送。",
   "settings.api.webhook.test": "测试",
   "settings.api.webhook.testing": "发送中…",
   "settings.api.webhook.ok": "已送达",

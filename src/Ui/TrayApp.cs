@@ -146,7 +146,7 @@ public sealed class TrayApp : IDisposable
             // она либо сработала, либо её там нет
             if (reminder || !_api.WebhookOnChargeLimit || !Webhook.IsAllowed(_api.WebhookUrl)) return;
             string url = _api.WebhookUrl!;
-            string json = Webhook.Payload("chargeLimit", target.Limit, ApiStatusSnapshot());
+            string json = Webhook.Payload("chargeLimit", target.Limit, ApiStatusSnapshot(), hardwareLimit: !target.Soft);
             Log.Write($"ChargeLimit: {pct}% ≥ {target.Limit}% — шлём вебхук");
             _ = Task.Run(() => Webhook.SendAsync(url, json));
         };
@@ -697,7 +697,7 @@ public sealed class TrayApp : IDisposable
     {
         if (!Webhook.IsAllowed(_api.WebhookUrl)) { done(false); return; }
         string url = _api.WebhookUrl!;
-        string json = Webhook.Payload("test", _cfg.CarePercent(), ApiStatusSnapshot());
+        string json = Webhook.Payload("test", _cfg.CarePercent(), ApiStatusSnapshot(), hardwareLimit: !_cfg.ChargeLimitUnsupported);
         _ = Task.Run(async () =>
         {
             bool ok = await Webhook.SendAsync(url, json).ConfigureAwait(false);

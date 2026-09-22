@@ -33,11 +33,19 @@ public static class Webhook
     /// Тело события: поля состояния — теми же именами, что у <c>GET /status</c> (второй словарь
     /// для тех же величин заставил бы получателя писать две раскладки), плюс сам повод.
     /// </summary>
-    public static string Payload(string evt, int limit, ApiStatus st) =>
+    /// <param name="hardwareLimit">
+    /// Чей это порог. <c>true</c> — аппаратный: прошивка уже остановила заряд, выключение
+    /// розетки полезно, но не критично. <c>false</c> — программный (XIC-74): заряд
+    /// ПРОДОЛЖАЕТСЯ, и розетка — единственное, что его остановит. Для автоматизации разница
+    /// существенная (во втором случае уместны повторные попытки и уведомление владельцу),
+    /// поэтому она в теле события, а не додумывается получателем по значению limit.
+    /// </param>
+    public static string Payload(string evt, int limit, ApiStatus st, bool hardwareLimit = true) =>
         JsonSerializer.Serialize(new
         {
             @event = evt,
             limit,
+            hardwareLimit,
             // Zulu без смещения: у формата "O" смещение пишется через «+», а JSON-сериализатор
             // экранирует его в + — валидно, но в логе получателя выглядит как поломка
             time = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture),
