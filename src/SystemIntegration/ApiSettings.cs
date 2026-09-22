@@ -34,6 +34,17 @@ public sealed class ApiSettings
     public bool AllowCare { get; set; }
     public bool AllowTravel { get; set; }
     public bool AllowOwl { get; set; }
+
+    /// <summary>Куда слать событие «заряд дошёл до порога» (XIC-75): http/https, пусто —
+    /// вебхука нет и сетевого кода не существует. Живёт здесь, а не в config.json, по той же
+    /// причине, что и токен: непривилегированный процесс не должен уметь заставить наш
+    /// elevated-процесс сходить по своему адресу.</summary>
+    public string? WebhookUrl { get; set; }
+
+    /// <summary>Слать ли событие о пороге заряда. Отдельно от <see cref="Enabled"/>: входящий
+    /// сервер и исходящее событие — независимые способности, и открывать слушающий сокет ради
+    /// одного POST наружу было бы хуже, а не лучше.</summary>
+    public bool WebhookOnChargeLimit { get; set; }
 }
 
 /// <summary>Загрузка/сохранение api.json. Пишем всегда с ужесточённым ACL — пишет наш

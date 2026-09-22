@@ -66,6 +66,7 @@ public sealed class SettingsActions
     public required Func<SystemIntegration.BatteryReport> GetBatteryReport; // здоровье батареи (WMI + SOH1)
     public required Func<SystemIntegration.ApiSettings> GetApiSettings;    // настройки HTTP API (api.json, XIC-13)
     public required Action ApiApplied; // вкладка изменила настройки API → сохранить + перезапустить хост/фаервол
+    public required Action<Action<bool>> TestWebhook; // «Проверить»: послать тестовое событие; колбэк — результат в UI-потоке (XIC-75)
     public required Action TrayMetricApplied; // индикатор в трее (XIC-35): вкл/выкл/метрика/период изменились
     public required Action<OsdPosition> SetOsdPosition; // где показывать OSD (сетка 3×3)
     public required Action<int> SetOsdDuration;         // сколько висит, мс

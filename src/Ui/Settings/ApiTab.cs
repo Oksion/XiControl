@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using XiControl.Config;
+using XiControl.Localization;
+using XiControl.SystemIntegration;
 
 namespace XiControl.Ui.Settings;
 
@@ -61,20 +63,7 @@ public sealed class ApiTab : SettingsPane
         gen.AutoSize = false;
         gen.Width = TextRenderer.MeasureText(gen.Text, gen.Font).Width + ui.Sc(24);
 
-        int textW = Math.Max(ui.Sc(120), ui.RowW - gen.Width - ui.Sc(48)); // текст не лезет под кнопку
-        int descH = TextRenderer.MeasureText(tokenDesc, ui.DescFont, new Size(textW, 0), TextFormatFlags.WordBreak).Height;
-        int fieldY = ui.Sc(29) + descH + ui.Sc(10);
-        int cardH = fieldY + tokenField.Height + ui.Sc(14);
-        var card = new Panel { Width = ui.RowW, Height = cardH, BackColor = ui.T.Card, Margin = new Padding(0, 0, 0, ui.Sc(4)) };
-        card.Region = new Region(Draw.Rounded(new RectangleF(0, 0, ui.RowW, cardH), ui.Sc(6)));
-        card.Paint += (_, e) => ui.PaintCardBorder(e.Graphics, ui.RowW, cardH);
-        card.Controls.Add(new Label { Text = tokenTitle, AutoSize = false, Width = textW, Height = ui.Sc(20), ForeColor = ui.T.Text, BackColor = Color.Transparent, Font = ui.TitleFont, Location = new Point(ui.Sc(16), ui.Sc(9)), AutoEllipsis = true });
-        card.Controls.Add(new Label { Text = tokenDesc, AutoSize = false, Width = textW, Height = descH + ui.Sc(2), ForeColor = ui.T.Text2, BackColor = Color.Transparent, Font = ui.DescFont, Location = new Point(ui.Sc(16), ui.Sc(29)) });
-        gen.Location = new Point(ui.RowW - gen.Width - ui.Sc(16), (fieldY - gen.Height) / 2); // по центру текстового блока
-        tokenField.Location = new Point(ui.Sc(16), fieldY);
-        card.Controls.Add(gen);
-        card.Controls.Add(tokenField);
-        Controls.Add(card);
+        Controls.Add(ui.FieldCard(tokenTitle, tokenDesc, tokenField, gen));
 
         // Пер-командные разрешения. Тумблер команды, чья фича выключена в «Функциях», —
         // серый: сначала включите фичу, потом открывайте её в API.
@@ -89,5 +78,83 @@ public sealed class ApiTab : SettingsPane
         Cmd("settings.api.cmd.care", s.AllowCare, v => s.AllowCare = v);
         Cmd("settings.api.cmd.travel", s.AllowTravel, v => s.AllowTravel = v);
         Cmd("settings.api.cmd.owl", s.AllowOwl, v => s.AllowOwl = v, cfg.OwlMode);
+
+        // ---- Вебхук (XIC-75) ----
+        // Мастер-тумблером API НЕ гасится намеренно: входящий сервер и исходящее событие —
+        // независимые способности. Заставлять открывать слушающий сокет ради одного POST
+        // наружу значило бы просить пользователя об уступке в безопасности ни за что.
+        ui.AddGroup(this, "settings.api.webhook.group");
+        ui.AddNote(this, "settings.api.webhook.note");
+        var hook = ui.Toggle(s.WebhookOnChargeLimit, on => { s.WebhookOnChargeLimit = on; act.ApiApplied(); });
+        ui.AddRow(this, "settings.api.webhook", "settings.api.webhook.desc", hook);
+        var url = ui.TextField(s.WebhookUrl ?? "", ui.RowW - ui.Sc(32), v =>
+        {
+            string trimmed = v.Trim();
+            // пустое — выключено; мусор не сохраняем молча, а откатываем показом прежнего
+            if (trimmed.Length == 0 || Webhook.IsAllowed(trimmed))
+            {
+                s.WebhookUrl = trimmed.Length == 0 ? null : trimmed;
+                act.ApiApplied();
+            }
+            else rebuild();
+        });
+        url.AccessibleName = Loc.T("settings.api.webhook.url");
+
+        // результат пишем на самой кнопке (как «Проверить обновления»): отдельного OSD у
+        // события нет, а знать, дошло ли до розетки, — весь смысл проверки
+        Button test = null!;
+        test = ui.LinkButton("settings.api.webhook.test", () =>
+        {
+            test.Enabled = false;
+            test.Text = Loc.T("settings.api.webhook.testing");
+            act.TestWebhook(ok =>
+            {
+                test.Text = Loc.T(ok ? "settings.api.webhook.ok" : "settings.api.webhook.fail");
+                test.Enabled = true;
+            });
+        });
+        test.AutoSize = false;
+        // ширина по самой длинной из подписей: кнопка меняет текст и не должна прыгать
+        test.Width = ui.Sc(24) + new[] { test.Text, Loc.T("settings.api.webhook.testing"), Loc.T("settings.api.webhook.ok"), Loc.T("settings.api.webhook.fail") }
+            .Max(t => TextRenderer.MeasureText(t, test.Font).Width);
+        test.Height = ui.Sc(30);
+        // Готовность считаем по тому, что НАБРАНО, а не по сохранённому: адрес сохраняется по
+        // уходу фокуса, а фокус как раз и уходит на эту кнопку. Кнопка, серая до пересборки
+        // окна, выглядит как сломанная — именно так это и выглядело.
+        test.Enabled = Webhook.IsAllowed(url.Text.Trim());
+        url.TextChanged += (_, _) =>
+        {
+            test.Enabled = Webhook.IsAllowed(url.Text.Trim());
+            test.Text = Loc.T("settings.api.webhook.test"); // адрес правят — прошлый результат уже не про него
+        };
+        Controls.Add(ui.FieldCard(Loc.T("settings.api.webhook.url"), Loc.T("settings.api.webhook.url.desc"), url, test));
+
+        // ---- Примеры запросов (XIC-71) ----
+        // Без них вкладка кончалась на «включено, токен сгенерирован» — и что дальше, знал
+        // только тот, кто читал README. Порт и адрес подставляем фактические, токен — как
+        // плейсхолдер: настоящий мы не храним (только его SHA-256).
+        ui.AddGroup(this, "settings.api.examples");
+        ui.AddNote(this, "settings.api.examples.note");
+        string host = s.LanAccess ? Loc.T("settings.api.examples.host") : "127.0.0.1";
+        foreach (var (titleKey, sample) in Examples(host, s.Port))
+        {
+            var box = ui.TextField(sample, ui.RowW - ui.Sc(32), _ => { });
+            box.ReadOnly = true;                   // поле, а не Label: выделяется и копируется Ctrl+C
+            box.AccessibleName = Loc.T(titleKey);
+            Controls.Add(ui.FieldCard(Loc.T(titleKey), null, box)); // заголовка хватает — что делает команда, видно из неё
+        }
     }
+
+    // Готовые команды: curl (он же есть в Windows 10+ из коробки) и PowerShell — первая
+    // читает состояние, вторая переключает режим. Больше не нужно: остальные маршруты
+    // устроены так же, а полный список живёт в README.
+    private static (string TitleKey, string Sample)[] Examples(string host, int port) =>
+    [
+        ("settings.api.example.status",
+            $"curl -H \"Authorization: Bearer ВАШ_ТОКЕН\" http://{host}:{port}/status"),
+        ("settings.api.example.mode",
+            $"curl -X POST -H \"Authorization: Bearer ВАШ_ТОКЕН\" -H \"Content-Type: application/json\" -d \"{{\\\"value\\\":\\\"Turbo\\\"}}\" http://{host}:{port}/mode"),
+        ("settings.api.example.care",
+            $"Invoke-RestMethod http://{host}:{port}/care -Method Post -Headers @{{Authorization='Bearer ВАШ_ТОКЕН'}} -ContentType 'application/json' -Body '{{\"on\":true}}'"),
+    ];
 }
