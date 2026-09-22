@@ -43,8 +43,10 @@ auto refresh rate and "owl mode" (stay awake).*
 
 *In full view — live graphs: power draw (W), CPU, **GPU** (clock and watts under the percentage),
 RAM, **hotspot temperature** (hot zone in cherry red) and the connected adapter's wattage. Collapses
-into a compact line (Power / CPU / GPU / RAM) or a single watts readout — via the "view" button or a
-double-click; current direction is shown by color (charging green / discharging orange).*
+into a compact line (Power / CPU / GPU / RAM) or a single large readout — via the "view" button or a
+double-click; current direction is shown by color (charging green / discharging orange). In the
+smallest view you pick the metric with a right-click: power, CPU, GPU, RAM or temperature — on AC,
+where there are no watts to show, you can watch load or degrees instead.*
 
 *The tray icon changes with the active mode:*
 

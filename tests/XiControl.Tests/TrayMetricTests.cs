@@ -38,6 +38,29 @@ public class TrayMetricTests
         TrayMetricFormat.ParseKind(key).Should().Be(m);
     }
 
+    // ---- Available: метрика, которую этой машине есть чем показать (XIC-70) ----
+
+    [Theory]
+    [InlineData(TrayMetric.Gpu, false, true)]   // не Intel — IGCL не поднялся
+    [InlineData(TrayMetric.Temp, true, false)]  // ни DPTF, ни ACPI-зоны
+    public void Available_нечем_показать_откатывается_к_потреблению(TrayMetric want, bool gpu, bool temp) =>
+        TrayMetricFormat.Available(want, gpu, temp).Should().Be(TrayMetric.Power,
+            "вечный прочерк вместо числа выглядит поломкой, а не отсутствием датчика");
+
+    [Theory]
+    [InlineData(TrayMetric.Gpu)]
+    [InlineData(TrayMetric.Temp)]
+    [InlineData(TrayMetric.Cpu)]
+    [InlineData(TrayMetric.Ram)]
+    [InlineData(TrayMetric.Power)]
+    public void Available_есть_чем_показать_выбор_не_трогаем(TrayMetric want) =>
+        TrayMetricFormat.Available(want, hasGpu: true, hasTemp: true).Should().Be(want);
+
+    [Fact]
+    public void Available_проценты_и_ватты_есть_всегда() =>
+        TrayMetricFormat.Available(TrayMetric.Cpu, hasGpu: false, hasTemp: false)
+            .Should().Be(TrayMetric.Cpu, "CPU и RAM не зависят ни от IGCL, ни от DPTF");
+
     // ---- IconText: компактный текст на значке ----
 
     [Fact]
