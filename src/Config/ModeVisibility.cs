@@ -17,6 +17,30 @@ public static class ModeVisibility
     public const int Minimum = 2;
 
     /// <summary>
+    /// Скрытые режимы для одного источника питания (XIC-65). Нет записи — ничего не скрыто:
+    /// новый источник начинает с полного набора, а не с пустого.
+    /// </summary>
+    public static IReadOnlyList<PerfMode> For(
+        IReadOnlyDictionary<string, List<PerfMode>>? bySource, bool online) =>
+        bySource is not null && bySource.TryGetValue(ModeLearning.Source(online), out var list)
+            ? list : [];
+
+    /// <summary>
+    /// Разложить общий список скрытых по обоим источникам — миграция со времён, когда
+    /// видимость была одна на всё. Прятал человек режим вообще, значит он остаётся скрытым
+    /// и от сети, и от батареи: внезапно вернувшаяся ячейка читалась бы как поломка.
+    /// </summary>
+    public static Dictionary<string, List<PerfMode>> Split(IEnumerable<PerfMode>? hidden)
+    {
+        var all = hidden?.Distinct().ToList() ?? [];
+        return new Dictionary<string, List<PerfMode>>
+        {
+            [ModeLearning.Ac] = [.. all],
+            [ModeLearning.Battery] = [.. all],
+        };
+    }
+
+    /// <summary>
     /// Видимые режимы в порядке <paramref name="all"/>. Скрытые из конфига применяются, только
     /// если после них останется хотя бы <see cref="Minimum"/>: кривая ручная правка (скрыли всё)
     /// не должна отбирать выбор — в этом случае показываем всё, как при первом запуске.

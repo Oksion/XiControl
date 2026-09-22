@@ -344,7 +344,10 @@ public sealed class AppController
         if (ModeLearning.RejectedEverywhere(_cfg.RejectedModes, mode))
         {
             Log.Write($"Perf: {mode} отвергнут на обоих источниках — убираю из видимых");
-            SetModeVisible(mode, visible: false);   // сам сохранит конфиг и пересоберёт набор
+            // прячем у ОБОИХ источников: режима на этой машине нет вовсе, и показывать его
+            // от батареи только потому, что отказ случился в розетке, было бы бессмысленно
+            SetModeVisible(mode, visible: false, online: true);
+            SetModeVisible(mode, visible: false, online: false);
             return;
         }
         _cfg.Save();
@@ -362,20 +365,49 @@ public sealed class AppController
     /// Показать/скрыть один режим. Последние два скрыть нельзя — набор, из которого нечего
     /// выбирать, бессмысленен; попытка молча игнорируется (UI такой тумблер и не даёт нажать).
     /// </summary>
-    public void SetModeVisible(PerfMode mode, bool visible)
-    {
-        var next = ModeVisibility.Toggle(AllModes, _cfg.HiddenModes, mode, visible);
-        if (_cfg.HiddenModes is not null && next.Length == _cfg.HiddenModes.Count
-            && next.All(_cfg.HiddenModes.Contains)) return;   // запрет или ничего не изменилось
+    public void SetModeVisible(PerfMode mode, bool visible) => SetModeVisible(mode, visible, OnlineNow);
 
-        _cfg.HiddenModes = [.. next];
+    /// <summary>
+    /// То же, но для конкретного источника питания (XIC-65): вкладка настроек правит и тот
+    /// набор, который сейчас не активен — человек настраивает «от батареи», сидя в розетке.
+    /// </summary>
+    public void SetModeVisible(PerfMode mode, bool visible, bool online)
+    {
+        var bySource = _cfg.HiddenModesBySource ??= ModeVisibility.Split(_cfg.HiddenModes);
+        string key = ModeLearning.Source(online);
+        var current = ModeVisibility.For(bySource, online);
+
+        var next = ModeVisibility.Toggle(AllModes, current, mode, visible);
+        if (next.Length == current.Count && next.All(current.Contains)) return;  // запрет или без изменений
+
+        bySource[key] = [.. next];
         _cfg.Save();
         ApplyModeVisibility();
         ModesReloaded?.Invoke();
     }
 
+    /// <summary>Пересобрать набор под текущий источник питания и сообщить UI (XIC-65).
+    /// Зовётся на переходе AC↔батарея: составы у источников разные.</summary>
+    public void ReloadModeVisibility()
+    {
+        var before = _modes;
+        ApplyModeVisibility();
+        if (before.Length == _modes.Length && before.SequenceEqual(_modes)) return;
+        ModesReloaded?.Invoke();
+    }
+
+    /// <summary>Скрытые режимы для источника — вкладке настроек, чтобы рисовать два тумблера.</summary>
+    public IReadOnlyList<PerfMode> HiddenModesFor(bool online) =>
+        ModeVisibility.For(_cfg.HiddenModesBySource, online);
+
+    /// <summary>Сколько режимов останется видимо у источника — для гашения его тумблеров.</summary>
+    public bool CanHideModeFor(bool online) =>
+        ModeVisibility.CanHide(ModeVisibility.Visible(AllModes, HiddenModesFor(online)).Length);
+
     /// <summary>Можно ли скрыть ещё один режим (для гашения тумблеров в настройках).</summary>
     public bool CanHideMode => ModeVisibility.CanHide(_modes.Length);
+
+    private bool OnlineNow => Safe(() => _power.IsOnline, true);
 
     // Применить желаемый стартовый режим; если прошивка не приняла (напр. Full-speed на батарее) — Auto.
     private void ApplyStartMode(PerfMode mode)
@@ -384,7 +416,9 @@ public sealed class AppController
             Safe(() => _mifs.SetPerfMode(PerfMode.Auto), false);
     }
 
-    private void ApplyModeVisibility() => _modes = ModeVisibility.Visible(AllModes, _cfg.HiddenModes);
+    // Набор зависит от источника питания (XIC-65) — пересобирается и при смене розетки
+    private void ApplyModeVisibility() =>
+        _modes = ModeVisibility.Visible(AllModes, ModeVisibility.For(_cfg.HiddenModesBySource, OnlineNow));
 
     // ---- Стратегия режима при старте ----
 

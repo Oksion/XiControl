@@ -24,8 +24,12 @@ public sealed class SettingsActions
     public required Func<string> CurrentLanguage;             // текущий культурный код
     public required Action<string> SetLanguage;              // сменить язык по культурному коду
     public required Action<string?> SetFlyoutTheme;          // тема панелей/OSD: null/"light"/"system"
-    public required Action<PerfMode, bool> SetModeVisible;   // режим, показывать ли
-    public required Func<bool> CanHideMode;                  // остались ли режимы сверх минимума
+    // Видимость режимов своя у сети и у батареи (XIC-65), поэтому источник — обязательная
+    // координата: варианта «просто скрыть режим» в UI больше нет, и контракт это отражает.
+    public required Action<PerfMode, bool, bool> SetModeVisibleFor;   // режим, показывать ли, источник
+    public required Func<bool, IReadOnlyList<PerfMode>> HiddenModesFor;  // скрытые у источника
+    public required Func<bool, bool> CanHideModeFor;                     // есть ли запас у источника
+    public required Func<bool> IsOnlineNow;                              // питание сейчас: сеть?
     public required Func<StartStrategy> GetStartStrategy;
     public required Action<StartStrategy> SetStartStrategy;
     public required Action<bool, PerfMode?> SetProfileMode;  // ac, mode
