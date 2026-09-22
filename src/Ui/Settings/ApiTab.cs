@@ -14,6 +14,11 @@ namespace XiControl.Ui.Settings;
 /// </summary>
 public sealed class ApiTab : SettingsPane
 {
+    // Ветка main, а не тег: документ правится чаще, чем выходят релизы, и ссылка из старой
+    // версии должна вести на актуальное описание протокола, а не на слепок полугодовой давности.
+    private const string DocsUrl = "https://github.com/Oksion/XiControl/blob/main/docs/15-http-api.md";
+
+
     public ApiTab(SettingsToolkit ui, AppConfig cfg, SettingsActions act, Action rebuild) : base(ui)
     {
         var s = act.GetApiSettings();
@@ -135,6 +140,13 @@ public sealed class ApiTab : SettingsPane
         // плейсхолдер: настоящий мы не храним (только его SHA-256).
         ui.AddGroup(this, "settings.api.examples");
         ui.AddNote(this, "settings.api.examples.note");
+        // «Подробнее» — на полное описание протокола: коды ответов, вебхук и готовый сценарий
+        // для Home Assistant в три экрана настроек не поместятся и не должны
+        var docs = ui.LinkButton("settings.api.docs.btn", () => Open(DocsUrl));
+        docs.AutoSize = false;
+        docs.Width = TextRenderer.MeasureText(docs.Text, docs.Font).Width + ui.Sc(24);
+        docs.Height = ui.Sc(30);
+        ui.AddRow(this, "settings.api.docs", "settings.api.docs.desc", docs);
         string host = s.LanAccess ? Loc.T("settings.api.examples.host") : "127.0.0.1";
         foreach (var (titleKey, sample) in Examples(host, s.Port))
         {
@@ -145,9 +157,15 @@ public sealed class ApiTab : SettingsPane
         }
     }
 
+    private static void Open(string url)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch { /* нет браузера — не повод падать */ }
+    }
+
     // Готовые команды: curl (он же есть в Windows 10+ из коробки) и PowerShell — первая
     // читает состояние, вторая переключает режим. Больше не нужно: остальные маршруты
-    // устроены так же, а полный список живёт в README.
+    // устроены так же, а полное описание — в docs/15-http-api.md по кнопке «Подробнее».
     private static (string TitleKey, string Sample)[] Examples(string host, int port) =>
     [
         ("settings.api.example.status",
