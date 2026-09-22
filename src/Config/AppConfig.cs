@@ -35,6 +35,36 @@ public sealed class AppConfig
     /// </summary>
     public int CareLimitPercent { get; set; } = Mifs.ChargeThresholdPercent;
 
+    // ---- Программный порог заряда (XIC-74): для моделей, где аппаратного лимита нет ----
+
+    /// <summary>
+    /// Прошивка отказалась ставить порог заряда — на этой машине группы 0x10/0x02 нет
+    /// (подтверждено на TM2113). Выучивается по факту отказа и снимается при первом успехе:
+    /// гадать по модели не нужно, железо отвечает само. Ровно этот признак включает показ
+    /// программного порога — костыль не предлагается там, где есть настоящий лимит.
+    /// </summary>
+    public bool ChargeLimitUnsupported { get; set; }
+
+    /// <summary>Предупреждать, когда заряд дошёл до <see cref="SoftChargeLimitPercent"/>.
+    /// Это подсказка «пора выдернуть», а не защита: зарядку мы остановить не можем.
+    /// Выключено — опроса батареи нет вовсе.</summary>
+    public bool SoftChargeAlert { get; set; }
+
+    /// <summary>Порог программного предупреждения, %. Шага прошивки здесь нет — считаем сами,
+    /// поэтому набор свободнее аппаратного (50–95 с шагом 5).</summary>
+    public int SoftChargeLimitPercent { get; set; } = 80;
+
+    /// <summary>Сопровождать предупреждение звуком: человек по условию задачи не смотрит на
+    /// экран — ему надо встать и выдернуть провод.</summary>
+    public bool SoftChargeAlertSound { get; set; } = true;
+
+    /// <summary>Через сколько минут напомнить, если зарядник всё ещё в розетке (config-only).</summary>
+    public int SoftChargeRepeatMin { get; set; } = 15;
+
+    /// <summary>Сколько напоминаний максимум за одну зарядку, кроме первого (config-only).
+    /// 0 — не напоминать вовсе: сказали один раз и молчим.</summary>
+    public int SoftChargeRepeatMax { get; set; } = 3;
+
     public bool AutoStart { get; set; } = false;
 
     /// <summary>Логировать ошибки и проблемы в %APPDATA%\XiControl\log.txt.

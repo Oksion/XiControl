@@ -63,6 +63,11 @@ where there are no watts to show, you can watch load or degrees instead.*
   - 🧳 **"Travel" mode** — a one-off charge to 100% on top of battery care: the suitcase button
     in the panel / a menu item. On reaching 100% — an OSD and a sound; unplugging the charger
     resets the mode by itself (the next plug-in is back to the threshold).
+  - ⏰ **Software threshold** — for models whose firmware **refuses** the limit: the app watches
+    the level and tells you to pull the cable (a popup and a sound, up to three reminders). It
+    shows up in Settings → Battery on those machines only, and only after the firmware has said
+    no: there are no model lists in the code, the hardware answers for itself. It is a reminder,
+    not protection — real protection comes from the **webhook** plus a smart plug (see HTTP API).
 - 🔌 **Charger wattage** — when the charger is plugged in, show the connected PD adapter's
   wattage (watts) in the OSD and in the Monitor. Over the charge icon — a **PSU quality badge**:
   🔴 "!" if the adapter is weaker than the configured threshold (slow charging), ⚪ "?" if the

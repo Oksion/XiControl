@@ -63,6 +63,7 @@ public sealed class SettingsActions
     public required Action<bool> SetTouchpadEdgeSwap;         // поменять края местами
     public required Action<bool> SetOwlFeature;
     public required Action<int> SetCareLimit;                // порог «беречь батарею», % (применить на железе)
+    public required Action SoftChargeApplied;                // программный порог изменён — перевзвести наблюдение (XIC-74)
     public required Func<SystemIntegration.BatteryReport> GetBatteryReport; // здоровье батареи (WMI + SOH1)
     public required Func<SystemIntegration.ApiSettings> GetApiSettings;    // настройки HTTP API (api.json, XIC-13)
     public required Action ApiApplied; // вкладка изменила настройки API → сохранить + перезапустить хост/фаервол

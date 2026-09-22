@@ -229,7 +229,7 @@ public sealed class AppController
     public void ToggleCare(bool on)
     {
         int percent = on ? _cfg.CarePercent() : 100;
-        if (!Safe(() => _mifs.SetChargeLimit(percent), false)) { FirmwareFailed?.Invoke(); return; }
+        if (!ApplyChargeLimit(percent)) { FirmwareFailed?.Invoke(); return; }
         if (_cfg.TravelMode) { _cfg.TravelMode = false; _travel.Rearm(); }
         _cfg.ChargeCare = on;
         _cfg.Save();
@@ -243,7 +243,7 @@ public sealed class AppController
     {
         if (Mifs.ChargeCodeForPercent(percent) is null) return;   // не пишем вслепую неизвестный уровень
         if (_cfg.ChargeCare && !_cfg.TravelMode
-            && !Safe(() => _mifs.SetChargeLimit(percent), false)) { FirmwareFailed?.Invoke(); return; }
+            && !ApplyChargeLimit(percent)) { FirmwareFailed?.Invoke(); return; }
         _cfg.CareLimitPercent = percent;
         _cfg.Save();
         CareChanged?.Invoke(_cfg.ChargeCare);   // обновить подписи (панель/меню/значок)
@@ -256,12 +256,33 @@ public sealed class AppController
         if (on && !_cfg.ChargeCare) return;
         // on → снять защиту (заряд до 100); off → вернуть базовый порог X%.
         // Сначала прошивка: не приняла → состояние не изменилось, конфиг не трогаем (6.2)
-        if (!Safe(() => _mifs.SetChargeLimit(on ? 100 : _cfg.CarePercent()), false))
-        { FirmwareFailed?.Invoke(); return; }
+        if (!ApplyChargeLimit(on ? 100 : _cfg.CarePercent())) { FirmwareFailed?.Invoke(); return; }
         _cfg.TravelMode = on;
         _cfg.Save();
         _travel.Rearm();
         TravelChanged?.Invoke(on);
+    }
+
+    /// <summary>
+    /// Написать порог в прошивку и заодно ЗАПОМНИТЬ, умеет ли эта машина такое вообще (XIC-74).
+    /// Единственная точка, где приложение ставит лимит по воле человека, поэтому и вывод
+    /// делается здесь: отказ — признак, что группы 0x10/0x02 на модели нет (так на TM2113),
+    /// успех — что есть. Гадать по названию модели не нужно, железо отвечает само.
+    ///
+    /// Сверка ChargeGuard сюда НЕ ходит намеренно: она переустанавливает лимит по событиям
+    /// питания, и разовый сбой на просыпающемся EC пометил бы рабочую машину как «не умеет».
+    /// Учимся только на явном действии пользователя.
+    /// </summary>
+    private bool ApplyChargeLimit(int percent)
+    {
+        bool ok = Safe(() => _mifs.SetChargeLimit(percent), false);
+        if (ok == !_cfg.ChargeLimitUnsupported) return ok;  // вывод не изменился — конфиг не трогаем
+        _cfg.ChargeLimitUnsupported = !ok;
+        _cfg.Save();
+        Log.Write(ok
+            ? "Заряд: прошивка приняла порог — аппаратный лимит есть"
+            : "Заряд: прошивка отвергла порог — аппаратного лимита на этой модели нет");
+        return ok;
     }
 
     /// <summary>Тихий сброс «В дорогу» (отключили зарядник): ChargeGuard сам вернёт «беречь 80%».</summary>

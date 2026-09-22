@@ -50,6 +50,42 @@ public sealed class BatteryTab : SettingsPane
         ui.AddNote(this, CareHintKey(cfg.CarePercent()));
         ui.AddNote(this, "settings.battery.note");
 
+        // ---- Программный порог (XIC-74) ----
+        // Появляется только там, где прошивка порог не принимает (выучено по её отказу):
+        // предлагать костыль рядом с настоящим лимитом — значит сбивать с толку. Сам
+        // аппаратный выбор выше при этом не прячем: если модель однажды научится (или
+        // научимся мы — так уже было с диалектом ответа в XIC-43), человеку нужен способ
+        // попробовать снова.
+        if (cfg.ChargeLimitUnsupported)
+        {
+            ui.AddGroup(this, "settings.battery.soft");
+            ui.AddNote(this, "settings.battery.soft.note");
+            ui.AddRow(this, "settings.battery.soft.on", "settings.battery.soft.on.desc",
+                ui.Toggle(cfg.SoftChargeAlert, on =>
+                {
+                    cfg.SoftChargeAlert = on;
+                    cfg.Save();
+                    act.SoftChargeApplied();
+                    rebuild();   // зажечь/погасить порог и звук ниже
+                }));
+
+            // шаг 5% свободный: считаем сами, прошивка тут ни при чём
+            int[] steps = [.. Enumerable.Range(0, 10).Select(i => 50 + i * 5)];
+            int cur = Math.Max(0, Array.IndexOf(steps, Math.Clamp(cfg.SoftChargeLimitPercent, 50, 95)));
+            var soft = ui.Combo([.. steps.Select(p => $"{p}%")], cur, i =>
+            {
+                cfg.SoftChargeLimitPercent = steps[i];
+                cfg.Save();
+                act.SoftChargeApplied();
+            }, ui.Sc(120));
+            soft.Enabled = cfg.SoftChargeAlert;
+            ui.AddRow(this, "settings.battery.soft.limit", "settings.battery.soft.limit.desc", soft);
+
+            var alertSound = ui.Toggle(cfg.SoftChargeAlertSound, on => { cfg.SoftChargeAlertSound = on; cfg.Save(); });
+            alertSound.Enabled = cfg.SoftChargeAlert;
+            ui.AddRow(this, "settings.battery.soft.sound", "settings.battery.soft.sound.desc", alertSound);
+        }
+
         ui.AddGroup(this, "settings.battery.travel");
         ui.AddRow(this, "settings.travel.sound", "settings.travel.sound.desc",
             ui.Toggle(cfg.TravelSound, on => { cfg.TravelSound = on; cfg.Save(); }));

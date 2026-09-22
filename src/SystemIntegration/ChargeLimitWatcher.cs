@@ -15,11 +15,15 @@ public enum ChargeWatch
     Reset,
 }
 
+/// <summary>За каким порогом следим и чей он: аппаратный (прошивка сама остановит заряд)
+/// или программный (остановить мы не можем — можно только сказать человеку).</summary>
+public readonly record struct ChargeTarget(int Limit, bool Soft);
+
 /// <summary>
-/// Наблюдение «заряд дошёл до порога» (XIC-75). Событие одно, потребителей у него двое:
-/// вебхук (розетка выключается сама) и — когда дойдут руки до XIC-74 — уведомление человеку
-/// на моделях без аппаратного лимита. Поэтому наблюдатель знает только про заряд и порог,
-/// а что с этим делать, решает подписчик.
+/// Наблюдение «заряд дошёл до порога». Событие одно, потребителей двое: вебхук (XIC-75 —
+/// розетка выключается сама) и предупреждение человеку на моделях без аппаратного лимита
+/// (XIC-74). Поэтому наблюдатель знает только про заряд и порог, а что с этим делать,
+/// решает подписчик.
 ///
 /// Опрос, а не событие: Windows не умеет будить по «батарея доросла до N%», а
 /// <c>PowerModeChanged</c> с процентами не приходит. Раз в 30 секунд — заряд от 60 до 80
@@ -30,15 +34,20 @@ public sealed class ChargeLimitWatcher : IDisposable
     private readonly AppConfig _cfg;
     private readonly IPowerEvents _power;
     private readonly IAppTimer _timer;
-    private bool _fired; // о пороге этой зарядки уже сообщили
+    private readonly Func<long> _clock;
+    private bool _fired;      // о пороге этой зарядки уже сообщили
+    private long _firedAt;    // когда именно — отсюда считаются напоминания
+    private int _reminders;   // сколько напоминаний уже отправили за эту зарядку
 
-    /// <summary>Заряд дошёл до порога: (текущий %, порог %). Один раз за зарядку.</summary>
-    public Action<int, int>? Reached;
+    /// <summary>Заряд дошёл до порога: (текущий %, порог, напоминание ли это). Первое
+    /// срабатывание — одно за зарядку; дальше — только напоминания программного порога.</summary>
+    public Action<int, ChargeTarget, bool>? Reached;
 
-    public ChargeLimitWatcher(AppConfig cfg, IPowerEvents power, IAppTimer? timer = null)
+    public ChargeLimitWatcher(AppConfig cfg, IPowerEvents power, IAppTimer? timer = null, Func<long>? clock = null)
     {
         _cfg = cfg;
         _power = power;
+        _clock = clock ?? (static () => Environment.TickCount64);
         _timer = timer ?? new UiTimer();
         _timer.Interval = 30_000;
         _timer.Tick += Check;
@@ -51,29 +60,75 @@ public sealed class ChargeLimitWatcher : IDisposable
     /// </summary>
     public void Rearm()
     {
-        if (!_power.IsOnline) _fired = false; // отключили — следующая зарядка сообщит снова
-        if (_cfg.ChargeCare && _power.IsOnline) _timer.Start();
+        if (!_power.IsOnline) Forget();        // отключили — следующая зарядка сообщит снова
+        if (Target() is not null && _power.IsOnline) _timer.Start();
         else _timer.Stop();
     }
 
     private void Check()
     {
-        int limit = _cfg.CarePercent();
-        var what = Decide(_cfg.ChargeCare, _power.IsOnline, limit, _power.BatteryLifePercent, _fired);
-        switch (what)
+        if (Target() is not ChargeTarget t)
+        {
+            _timer.Stop();                     // следить стало не за чем (выключили обе опции)
+            return;
+        }
+
+        float life = _power.BatteryLifePercent;
+        switch (Decide(true, _power.IsOnline, t.Limit, life, _fired))
         {
             case ChargeWatch.Reset:
-                _fired = false;
+                Forget();
                 _timer.Stop();
-                break;
+                return;
             case ChargeWatch.Fire:
                 _fired = true;
-                Reached?.Invoke((int)Math.Round(_power.BatteryLifePercent * 100), limit);
-                break;
-            default:
-                if (!_cfg.ChargeCare) _timer.Stop(); // порог выключили, пока мы ждали
-                break;
+                _firedAt = _clock();
+                Reached?.Invoke((int)Math.Round(life * 100), t, false);
+                return;
         }
+
+        // Первое срабатывание уже было. Аппаратному порогу добавить нечего — прошивка сама
+        // остановила заряд; а программный держится только на человеке, и если он не подошёл,
+        // зарядка идёт дальше — напоминаем, пока провод в розетке.
+        if (!t.Soft || !_fired) return;
+        if (!ShouldRemind(_power.IsOnline, life, t.Limit, _clock() - _firedAt,
+                Math.Max(1, _cfg.SoftChargeRepeatMin) * 60_000L, _reminders, Math.Max(0, _cfg.SoftChargeRepeatMax)))
+            return;
+        _reminders++;
+        _firedAt = _clock();
+        Reached?.Invoke((int)Math.Round(life * 100), t, true);
+    }
+
+    private void Forget()
+    {
+        _fired = false;
+        _reminders = 0;
+    }
+
+    /// <summary>
+    /// За каким порогом следить. Программный порог предлагается ТОЛЬКО там, где аппаратного
+    /// нет: иначе мы подсовывали бы костыль рядом с настоящим решением и будили человека
+    /// ради того, что прошивка делает сама.
+    /// </summary>
+    public static ChargeTarget? Target(bool care, int careLimit, bool softOn, int softLimit, bool hardwareMissing) =>
+        hardwareMissing
+            ? softOn ? new ChargeTarget(Math.Clamp(softLimit, 20, 100), true) : null
+            : care ? new ChargeTarget(careLimit, false) : null;
+
+    private ChargeTarget? Target() => Target(_cfg.ChargeCare, _cfg.CarePercent(),
+        _cfg.SoftChargeAlert, _cfg.SoftChargeLimitPercent, _cfg.ChargeLimitUnsupported);
+
+    /// <summary>
+    /// Пора ли напомнить. Напоминаем, пока выполняются все условия сразу: зарядник в розетке,
+    /// заряд всё ещё выше порога (человек мог выдернуть и снова воткнуть при меньшем заряде),
+    /// прошло достаточно времени и лимит напоминаний не исчерпан. Последнее — не формальность:
+    /// приложение, которое пищит каждые четверть часа до утра, выключают целиком.
+    /// </summary>
+    public static bool ShouldRemind(bool online, float life, int limit, long sinceMs, long everyMs, int sent, int max)
+    {
+        if (!online || sent >= max) return false;
+        if (life is < 0f or > 1f || life * 100f < limit) return false;
+        return sinceMs >= everyMs;
     }
 
     /// <summary>
