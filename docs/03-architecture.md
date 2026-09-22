@@ -121,9 +121,12 @@ xi_control/
  │   │                         FormChrome, ModeUi, UiNav (чистая навигация — под тестами),
  │   │                         SettingsForm, SettingsActions, ToggleSwitch,
  │   │                         ScaledFonts, SvgIcons, FlyoutTip, Draw, TrayIcons, DarkMenu
- │   ├─ Ui/Settings/        — SettingsToolkit (фабрика виджетов), SettingsTheme, NavStrip,
- │   │                         SettingsPane (база вкладок), вкладки-контролы
- │   │                         General/Features/Battery/Display/Touchpad/Perf/Keys/Osd/Api/AboutTab
+ │   ├─ Ui/Settings/        — SettingsToolkit (фабрика виджетов: карточки, тумблеры, комбо,
+ │   │                         сегментный SegmentPicker, двухэтажная FieldCard), SettingsTheme,
+ │   │                         NavStrip, SettingsPane (база вкладок; не подкручивает список
+ │   │                         под контрол, получивший фокус мышью), вкладки-контролы
+ │   │                         General/Features/Battery/Display/Touchpad/Perf/Keys/Osd/Api/AboutTab,
+ │   │                         CurveEditor (правка кривой авто-яркости мышью, XIC-33/66)
  │   ├─ SystemIntegration/  — ChargeGuard, RefreshRate(+Guard), PowerProfileGuard,
  │   │                         BrightnessCapGuard (лимит яркости, XIC-29),
  │   │                         AutoBrightnessGuard + BrightnessCurve/MedianWindow +
@@ -134,7 +137,10 @@ xi_control/
  │   │                         (общий HidNodeToggle), TouchpadDeadZone, AwakeMode, MicControl,
  │   │                         KeyActions, AutoStart, UpdateCheck, Sound, BatteryInfo, PowerDraw,
  │   │                         GpuTelemetry,
- │   │                         HttpApi/ApiRouter/ApiSettings/ApiFirewall (opt-in HTTP API, XIC-13)
+ │   │                         HttpApi/ApiRouter/ApiSettings/ApiFirewall (opt-in HTTP API, XIC-13),
+ │   │                         ChargeLimitWatcher + Webhook (исходящее событие о пороге заряда:
+ │   │                         вебхук XIC-75 и предупреждение человеку XIC-74 — см. docs/15),
+ │   │                         CurveEdit (правила ручной правки кривой яркости, XIC-33/66)
  │   ├─ Config/             — AppConfig (POCO + миграции), IConfigStore/JsonConfigStore,
  │   │                         LegacyLanguageConverter
  │   └─ Localization/       — lang/{ru,en,zh}.json (переводы, встроены в exe) + Loc.cs (загрузчик,

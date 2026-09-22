@@ -312,15 +312,13 @@ empty or a missing file → the built-in jingle; `%VARIABLES%` are supported; WA
 
 ### Hide unused modes
 
-The toggles **Settings → Performance → "Show the Eco mode" / "Show Full speed"**
-(applied immediately; the panel doesn't shrink — the cells of the remaining modes stretch).
-Same in `%APPDATA%\XiControl\config.json` (you then won't be able to enable a hidden mode from
-the app):
+**Settings → Performance**: one toggle per mode, with an **"On AC / On battery"** switch above the
+list. Visibility is per power source: the firmware won't accept Full speed on battery anyway, and
+Eco is rarely what you want at the desk. Applied immediately; the panel doesn't shrink — the cells
+of the remaining modes stretch. The list can't go empty: the "at least one visible mode" rule is
+counted separately for each source.
 
-```json
-"EcoMode": false,
-"FullSpeedMode": false
-```
+Why you might want this:
 
 - **Eco** — the most economical profile: on the tested model it turns off the keyboard backlight
   and lowers screen brightness. The vendor software offers it too; it was hidden only from *us*,
@@ -328,7 +326,20 @@ the app):
 - **Full speed** — if you don't use it or want to prevent accidental activation
   (the mode is loud and only works on AC).
 
-Both are shown by default. After editing the config by hand, restart the app.
+**A mode your model doesn't have removes itself.** If the firmware refuses it both on AC and on
+battery, it leaves the list — one power source is deliberately not enough, since Full speed
+legitimately refuses on battery and works on AC. Nothing is probed behind your back: it learns
+only from modes you pick yourself.
+
+In `%APPDATA%\XiControl\config.json` this is `HiddenModesBySource`, one list per source:
+
+```json
+"HiddenModesBySource": { "ac": ["Eco"], "battery": ["FullSpeed"] }
+```
+
+The old `EcoMode`/`FullSpeedMode` fields and the flat `HiddenModes` list migrate automatically on
+the first run of the new version — there's no need to edit them by hand any more. After editing
+the config manually, restart the app.
 
 ### Startup performance mode
 
@@ -713,6 +724,9 @@ None of this runs or spends resources while the API is off (the server simply is
 - The "battery care" threshold is picked from a discrete set the firmware supports — an arbitrary
   percentage via WMI is impossible. On the tested model (TM2424) that's 40/50/60/70/80/100%;
   on other models the set may differ (the firmware validates it itself and rejects unsupported levels).
+  **And some models have no hardware limit at all** — on the TM2113 the firmware refuses the
+  command. There the app offers a software threshold: it will tell you to pull the cable, but it
+  cannot stop the charging (see "Charge protection" above).
 - The Fn+Mi combo is indistinguishable from a single Mi (the firmware sends identical events),
   which is why short/long presses are used.
 - The feature set depends on the model: firmware telemetry (fan RPM) is unsupported on the tested
