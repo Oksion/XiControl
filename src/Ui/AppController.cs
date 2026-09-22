@@ -612,6 +612,10 @@ public sealed class AppController
     /// <summary>Снимок кривой (сеть/батарея) для отрисовки графика на вкладке «Экран».</summary>
     public Config.BrightnessPoint[] BrightnessCurvePoints(bool online) => _autoGuard.CurveSnapshot(online);
 
+    /// <summary>Кривая, правленная мышью на графике (XIC-33/XIC-66): сохранить и применить.</summary>
+    public void SetBrightnessCurve(bool online, IReadOnlyList<Config.BrightnessPoint> points) =>
+        _autoGuard.SetCurve(online, points);
+
     /// <summary>Лимиты яркости из окна настроек (сеть, батарея) — сохранить и свериться.</summary>
     public void SetBrightnessCaps(int ac, int batt)
     {

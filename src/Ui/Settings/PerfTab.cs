@@ -161,36 +161,10 @@ public sealed class PerfTab : SettingsPane
     /// </summary>
     private static bool? _editingAc;
 
-    /// <summary>Переключатель контекста: два сегмента во всю ширину строки.</summary>
-    private Panel SourcePicker(bool ac, Action rebuild)
-    {
-        var host = new Panel { Width = Ui.RowW, Height = Ui.Sc(34), BackColor = Ui.T.WinBg, Margin = new Padding(0, 0, 0, Ui.Sc(8)) };
-        host.Controls.Add(Segment("settings.perf.modes.ac", isAc: true, ac, rebuild, 0));
-        host.Controls.Add(Segment("settings.perf.modes.battery", isAc: false, ac, rebuild, Ui.RowW / 2));
-        return host;
-    }
-
-    private Button Segment(string key, bool isAc, bool ac, Action rebuild, int x)
-    {
-        bool active = isAc == ac;
-        var b = new Button
-        {
-            Text = Loc.T(key),
-            Width = Ui.RowW / 2,
-            Height = Ui.Sc(34),
-            Location = new Point(x, 0),
-            FlatStyle = FlatStyle.Flat,
-            // активный сегмент акцентом, неактивный — как обычная карточка: разница видна
-            // сразу, без второго взгляда на положение переключателей
-            BackColor = active ? Ui.T.Accent : Ui.T.Card,
-            ForeColor = active ? (Ui.T.Dark ? Color.FromArgb(0, 45, 74) : Color.White) : Ui.T.Text,
-            Font = Ui.CtlFont,
-            Cursor = Cursors.Hand,
-        };
-        b.FlatAppearance.BorderColor = active ? Ui.T.Accent : Ui.T.Border;
-        b.Click += (_, _) => { if (!active) { _editingAc = isAc; rebuild(); } };
-        return b;
-    }
+    /// <summary>Переключатель контекста: общий сегментный виджет из SettingsToolkit.</summary>
+    private Panel SourcePicker(bool ac, Action rebuild) =>
+        Ui.SegmentPicker("settings.perf.modes.ac", "settings.perf.modes.battery", ac,
+            pickedAc => { _editingAc = pickedAc; rebuild(); });
 
     // Только видимые режимы (скрытый из приложения включить нельзя) плюс текущий выбор, даже
     // если его успели скрыть. Правило — из общего ModeVisibility, чтобы список не разъезжался

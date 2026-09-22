@@ -714,6 +714,7 @@ public sealed class TrayApp : IDisposable
                 SetBrightnessMedianSec = _controller.SetBrightnessMedianSec,
                 ResetBrightnessCurve = _controller.ResetBrightnessCurve,
                 BrightnessCurvePoints = _controller.BrightnessCurvePoints,
+                SetBrightnessCurve = _controller.SetBrightnessCurve,
                 SetAutoHz = _controller.ToggleAutoHz,
                 SetRefreshRateFeature = _controller.ToggleRefreshRateFeature,
                 SetHoldRefreshRate = _controller.SetHoldRefreshRate,

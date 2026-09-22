@@ -372,6 +372,26 @@ public sealed class AutoBrightnessGuard : IDisposable
         if (_cfg.AutoBrightness) Task.Run(Evaluate, CancellationToken.None);
     }
 
+    /// <summary>Заменить кривую источника на правленную мышью (XIC-33/XIC-66). Список в
+    /// конфиге меняется НА МЕСТЕ: на него держат ссылку живые BrightnessCurve, и подмена
+    /// самого списка оставила бы обучение работать со старым. Правка сразу применяется —
+    /// человек двигал точку, глядя на экран, и ждёт, что экран послушается.</summary>
+    public void SetCurve(bool online, IReadOnlyList<BrightnessPoint> points)
+    {
+        if (points.Count == 0) return; // пустая кривая означала бы «50% всегда» — это не правка
+        lock (_lock)
+        {
+            var target = online ? _cfg.AutoBrightnessPointsAc : _cfg.AutoBrightnessPointsBattery;
+            target.Clear();
+            target.AddRange(points.Select(p => new BrightnessPoint { Lux = p.Lux, Percent = p.Percent }));
+            _actedLux = float.NaN; // следующие люксы значимы — пересчитаемся по новой кривой
+        }
+        Log.Write($"AutoBrightness: кривая правлена вручную ({(online ? "сеть" : "батарея")}, точек: {points.Count})");
+        _cfg.Save();
+        // CancellationToken.None намеренно (S8949) — см. ResetCurve
+        if (_cfg.AutoBrightness && online == _power.IsOnline) Task.Run(Evaluate, CancellationToken.None);
+    }
+
     /// <summary>Снимок точек кривой выбранного источника питания для отрисовки в настройках
     /// (график рисует обе): копия под замком — обучение может идти параллельно на пуле.</summary>
     public BrightnessPoint[] CurveSnapshot(bool online)

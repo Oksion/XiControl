@@ -28,6 +28,17 @@ public sealed class SettingsForm : Form
     private readonly List<Panel?> _panes = [];
     private int _tab;
 
+    // Прокрутка открытой вкладки, пережившая пересборку. Вкладки — самостоятельные контролы,
+    // и любое изменение пересоздаёт их целиком (так тумблеры не расходятся с конфигом), но
+    // человеку от этого плохо: переключатель «От сети / От батареи» стоит посреди длинного
+    // списка, и окно на каждый клик отматывалось в начало.
+    private int _scrollY;
+
+    // Путь до контрола, который был под фокусом (индексы в Controls): после пересборки фокус
+    // возвращается на то же место, иначе он достаётся первой карточке — а вместе с ним туда
+    // же уезжает и прокрутка.
+    private int[] _focusPath = [];
+
     // смена разрешения/масштаба сыплется пачкой событий — гасим дребезг и пересобираем один раз
     // (шов IAppTimer тут не нужен: окно юнит-тестами не покрывается)
     private readonly UiTimer _rescale = new() { Interval = 250 };
@@ -187,6 +198,11 @@ public sealed class SettingsForm : Form
         BackColor = _ui.T.WinBg;
 
         SuspendLayout();
+        // куда была отмотана открытая вкладка (getter отдаёт смещение со знаком минус)
+        // и что в ней было под фокусом — вернём и то, и другое после пересборки
+        var openPane = _tab < _panes.Count ? _panes[_tab] : null;
+        _scrollY = openPane is not null ? -openPane.AutoScrollPosition.Y : 0;
+        _focusPath = openPane is not null ? PathTo(openPane, FocusedControl()) : [];
         // Clear не диспозит старые контролы — освобождаем сами (хэндлы, Region'ы), как в BuildMenu
         var stale = Controls.Cast<Control>().ToArray();
         Controls.Clear();
@@ -240,6 +256,56 @@ public sealed class SettingsForm : Form
 
         SelectTab(_tab);
         ResumeLayout();
+
+        if (_panes[_tab] is not Panel restored) return;
+
+        // PerformLayout обязателен: пока поток не разложил карточки, диапазон прокрутки ещё
+        // нулевой, и присваивание AutoScrollPosition молча ничего не сделает
+        restored.PerformLayout();
+
+        // Сначала фокус, потом прокрутка — и только в таком порядке. WinForms подкручивает
+        // контейнер к контролу, получившему фокус: если фокус достанется первой карточке
+        // (а после пересборки он достаётся именно ей), список тут же отмотается в начало и
+        // затрёт восстановленную позицию. Хуже того, следующий клик «не нажимался» —
+        // содержимое уезжало из-под курсора между нажатием и отпусканием.
+        if (ByPath(restored, _focusPath) is { CanFocus: true } target) target.Focus();
+
+        // уехавшее за конец (карточек стало меньше) WinForms зажмёт сам
+        if (_scrollY > 0) restored.AutoScrollPosition = new Point(0, _scrollY);
+    }
+
+    // Контрол под фокусом: у вкладок-панелей (FlowLayoutPanel — не ContainerControl)
+    // ActiveControl формы сразу даёт нужный, но вложенные контейнеры бывают, и цикл дешевле,
+    // чем разбираться, какой именно виджет когда-нибудь окажется ContainerControl.
+    private Control? FocusedControl()
+    {
+        Control? c = this;
+        while (c is ContainerControl { ActiveControl: not null } cc) c = cc.ActiveControl;
+        return c == this ? null : c;
+    }
+
+    // Путь до контрола индексами в Controls: вкладка пересобирается тем же кодом в том же
+    // порядке, поэтому путь переживает пересборку, а ссылка на объект — нет (он диспознут).
+    private static int[] PathTo(Control root, Control? target)
+    {
+        var path = new List<int>();
+        for (var c = target; c is not null && c != root; c = c.Parent)
+        {
+            if (c.Parent is null) return []; // фокус жил не в этой вкладке — возвращать нечего
+            path.Insert(0, c.Parent.Controls.IndexOf(c));
+        }
+        return [.. path];
+    }
+
+    private static Control? ByPath(Control root, int[] path)
+    {
+        var c = root;
+        foreach (int i in path)
+        {
+            if (i < 0 || i >= c.Controls.Count) return null; // карточек стало меньше — не угадываем
+            c = c.Controls[i];
+        }
+        return c == root ? null : c;
     }
 
     private void SelectTab(int i)

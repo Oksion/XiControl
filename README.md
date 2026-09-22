@@ -434,10 +434,18 @@ adjust the brightness by hand and the app remembers "in this light I want that m
 - **You can see it working**: the tab shows live lux and a graph of both curves (AC in the
   accent color, battery in orange) with anchor points and a marker at the current light level.
   Adjust the brightness and a few seconds later the new point appears on the graph.
+- **The curve is editable right on the graph**, no config.json required: drag a point with the
+  mouse, double-click empty space to add one, right-click a point to remove it (2 to 12 points).
+  Same from the keyboard: ←/→ to pick a point, ↑/↓ for brightness (Shift for bigger steps),
+  Ctrl+←/→ for the light level, Insert and Delete. You edit one source at a time — the one
+  picked by the "On AC / On battery" switch above the graph; the other stays as a faint line for
+  comparison. A point never crosses its neighbours: "brighter room, dimmer screen" is something
+  the curve can neither learn nor be dragged into.
 
 It plays nice with the other brightness features: the **limit** (above) acts as an output
-filter — the curve learns your true intent while the limit simply caps the result (you can see
-it "slicing" the curve on the graph); **"Remember brightness"** is switched off while
+filter — the curve learns your true intent while the limit simply caps the result (the graph
+shows it as a dotted line: nothing above it reaches the screen);
+**"Remember brightness"** is switched off while
 auto-brightness is on (the curve replaces those slots). With **Windows adaptive brightness** the
 feature stays inactive (two controllers of one slider inevitably fight) and says so on the tab.
 
