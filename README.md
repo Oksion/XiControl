@@ -567,9 +567,14 @@ Media actions work with any player — the key goes to whoever owns the Windows 
 is deliberately absent: the keyboard already has dedicated keys for it.
 
 The touchpad and touchscreen are disabled with Windows' stock mechanism (like "Disable device" in
-Device Manager, no drivers) and **always re-enable on their own after a reboot** — they can't get
+Device Manager, no drivers) and by default **re-enable on their own after a reboot** — they can't get
 stuck disabled. Their cells are also in the quick panel, next to auto refresh rate (the touchscreen
 cell only if a touchscreen is present).
+
+If you don't need a device at all, Settings → Features has a **"Keep it off across restarts"**
+toggle (one for the touchpad, one for the touchscreen). Then we won't switch it back on at startup;
+you can bring it back with the same toggle in the panel or menu. What the app did *not* turn off it
+never touches: disable the touchscreen in Device Manager and it stays that way.
 
 - Holding the Mi button opens the quick panel by default, but it can be remapped — e.g. put the
   panel on a single click and "travel" on the hold.

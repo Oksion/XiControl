@@ -14,5 +14,6 @@ public sealed class TouchpadControl(AppConfig cfg) : HidNodeToggle
     protected override string LogName => "Touchpad";
     protected override string? DeviceId { get => cfg.TouchpadDeviceId; set => cfg.TouchpadDeviceId = value; }
     protected override bool PersistOff { get => cfg.TouchpadPersistOff; set => cfg.TouchpadPersistOff = value; }
+    protected override bool KeepOff => cfg.TouchpadKeepOff;
     protected override void SaveConfig() => cfg.Save();
 }
