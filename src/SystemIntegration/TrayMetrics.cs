@@ -35,6 +35,19 @@ public static class TrayMetricFormat
     };
 
     /// <summary>
+    /// Метрика, которую на этой машине есть чем показать. Выбор живёт в конфиге и переживает
+    /// переезд на другое железо: «GPU» на AMD-модели (IGCL нет) или «температура» там, где
+    /// нет ни DPTF, ни ACPI-зоны, означали бы вечный прочерк вместо числа. Молча откатываемся
+    /// к потреблению — оно есть везде (XIC-70).
+    /// </summary>
+    public static TrayMetric Available(TrayMetric want, bool hasGpu, bool hasTemp) => want switch
+    {
+        TrayMetric.Gpu when !hasGpu => TrayMetric.Power,
+        TrayMetric.Temp when !hasTemp => TrayMetric.Power,
+        _ => want,
+    };
+
+    /// <summary>
     /// Текст на значке: целое число без знака и единиц («12», «67°», «—» = нет данных).
     /// Единицы — в тултипе: двухэтажный вариант «число + единица» пробовали (приём
     /// TrafficMonitor) — на этом размере значка нижняя строка нечитаема, отказались.

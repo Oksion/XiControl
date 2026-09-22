@@ -64,9 +64,15 @@ public sealed class MonitorForm : FlyoutForm
     private int _tipBtn; // 0 нет, 1 close, 2 view, 3 expand — чтобы не пере-показывать на той же
     private bool _closeHover, _viewHover, _expandHover;
 
-    // вид виджета: полный (графики) / мини (строка индикаторов) / только ватты
+    // вид виджета: полный (графики) / мини (строка индикаторов) / одна метрика крупно
     private enum ViewKind { Full, Mini, Power }
     private ViewKind _view;
+
+    // какая метрика в компактном виде (XIC-70). Список общий с индикатором в трее (XIC-35),
+    // а настройка своя: трей и виджет держат открытыми вместе, и дублировать в них одно
+    // и то же бессмысленно.
+    private SystemIntegration.TrayMetric _compact;
+    private ContextMenuStrip? _compactMenu; // меню выбора метрики (переживает свой Closed — см. ShowCompactMenu)
     private int _corner; // скругление текущего вида (общее для Region и рамки)
 
     private readonly AppConfig _cfg;
@@ -84,6 +90,7 @@ public sealed class MonitorForm : FlyoutForm
             "power" => ViewKind.Power,
             _ => ViewKind.Full,
         };
+        _compact = SystemIntegration.TrayMetricFormat.ParseKind(cfg.MonitorCompactMetric);
         // borderless tool-window поверх всех окон — база FlyoutForm
         _tick.Tick += (_, _) => { Sample(); Invalidate(); };
         _ = Handle;
@@ -96,7 +103,10 @@ public sealed class MonitorForm : FlyoutForm
         _power.Clear(); _cpu.Clear(); _gpu.Clear(); _ram.Clear(); _temp.Clear();
         _cpuLoad.Reset(); // база времён CPU протухла, пока виджет был закрыт
         _gpuTel.Reset(); // иначе первая загрузка GPU размажется по времени, что виджет был закрыт
-        Sample(); // первая точка сразу (заодно определит наличие DPTF-температур и IGCL до ApplyView)
+        Sample(full: true); // первая точка сразу (заодно определит наличие DPTF-температур и IGCL до ApplyView)
+        // выбранной метрики на этой машине может не быть вовсе (GPU на не-Intel) — тогда
+        // показываем потребление, а не вечный прочерк
+        _compact = SystemIntegration.TrayMetricFormat.Available(_compact, _hasGpu, _hasTemp);
 
         ApplyView();
 
@@ -161,10 +171,63 @@ public sealed class MonitorForm : FlyoutForm
     // Переключить на конкретный вид; выбор запоминается в конфиге
     private void SetView(ViewKind v)
     {
+        // в компактном виде опрашивалась одна метрика, поэтому у остальных графиков в
+        // истории дыра. Рисовать её как непрерывную линию — врать: начинаем ряды заново,
+        // как при открытии виджета
+        bool fromCompact = _view == ViewKind.Power && v != ViewKind.Power;
         _view = v;
         _cfg.MonitorView = v switch { ViewKind.Mini => "mini", ViewKind.Power => "power", _ => null };
         _cfg.Save();
+        if (fromCompact)
+        {
+            _power.Clear(); _cpu.Clear(); _gpu.Clear(); _ram.Clear(); _temp.Clear();
+            _cpuLoad.Reset();
+            _gpuTel.Reset();
+            Sample(full: true);
+        }
         ApplyView();
+        Invalidate();
+    }
+
+    /// <summary>Меню выбора метрики компактного вида — правой кнопкой по виджету. Кнопки
+    /// туда не влезают (всё окно занято числом), а прятать настройку в окно настроек ради
+    /// виджета, у которого и вид переключается прямо на нём, было бы непоследовательно.
+    /// Метрики, которых на этой машине нет, в меню не предлагаются.</summary>
+    private void ShowCompactMenu(Point screen)
+    {
+        // Меню живёт в поле, а не диспозится по Closed: Click у пункта приходит ПОСЛЕ
+        // закрытия, и уничтожение меню в обработчике Closed съедало выбор — меню
+        // показывалось, а нажатие не делало ничего. Старое освобождаем при следующем показе.
+        _compactMenu?.Dispose();
+        var menu = new ContextMenuStrip { Renderer = new DarkMenuRenderer(), Font = LabelFont };
+        _compactMenu = menu;
+        menu.BackColor = DarkPalette.Bg;
+        menu.ForeColor = DarkPalette.Text;
+        foreach (var m in (SystemIntegration.TrayMetric[])[
+            SystemIntegration.TrayMetric.Power, SystemIntegration.TrayMetric.Cpu,
+            SystemIntegration.TrayMetric.Gpu, SystemIntegration.TrayMetric.Ram,
+            SystemIntegration.TrayMetric.Temp])
+        {
+            if (m == SystemIntegration.TrayMetric.Gpu && !_hasGpu) continue;
+            if (m == SystemIntegration.TrayMetric.Temp && !_hasTemp) continue;
+            var metric = m; // замыкание на копию
+            var item = new ToolStripMenuItem(Loc.T("traymetric." + SystemIntegration.TrayMetricFormat.Key(m)))
+            {
+                Checked = m == _compact,
+                ForeColor = DarkPalette.Text,
+            };
+            item.Click += (_, _) => SetCompact(metric);
+            menu.Items.Add(item);
+        }
+        menu.Show(screen);
+    }
+
+    private void SetCompact(SystemIntegration.TrayMetric m)
+    {
+        _compact = m;
+        _cfg.MonitorCompactMetric = SystemIntegration.TrayMetricFormat.Key(m);
+        _cfg.Save();
+        Sample(); // не ждать секунду с прочерком: новая метрика могла ни разу не опрашиваться
         Invalidate();
     }
 
@@ -183,12 +246,15 @@ public sealed class MonitorForm : FlyoutForm
 
     // виджет: перетаскивается за любое место, кроме кнопок; не прячется при потере фокуса
     private const int WM_NCHITTEST = 0x84, HTCLIENT = 1, HTCAPTION = 2;
-    private const int WM_NCLBUTTONDBLCLK = 0xA3;
+    private const int WM_NCLBUTTONDBLCLK = 0xA3, WM_NCRBUTTONUP = 0xA5;
     protected override void WndProc(ref Message m)
     {
         // двойной клик по «шапке» (то есть почти всему виджету) — следующий вид;
         // base не зовём, чтобы не сработало системное разворачивание окна
         if (m.Msg == WM_NCLBUTTONDBLCLK) { CycleView(); return; }
+        // правая кнопка по «шапке» в компактном виде — выбор метрики вместо системного меню
+        // окна (оно тут бесполезно: ни свернуть, ни изменить размер виджет не умеет)
+        if (m.Msg == WM_NCRBUTTONUP && _view == ViewKind.Power) { ShowCompactMenu(Cursor.Position); return; }
         base.WndProc(ref m);
         if (m.Msg == WM_NCHITTEST && (int)m.Result == HTCLIENT)
         {
@@ -226,12 +292,14 @@ public sealed class MonitorForm : FlyoutForm
         }
     }
 
-    private static string? TipFor(int btn) => btn switch
+    // В компактном виде кнопок нет, зато есть неочевидный жест — правая кнопка меняет
+    // метрику. Подсказка на пустом месте здесь единственный способ о нём рассказать.
+    private string? TipFor(int btn) => btn switch
     {
         1 => Loc.T("panel.close"),
         2 => Loc.T("monitor.view"),
         3 => Loc.T("monitor.expand"),
-        _ => null,
+        _ => _view == ViewKind.Power ? Loc.T("monitor.compact.tip") : null,
     };
 
     protected override void OnMouseLeave(EventArgs e)
@@ -245,13 +313,22 @@ public sealed class MonitorForm : FlyoutForm
 
     // ---------- семплирование ----------
 
-    private void Sample()
+    /// <summary>
+    /// Снять точку. В компактном виде опрашивается ТОЛЬКО показываемая метрика: поднимать
+    /// IGCL и счётчик CPU ради числа, которого не видно, — та же логика, что у индикатора
+    /// в трее (XIC-35): не видно = не платим. <paramref name="full"/> — полный обход
+    /// независимо от вида: им открывается виджет (так выясняется, есть ли вообще GPU и
+    /// температуры) и им же начинаются графики после переключения вида.
+    /// </summary>
+    private void Sample(bool full = false)
     {
-        Push(_cpu, SampleCpu());
-        Push(_gpu, SampleGpu());
-        Push(_ram, SampleRam());
-        Push(_power, SamplePowerWatts());
-        Push(_temp, SampleTempC());
+        bool all = full || _view != ViewKind.Power;
+        if (all || _compact == SystemIntegration.TrayMetric.Cpu) Push(_cpu, SampleCpu());
+        if (all || _compact == SystemIntegration.TrayMetric.Gpu) Push(_gpu, SampleGpu());
+        if (all || _compact == SystemIntegration.TrayMetric.Ram) Push(_ram, SampleRam());
+        if (all || _compact == SystemIntegration.TrayMetric.Power) Push(_power, SamplePowerWatts());
+        if (all || _compact == SystemIntegration.TrayMetric.Temp) Push(_temp, SampleTempC());
+        if (!all) return; // ватты адаптера показывает только полный вид
         try { _adapterWatts = _mifs.GetAdapterWatts(); } catch (Exception ex) { Log.Ex("Monitor.Adapter", ex); _adapterWatts = 0; }
     }
 
@@ -359,7 +436,7 @@ public sealed class MonitorForm : FlyoutForm
         float pw = _power.Count > 0 ? _power[^1] : float.NaN;
         Color pColor = float.IsNaN(pw) ? FlyoutPalette.Dim : (pw >= 0 ? ChargeCol : DischargeCol);
 
-        if (_view == ViewKind.Power) { PaintPower(g, pw, pColor); return; }
+        if (_view == ViewKind.Power) { PaintCompact(g, pw, pColor); return; }
         if (_view == ViewKind.Mini) { PaintMini(g, pw, pColor); return; }
 
         TextRenderer.DrawText(g, Loc.T("monitor.title"), TitleFont,
@@ -437,13 +514,32 @@ public sealed class MonitorForm : FlyoutForm
         return x + w + Sc(8);
     }
 
-    // Вид «только ватты»: одно целое число во всё окно; направление тока — цветом,
-    // как на графике (зелёный — заряд, оранжевый — разряд, серое «—» — от сети)
-    private void PaintPower(Graphics g, float pw, Color pColor)
+    // Компактный вид: одно число во всё окно. Метрику выбирает пользователь правой кнопкой
+    // (XIC-70); цвет у каждой свой — тот же, что у её ряда в полном виде, чтобы связь между
+    // видами читалась без подписи (у потребления цвет ещё и означает направление тока:
+    // зелёный — заряд, оранжевый — разряд, серое «—» — от сети)
+    private void PaintCompact(Graphics g, float pw, Color pColor)
     {
-        string text = float.IsNaN(pw) ? "—" : Loc.T("monitor.watts.scale", MathF.Abs(pw));
-        TextRenderer.DrawText(g, text, BigFont, ClientRectangle, pColor,
+        var (text, color) = _compact switch
+        {
+            SystemIntegration.TrayMetric.Cpu => (Pct(_cpu), CpuCol),
+            SystemIntegration.TrayMetric.Gpu => (Pct(_gpu), GpuCol),
+            SystemIntegration.TrayMetric.Ram => (Pct(_ram), RamCol),
+            SystemIntegration.TrayMetric.Temp => TempCompact(),
+            _ => (float.IsNaN(pw) ? "—" : Loc.T("monitor.watts.scale", MathF.Abs(pw)), pColor),
+        };
+        TextRenderer.DrawText(g, text, BigFont, ClientRectangle, color,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+    }
+
+    private static string Pct(List<float> series) =>
+        series.Count > 0 && !float.IsNaN(series[^1]) ? $"{series[^1]:0}%" : "—";
+
+    private (string, Color) TempCompact()
+    {
+        float c = _temp.Count > 0 ? _temp[^1] : float.NaN;
+        if (float.IsNaN(c)) return ("—", TempCol);
+        return (Loc.T("monitor.temp.c", (int)c), c >= HotAt ? TempHotCol : TempCol);
     }
 
     /// <summary>Верх шкалы ватт: максимум данных с запасом, округлённый вверх до кратного 5 (мин. 10).</summary>
@@ -543,6 +639,7 @@ public sealed class MonitorForm : FlyoutForm
         {
             _tick.Dispose();
             _tip.Dispose();
+            _compactMenu?.Dispose();
             _battery?.Dispose();
             _tempSrc.Dispose();
             _powerDraw.Dispose();
