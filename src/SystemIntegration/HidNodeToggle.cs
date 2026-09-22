@@ -39,8 +39,14 @@ public abstract class HidNodeToggle
     /// <summary>ID узла-родителя из конфига — запоминается автоматически при первом обнаружении.</summary>
     protected abstract string? DeviceId { get; set; }
 
-    /// <summary>Флаг «отключено персистентным путём» из конфига — по нему включаем на старте.</summary>
+    /// <summary>Бухгалтерия: «персистентный путь применили МЫ». Не намерение — см.
+    /// <see cref="KeepOff"/>. По нему же знаем, что за собой надо убрать.</summary>
     protected abstract bool PersistOff { get; set; }
+
+    /// <summary>Намерение пользователя: «пусть остаётся выключенным между перезагрузками».
+    /// Разведено с <see cref="PersistOff"/> намеренно — один флаг не может отвечать и за
+    /// «кто выключил», и за «надо ли включать обратно» (XIC-53).</summary>
+    protected abstract bool KeepOff { get; }
 
     /// <summary>Сохранить конфиг после правки <see cref="DeviceId"/>/<see cref="PersistOff"/>.</summary>
     protected abstract void SaveConfig();
@@ -92,12 +98,51 @@ public abstract class HidNodeToggle
     /// <summary>
     /// Страховка на старте приложения: если в прошлый раз пришлось отключать персистентно,
     /// после перезагрузки включаем устройство сами (мягкое отключение возвращается без нас).
+    ///
+    /// Три причины НЕ включать, и каждая важна (XIC-53):
+    /// <list type="bullet">
+    /// <item>гасили не мы (<see cref="PersistOff"/> = false) — значит это чужое решение,
+    ///   принятое Диспетчером устройств, и перебивать его нельзя;</item>
+    /// <item>пользователь попросил оставить выключенным (<see cref="KeepOff"/>);</item>
+    /// <item>устройство и так включено — тогда включать нечего, а флаг надо снять: иначе он
+    ///   залипает навсегда и каждая загрузка снова зовёт <c>Enable</c>. Именно так у автора
+    ///   issue #39 получился вечный цикл: медленное, но успешное включение записалось как
+    ///   неудача, флаг остался, и дальше мы включали экран, чем бы он его ни гасил.</item>
+    /// </list>
     /// </summary>
     public void RestoreAfterBoot()
     {
-        if (!PersistOff) return;
-        Log.Write($"{LogName}: включаю после перезагрузки (осталось персистентное отключение)");
-        Enable();
+        switch (DecideAfterBoot(PersistOff, KeepOff, PersistOff ? IsEnabled() : null))
+        {
+            case BootAction.Nothing:
+                if (PersistOff && KeepOff) Log.Write($"{LogName}: оставляю выключенным — так просили в настройках");
+                break;
+
+            case BootAction.ClearFlag:
+                PersistOff = false;
+                SaveConfig();
+                Log.Write($"{LogName}: уже включено — снимаю отметку о персистентном отключении");
+                break;
+
+            case BootAction.Enable:
+                Log.Write($"{LogName}: включаю после перезагрузки (осталось персистентное отключение)");
+                Enable();
+                break;
+        }
+    }
+
+    /// <summary>Что делать с устройством на старте. Вынесено ради тестов: живой PnP юнитами
+    /// не покрыть, а само решение — три условия, и ошибка в любом из них дорогая.</summary>
+    internal enum BootAction { Nothing, ClearFlag, Enable }
+
+    /// <param name="enabled">Текущее состояние узла; null — не спрашивали или не нашли.</param>
+    internal static BootAction DecideAfterBoot(bool persistOff, bool keepOff, bool? enabled)
+    {
+        if (!persistOff) return BootAction.Nothing;  // гасили не мы — чужое решение не трогаем
+        if (keepOff) return BootAction.Nothing;      // человек попросил оставить выключенным
+        // Уже включено: включать нечего, но отметку снять обязательно — иначе она залипает и
+        // каждая загрузка снова зовёт Enable, чем бы человек устройство ни гасил (issue #39).
+        return enabled == true ? BootAction.ClearFlag : BootAction.Enable;
     }
 
     // ---- Отключение: мягкое (не-persist), затем путь Диспетчера устройств ----
@@ -158,21 +203,29 @@ public abstract class HidNodeToggle
                 int cr2 = CM_Reenumerate_DevNode(root, 0);
                 if (cr2 != 0) Log.Write($"{LogName}: CM_Reenumerate_DevNode → CR 0x{cr2:X}");
             }
-            ok = WaitState(enabled: true);
+            // Пересканирование корня — самый долгий путь: система перебирает всю шину, и
+            // полутора секунд ему заведомо мало. Раньше здесь ждали столько же, сколько после
+            // обычного CM_Enable, и медленное УСПЕШНОЕ включение записывалось как неудача —
+            // после чего PersistOff не снимался уже никогда (XIC-53).
+            ok = WaitState(enabled: true, attempts: SlowAttempts);
         }
         if (ok && PersistOff) { PersistOff = false; SaveConfig(); }
+        else if (!ok) Log.Write($"{LogName}: включить не удалось — отметка останется, проверим на следующем старте");
         return ok;
     }
 
-    // PnP-операции асинхронны — даём устройству до ~1.5 с прийти в целевое состояние.
+    private const int Attempts = 6;       // ~1.5 с — обычный CM_Enable/SetupAPI
+    private const int SlowAttempts = 24;  // ~6 с — после пересканирования корня PnP
+
+    // PnP-операции асинхронны — даём устройству прийти в целевое состояние.
     // Для «выключен» удалённый узел (IsEnabled == null после потери кэша) тоже успех.
-    private bool WaitState(bool enabled)
+    private bool WaitState(bool enabled, int attempts = Attempts)
     {
         for (int i = 0; ; i++)
         {
             var st = IsEnabled();
             if (enabled ? st == true : st != true) return true;
-            if (i >= 6) return false;
+            if (i >= attempts) return false;
             Thread.Sleep(250);
         }
     }
