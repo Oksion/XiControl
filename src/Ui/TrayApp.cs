@@ -116,14 +116,38 @@ public sealed class TrayApp : IDisposable
             if (_cfg.TravelSound) Sound.PlayTravelReady(_cfg.TravelSoundFile);
         };
 
-        // Заряд дошёл до порога → вебхук наружу (XIC-75). Не настроен — ни одного запроса:
-        // сюда мы попадаем, только если пользователь сам вписал адрес и включил событие.
-        _chargeLimit.Reached = (pct, limit) =>
+        // Заряд дошёл до порога. Два независимых потребителя одного события:
+        // человек (XIC-74 — только программный порог: аппаратный прошивка отработает сама)
+        // и чужая система (XIC-75 — вебхук, если настроен).
+        _chargeLimit.Reached = (pct, target, reminder) =>
         {
-            if (!_api.WebhookOnChargeLimit || !Webhook.IsAllowed(_api.WebhookUrl)) return;
+            if (target.Soft)
+            {
+                // пишем в лог и само предупреждение, не только вебхук: «а мне ничего не
+                // показало» — типовая жалоба, и без отметки её нечем разбирать
+                Log.Write($"SoftCharge: {pct}% ≥ {target.Limit}% — {(reminder ? "напоминание" : "предупреждение")}");
+                _osd.Flash(OsdKind.CareOn, Loc.T("osd.softcharge", pct),
+                    Loc.T(reminder ? "osd.softcharge.again" : "osd.softcharge.sub"));
+                if (_cfg.SoftChargeAlertSound) Sound.PlayTravelReady(_cfg.TravelSoundFile);
+                // Плюс системный тост — ОДИН раз, вместе с первым предупреждением: OSD живёт
+                // пару секунд и на заблокированном экране не виден вовсе (secure desktop),
+                // а тост висит десять и переживает полноэкранное окно поверх нашего.
+                //
+                // В центре уведомлений он НЕ остаётся (проверено): balloon tip от NotifyIcon
+                // Windows 11 рисует как тост, но в историю кладёт только приложения с
+                // зарегистрированным AppUserModelID — а он требует ярлыка в «Пуске», то есть
+                // следа в системе, которого у портативного exe быть не должно.
+                // Напоминания тостами не дублируем: три штуки подряд — уже спам.
+                if (!reminder) Safe(() => { _tray.ShowBalloonTip(10_000, Loc.T("app.name"),
+                    $"{Loc.T("osd.softcharge", pct)} — {Loc.T("osd.softcharge.sub")}",
+                    ToolTipIcon.Warning); return true; }, false);
+            }
+            // напоминание — только человеку: розетке второй раз то же событие не нужно,
+            // она либо сработала, либо её там нет
+            if (reminder || !_api.WebhookOnChargeLimit || !Webhook.IsAllowed(_api.WebhookUrl)) return;
             string url = _api.WebhookUrl!;
-            string json = Webhook.Payload("chargeLimit", limit, ApiStatusSnapshot());
-            Log.Write($"ChargeLimit: {pct}% ≥ {limit}% — шлём вебхук");
+            string json = Webhook.Payload("chargeLimit", target.Limit, ApiStatusSnapshot(), hardwareLimit: !target.Soft);
+            Log.Write($"ChargeLimit: {pct}% ≥ {target.Limit}% — шлём вебхук");
             _ = Task.Run(() => Webhook.SendAsync(url, json));
         };
 
@@ -673,7 +697,7 @@ public sealed class TrayApp : IDisposable
     {
         if (!Webhook.IsAllowed(_api.WebhookUrl)) { done(false); return; }
         string url = _api.WebhookUrl!;
-        string json = Webhook.Payload("test", _cfg.CarePercent(), ApiStatusSnapshot());
+        string json = Webhook.Payload("test", _cfg.CarePercent(), ApiStatusSnapshot(), hardwareLimit: !_cfg.ChargeLimitUnsupported);
         _ = Task.Run(async () =>
         {
             bool ok = await Webhook.SendAsync(url, json).ConfigureAwait(false);
@@ -778,6 +802,7 @@ public sealed class TrayApp : IDisposable
                 SetTouchpadEdgeSwap = _controller.SetTouchpadEdgeSwap,
                 SetOwlFeature = _controller.ToggleOwlFeature,
                 SetCareLimit = _controller.SetCareLimit,
+                SoftChargeApplied = _chargeLimit.Rearm,
                 GetBatteryReport = BatteryReportCached,
                 GetApiSettings = () => _api,
                 ApiApplied = ApiApplied,

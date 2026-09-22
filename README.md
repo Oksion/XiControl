@@ -63,6 +63,11 @@ where there are no watts to show, you can watch load or degrees instead.*
   - 🧳 **"Travel" mode** — a one-off charge to 100% on top of battery care: the suitcase button
     in the panel / a menu item. On reaching 100% — an OSD and a sound; unplugging the charger
     resets the mode by itself (the next plug-in is back to the threshold).
+  - ⏰ **Software threshold** — for models whose firmware **refuses** the limit: the app watches
+    the level and tells you to pull the cable (a popup and a sound, up to three reminders). It
+    shows up in Settings → Battery on those machines only, and only after the firmware has said
+    no: there are no model lists in the code, the hardware answers for itself. It is a reminder,
+    not protection — real protection comes from the **webhook** plus a smart plug (see HTTP API).
 - 🔌 **Charger wattage** — when the charger is plugged in, show the connected PD adapter's
   wattage (watts) in the OSD and in the Monitor. Over the charge icon — a **PSU quality badge**:
   🔴 "!" if the adapter is weaker than the configured threshold (slow charging), ⚪ "?" if the
@@ -673,9 +678,16 @@ Assistant stops polling us in a loop. The recipient address and the toggle are o
 carries the same fields as `GET /status`, plus the reason and the limit:
 
 ```json
-{"event":"chargeLimit","limit":60,"time":"2026-09-22T15:20:05Z","mode":"Auto","care":true,
- "travel":false,"owl":false,"batteryPercent":60,"charging":true,"watts":null,"health":100}
+{"event":"chargeLimit","limit":60,"hardwareLimit":true,"time":"2026-09-22T15:20:05Z",
+ "mode":"Auto","care":true,"travel":false,"owl":false,"batteryPercent":60,"charging":true,
+ "watts":null,"health":100}
 ```
+
+`hardwareLimit` tells you whose limit it was, and the difference matters for a scenario: `true` —
+the firmware has already stopped charging (switching the plug off is useful but not urgent),
+`false` — the limit is a **software** one and charging **continues** until the plug goes off. The
+event name is the same in both cases: an automation written for `chargeLimit` must not silently
+stop seeing the second one — which is the more dangerous of the two.
 
 It fires **once per charge** and re-arms when the charger is unplugged. It works independently of
 the server itself: no listening socket is needed for an outgoing event. With no address set, not a
