@@ -237,7 +237,9 @@ public sealed class TrayApp : IDisposable
         _controller.LanguageChanged = () => _icon.Refresh(); // Polled обновит тултип на новом языке
         _controller.FlyoutThemeChanged = RepaintFlyouts;     // палитру уже пересчитал контроллер
         // честная обратная связь: команда прошивке не прошла — говорим прямо, а не «успех»
-        _controller.FirmwareFailed = () => _osd.Flash(OsdKind.Error, Loc.T("osd.failed"), Loc.T("osd.failed.sub"));
+        // BeginInvoke: запись в тачпад (XIC-77) сообщает об отказе с фонового потока
+        _controller.FirmwareFailed = () => _osd.BeginInvoke(new Action(() =>
+            _osd.Flash(OsdKind.Error, Loc.T("osd.failed"), Loc.T("osd.failed.sub"))));
         _controller.UpdateFound = OnUpdateFound;
         _tray.BalloonTipClicked += (_, _) =>
         {
@@ -800,6 +802,9 @@ public sealed class TrayApp : IDisposable
                 SetTouchpadEdgeWidthMm = _controller.SetTouchpadEdgeWidthMm,
                 SetTouchpadEdgeSwipes = _controller.SetTouchpadEdgeSwipes,
                 SetTouchpadEdgeSwap = _controller.SetTouchpadEdgeSwap,
+                GetTouchpadHaptics = () => _controller.TouchpadHaptics,
+                SetTouchpadVibration = _controller.SetTouchpadVibration,
+                SetTouchpadPressure = _controller.SetTouchpadPressure,
                 SetOwlFeature = _controller.ToggleOwlFeature,
                 SetCareLimit = _controller.SetCareLimit,
                 SoftChargeApplied = _chargeLimit.Rearm,

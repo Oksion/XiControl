@@ -103,6 +103,8 @@ where there are no watts to show, you can watch load or degrees instead.*
 - 🖱️ **Touchpad on/off** — an action for any key + a cell in the panel. Disabling is done the
   stock way (like in Device Manager, no drivers) and does not survive a reboot — the touchpad
   can't get stuck disabled.
+- 📳 **Touchpad vibration strength and click force** — like in Xiaomi PC Manager, over the same
+  channel and without drivers; the settings are stored in the touchpad itself.
 - 👆 **Touchscreen on/off** — same for the laptop's touchscreen: an action for a key,
   a cell in the panel, stock driver-free disabling and auto re-enable after a reboot.
   The cell appears only if a touchscreen is present in the system.
@@ -263,7 +265,8 @@ autostart, panel theme, update check, logging), Features (owl, touchpad,
 touchscreen, refresh-rate control), Battery (charge threshold with a hint, "travel" sound and file,
 lock-screen sound and toast, charger-wattage OSD, "weak PSU" threshold, battery health), Display
 (brightness limit and memory; auto refresh rate, "Keep refresh rate" and the rates — the section is
-hidden if refresh-rate control is off), Touchpad (bottom dead zone), Performance (mode visibility,
+hidden if refresh-rate control is off), Touchpad (bottom dead zone, edge sliders, vibration
+strength and click force), Performance (mode visibility,
 separately for AC and battery, with a switch above the list; startup mode, power profiles),
 Keys (remapping), Notifications (where popups appear, how long
 they stay, which lock-key popups to show), HTTP API (port, token, permissions) and About
@@ -580,6 +583,19 @@ disappears for a second). Turning the option off **removes** the value rather th
 > The zone lives inside Windows palm rejection. If **Settings → Bluetooth & devices → Touchpad**
 > is set to maximum sensitivity, palm rejection is off entirely — and so is our zone. XiControl
 > notices this and shows a warning right on the tab.
+
+### Touchpad vibration and click force
+
+**Settings → Touchpad → "Haptic feedback"** sets how strongly the pad clicks under your finger
+(low / medium / high) and how hard you have to press (light / medium / firm; "medium" in both
+lists is the factory setting). This is the same thing Xiaomi PC Manager does, over the same
+vendor channel of the touchpad — plain HID reports, no drivers. The protocol was recovered from
+PC Manager's own code and verified on a TM2424.
+
+The values live in the touchpad itself, so they survive sleep and reboots and aren't stored in
+`config.json`: the app reads them once at startup and writes only when you pick a new value,
+checking every write by reading it back. On a laptop with a different touchpad the section
+simply doesn't appear.
 
 ### Key remapping
 

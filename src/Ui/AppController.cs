@@ -28,6 +28,7 @@ public sealed class AppController
     private readonly TouchscreenControl _touchscreen;
     private readonly TouchpadDeadZone _deadZone;
     private readonly TouchpadEdgeSliders _edges;
+    private readonly TouchpadHaptics? _haptics;
 
     private PerfMode[] _modes = [];
     private bool _autoStart;   // кэш состояния автозапуска (не дёргаем schtasks на каждое меню)
@@ -60,7 +61,8 @@ public sealed class AppController
         ChargeGuard charge, RefreshRateGuard hz, PowerProfileGuard profiles, BrightnessCapGuard capGuard,
         AutoBrightnessGuard autoGuard, AlsWatcher als,
         TravelChargeMonitor travel, TouchpadControl touchpad, TouchscreenControl touchscreen,
-        TouchpadDeadZone deadZone, TouchpadEdgeSliders edges)
+        TouchpadDeadZone deadZone, TouchpadEdgeSliders edges,
+        TouchpadHaptics? haptics = null)
     {
         _mifs = mifs;
         _cfg = cfg;
@@ -78,6 +80,7 @@ public sealed class AppController
         _touchscreen = touchscreen;
         _deadZone = deadZone;
         _edges = edges;
+        _haptics = haptics; // null в тестах: юниты не должны писать в настоящий тачпад
         ApplyModeVisibility();
     }
 
@@ -103,6 +106,10 @@ public sealed class AppController
             // и молча не стартует — пересоздаём на текущий exe
             if (_autoStart) Safe(() => { AutoStart.RepairIfBroken(); return true; }, true);
         });
+
+        // Тактильные настройки тачпада живут в нём самом — только прочитать для вкладки
+        // (запрос, который PC Manager шлёт на каждом своём старте); пишем лишь по выбору человека
+        if (_haptics is { } haptics) Task.Run(() => TouchpadHaptics = Safe(haptics.Read, null));
 
         // Страж заряда и авто-герцовка: применить желаемое состояние на старте
         _charge.Reapply();
@@ -907,6 +914,33 @@ public sealed class AppController
     {
         _cfg.TouchpadEdgeSwap = on;
         _cfg.Save();
+    }
+
+    /// <summary>Сила вибрации и порог нажатия, прочитанные из тачпада на старте (XIC-77).
+    /// null — тачпада с вендорским каналом нет (другая модель) или он не ответил: вкладка
+    /// тогда раздел не показывает.</summary>
+    public TouchpadHapticsState? TouchpadHaptics { get; private set; }
+
+    /// <summary>Сила вибрации тачпада. Пишется в сам тачпад (переживает сон и перезагрузку,
+    /// поэтому в конфиг не попадает); запись с проверкой чтением — в фоне, ~0,5 с.</summary>
+    public void SetTouchpadVibration(HapticsVibration level) =>
+        WriteHaptics(h => h.SetVibration(level), s => s with { Vibration = level });
+
+    /// <summary>Порог нажатия тачпада в единицах прошивки (ступени — PressurePresets).</summary>
+    public void SetTouchpadPressure(int threshold) =>
+        WriteHaptics(h => h.SetPressure(threshold), s => s with { Pressure = threshold });
+
+    private void WriteHaptics(Func<TouchpadHaptics, bool> write, Func<TouchpadHapticsState, TouchpadHapticsState> update)
+    {
+        if (_haptics is not { } haptics) return;
+        Task.Run(() =>
+        {
+            if (Safe(() => write(haptics), false))
+            {
+                if (TouchpadHaptics is { } s) TouchpadHaptics = update(s);
+            }
+            else FirmwareFailed?.Invoke(); // тачпад не подтвердил — честная ошибка, кэш не трогаем
+        });
     }
 
     /// <summary>Тачпад в системе есть — иначе опция в настройках бессмысленна.</summary>
