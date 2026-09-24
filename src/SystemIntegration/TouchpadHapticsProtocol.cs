@@ -3,9 +3,9 @@ namespace XiControl.SystemIntegration;
 /// <summary>Сила вибрации тачпада — три ступени Xiaomi PC Manager.</summary>
 public enum HapticsVibration { Low, Medium, High }
 
-/// <summary>Что прочитано из тачпада: сила вибрации (null — пара вне ступеней PC Manager)
-/// и порог нажатия в «сырых» единицах прошивки.</summary>
-public sealed record TouchpadHapticsState(HapticsVibration? Vibration, int Pressure);
+/// <summary>Что прочитано из тачпада: сила вибрации (null — пара вне ступеней PC Manager),
+/// порог нажатия и сила щелчка краевых ползунков — в «сырых» единицах прошивки.</summary>
+public sealed record TouchpadHapticsState(HapticsVibration? Vibration, int Pressure, int Slide);
 
 /// <summary>
 /// Протокол вендорского канала тачпада BLTP7853 (XIC-77): чистая логика кадров, без HID.
@@ -27,7 +27,15 @@ public static class TouchpadHapticsProtocol
     public const byte ReportId = 0x0D;
     public const byte CmdVibration = 0x5D;   // 2 short: пара «передач» мотора
     public const byte CmdPressure = 0x5B;    // 4 short: порог, порог×0.33, 500, 400
+    public const byte CmdSlide = 0x58;       // 1 short: сила щелчка PulseFrame (XIC-73)
+
+    /// <summary>Сила щелчка краевых ползунков: PC Manager ставит 80. Шкала та же, что у мотора
+    /// кликов (56…128), но щелчок на каждом шаге и 128 на живом пальце — перебор, а 40 —
+    /// в самый раз; поэтому ступени идут вниз от заводской, а не вверх.</summary>
+    public static readonly int[] SlidePresets = [40, 60, 80];
     private const byte CmdCommit = 0x01;
+    private const byte CmdPulse = 0x02;      // один щелчок мотора, силу задаёт 0x58
+    private const byte PulseEffect = 0x32;   // единственный эффект, который шлёт PC Manager
 
     /// <summary>Порог, выставленный на заводе (TM2424). У PC Manager ступени 100/120/140, и в
     /// заводское после первого выбора там уже не вернуться.</summary>
@@ -76,6 +84,12 @@ public static class TouchpadHapticsProtocol
 
     /// <summary>Кадр подтверждения записи: без него прошивка команду не применяет.</summary>
     public static byte[] CommitFrame(byte cmd) => Frame(CmdCommit, [cmd, (byte)(0x100 - cmd)], first: false);
+
+    /// <summary>Один щелчок мотора (XIC-73). Снят с <c>PluginGesture.dll</c> PC Manager — плагина
+    /// краевых жестов, который шлёт его на каждом шаге яркости/громкости: команда 0x02 с данными
+    /// <c>[0x32, 0xCE]</c>, один кадр без подтверждения. Сила — отдельной командой 0x58
+    /// («передача скольжения», PC Manager держит 80; у TM2424 так и стоит).</summary>
+    public static byte[] PulseFrame() => Frame(CmdPulse, [PulseEffect, (byte)(0x100 - PulseEffect)], first: false);
 
     /// <summary>Запрос чтения: <paramref name="count"/> short в ответ.</summary>
     public static byte[] ReadRequest(byte cmd, int count)

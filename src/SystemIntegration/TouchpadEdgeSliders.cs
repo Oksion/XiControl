@@ -55,15 +55,20 @@ public sealed class TouchpadEdgeSliders : IDisposable
     private volatile bool _resync = true;  // перечитать яркость: жест начался заново
     private int _busy;                // тик воркера уже идёт (WorkerTimer умеет входить повторно)
     private int _skipped;             // пропущено тиков подряд из-за занятости — сторож застрявшего WMI
+    private readonly Func<bool>? _pulse;       // щелчок мотора (XIC-73); null — вендорского канала нет
+    private volatile bool _pulseFresh = true;  // первый шаг жеста щёлкает сразу, без выдержки
+    private long _lastPulse;                   // время прошлого щелчка; трогает только воркер
 
     /// <summary>Сколько пропусков подряд считаем зависанием: 100 × 50 мс = 5 с.</summary>
     private const int StuckTicks = 100;
 
     public TouchpadEdgeSliders(AppConfig cfg, TouchpadControl pad,
-        Action<int>? volume = null, Action<int>? brightness = null, IAppTimer? pump = null)
+        Action<int>? volume = null, Action<int>? brightness = null, IAppTimer? pump = null,
+        TouchpadHaptics? haptics = null)
     {
         _cfg = cfg;
         _pad = pad;
+        _pulse = haptics is null ? null : haptics.Pulse; // null в тестах: мотор настоящего тачпада не трогаем
         _volume = volume ?? KeyActions.VolumeStep;
         _brightness = brightness ?? BrightnessStep;
         _gesture = new TouchpadEdgeGesture(WidthFraction(cfg), EdgeSlideScale.StepFraction);
@@ -168,6 +173,7 @@ public sealed class TouchpadEdgeSliders : IDisposable
                 // и поток чтения касаний вставал бы на нём в очередь.
                 _scale.Reset();
                 _resync = true;
+                _pulseFresh = true;
                 return;
             }
             if (result.Steps == 0) return;
@@ -215,9 +221,27 @@ public sealed class TouchpadEdgeSliders : IDisposable
             }
             if (taps != 0) _volume(taps);
             if (percent != 0) _brightness(percent);
+            if (taps != 0 || percent != 0) Pulse();
         }
         catch (Exception ex) { Log.Ex("TouchpadEdges.Drain", ex); }
         finally { Interlocked.Exchange(ref _busy, 0); }
+    }
+
+    // Щелчок на шаге (XIC-73) — отсюда, с воркера: HID-запись занимает миллисекунды, и потоку
+    // чтения касаний она ни к чему. Первый шаг жеста щёлкает сразу — это и есть «жест
+    // пойман», дальше — не чаще TouchpadEdgeHapticsMs. PC Manager держит 250 мс, но на живом
+    // пальце это ощущалось странно: щелчки отставали от шагов. По умолчанию — каждая порция.
+    private void Pulse()
+    {
+        if (_pulse is null || !_cfg.TouchpadEdgeHaptics) return;
+        long now = Environment.TickCount64;
+        int minMs = Math.Clamp(_cfg.TouchpadEdgeHapticsMs, PumpMs, 500);
+        // допуск 10 мс: тик воркера гуляет на пару мс, и при пороге ровно в период таймера
+        // половина щелчков выпадала бы — частота молча съезжала бы вдвое
+        if (!_pulseFresh && now - _lastPulse < minMs - 10) return;
+        _pulseFresh = false;
+        _lastPulse = now;
+        _pulse();
     }
 
     /// <summary>

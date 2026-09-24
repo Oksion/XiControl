@@ -36,8 +36,9 @@ public sealed class TouchpadHaptics
             if (h is null) return null;
             var vib = ReadValues(h, CmdVibration, 2);
             var press = ReadValues(h, CmdPressure, 4);
-            if (vib is null || press is null) return null;
-            return new TouchpadHapticsState(MatchVibration(vib[0], vib[1]), press[0]);
+            var slide = ReadValues(h, CmdSlide, 1);
+            if (vib is null || press is null || slide is null) return null;
+            return new TouchpadHapticsState(MatchVibration(vib[0], vib[1]), press[0], slide[0]);
         }
     }
 
@@ -49,6 +50,24 @@ public sealed class TouchpadHaptics
     /// поэтому сверяем только порог.</summary>
     public bool SetPressure(int threshold) =>
         Write(CmdPressure, PressureValues(threshold), v => v[0] == threshold);
+
+    /// <summary>Сила щелчка краевых ползунков (команда 0x58, XIC-73).</summary>
+    public bool SetSlide(int strength) =>
+        Write(CmdSlide, [(ushort)strength], v => v[0] == strength);
+
+    /// <summary>Один щелчок мотора (XIC-73). Зовётся на шаге краевого ползунка, поэтому не
+    /// ждёт: если в этот момент идёт запись настроек (~0,5 с), щелчок просто пропускается —
+    /// жест важнее отклика. false — не отправлен.</summary>
+    public bool Pulse()
+    {
+        if (!Monitor.TryEnter(_lock)) return false;
+        try
+        {
+            using var h = Open();
+            return h is not null && Send(h, PulseFrame());
+        }
+        finally { Monitor.Exit(_lock); }
+    }
 
     private bool Write(byte cmd, ushort[] values, Func<ushort[], bool> confirmed)
     {

@@ -916,6 +916,27 @@ public sealed class AppController
         _cfg.Save();
     }
 
+    /// <summary>Щелчок мотора на шаге краевого ползунка (XIC-73). Ползунки читают флаг на
+    /// каждом шаге, так что ни перезапуска узла, ни пересборки жеста не нужно.</summary>
+    public void SetTouchpadEdgeHaptics(bool on)
+    {
+        _cfg.TouchpadEdgeHaptics = on;
+        _cfg.Save();
+    }
+
+    /// <summary>Минимальный промежуток между щелчками краевых ползунков, мс. Ползунки читают
+    /// его на каждом шаге — применяется сразу.</summary>
+    public void SetTouchpadEdgeHapticsMs(int ms)
+    {
+        _cfg.TouchpadEdgeHapticsMs = ms;
+        _cfg.Save();
+    }
+
+    /// <summary>Сила щелчка краевых ползунков (XIC-73). Живёт в самом тачпаде, как и прочие
+    /// тактильные настройки, — запись с проверкой чтением, в фоне.</summary>
+    public void SetTouchpadSlideStrength(int strength) =>
+        WriteHaptics(h => h.SetSlide(strength), s => s with { Slide = strength });
+
     /// <summary>Сила вибрации и порог нажатия, прочитанные из тачпада на старте (XIC-77).
     /// null — тачпада с вендорским каналом нет (другая модель) или он не ответил: вкладка
     /// тогда раздел не показывает.</summary>
