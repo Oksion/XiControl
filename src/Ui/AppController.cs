@@ -1,4 +1,4 @@
-﻿using XiControl.Config;
+using XiControl.Config;
 using XiControl.Localization;
 using XiControl.SystemIntegration;
 using XiControl.Wmi;

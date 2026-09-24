@@ -7,7 +7,9 @@ root = true
 indent_style = space
 insert_final_newline = true
 trim_trailing_whitespace = true
-charset = utf-8-bom
+# Без BOM: так сохранено большинство файлов (и так пишут редакторы по умолчанию);
+# компилятор C# и без BOM читает исходники как UTF-8.
+charset = utf-8
 
 [*.{yml,yaml,json,jsonc}]
 indent_size = 2
@@ -76,4 +78,7 @@ dotnet_diagnostic.RCS1001.severity = none
 dotnet_diagnostic.RCS1003.severity = none
 # IDE0028 — стиль collection-инициализаторов, чистая косметика.
 dotnet_diagnostic.IDE0028.severity = none
+# RCS1139 — «добавь <summary>»: doc-комментарий члена часто состоит из одного <param> —
+#           смысл члена ясен из имени, пояснять нужно только аргумент.
+dotnet_diagnostic.RCS1139.severity = none
 # =====================================================================================

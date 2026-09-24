@@ -1,4 +1,4 @@
-﻿namespace XiControl.Ui.Settings;
+namespace XiControl.Ui.Settings;
 
 /// <summary>
 /// Базовая панель вкладки настроек: вертикальный поток карточек с прокруткой.

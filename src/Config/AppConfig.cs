@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 using XiControl.Wmi;
 
 namespace XiControl.Config;

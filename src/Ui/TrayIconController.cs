@@ -1,4 +1,4 @@
-﻿using XiControl.SystemIntegration;
+using XiControl.SystemIntegration;
 using XiControl.Wmi;
 
 namespace XiControl.Ui;

@@ -1,4 +1,4 @@
-﻿namespace XiControl.Ui.Settings;
+namespace XiControl.Ui.Settings;
 
 /// <summary>
 /// Палитра окна настроек (Win11-стиль). Читается из системной темы на каждую пересборку

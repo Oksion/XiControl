@@ -36,9 +36,20 @@ jobs:
         run: dotnet test XiControl.sln -c Release --no-build --nologo
 
       # Информационный шаг: показывает дрейф стиля, но НЕ роняет CI — и это
-      # осознанно навсегда (решение Фазы 4): в Loc.cs и OsdForm.cs намеренное
-      # колоночное выравнивание, которое dotnet format схлопывает. Правила же
-      # анализаторов и так жёсткие — они входят в Build через TreatWarningsAsErrors.
+      # осознанно навсегда (решение Фазы 4). Правила анализаторов и так жёсткие —
+      # они входят в Build через TreatWarningsAsErrors.
+      # --severity warn: info-подсказки анализаторов (LibraryImport, абзацы в doc-
+      # комментариях…) — это советы IDE, а не дрейф стиля; шаг ловит пробелы/кодировку.
+      # --exclude — файлы с намеренным ручным выравниванием (колонки, таблицы,
+      # плотные инициализаторы), которое dotnet format схлопывает. Список держать
+      # в синхроне с CLAUDE.md («не гонять dotnet format»), XIC-52.
       - name: Format check (non-blocking)
         continue-on-error: true
-        run: dotnet format XiControl.sln --verify-no-changes --severity info
+        run: >
+          dotnet format XiControl.sln --verify-no-changes --severity warn
+          --exclude src/Ui/OsdForm.cs
+          --exclude src/Wmi/Mifs.cs
+          --exclude src/Ui/TrayApp.cs
+          --exclude src/Ui/Settings/SettingsToolkit.cs
+          --exclude src/SystemIntegration/AlsSensor.cs
+          --exclude src/SystemIntegration/PowerProfileGuard.cs

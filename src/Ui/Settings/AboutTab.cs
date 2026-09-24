@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using XiControl.Config;
 using XiControl.Localization;
 using XiControl.SystemIntegration;

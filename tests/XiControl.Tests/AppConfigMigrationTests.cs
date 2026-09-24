@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using XiControl.Config;
 using XiControl.Wmi;
 using Xunit;

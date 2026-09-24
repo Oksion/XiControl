@@ -1,4 +1,4 @@
-﻿using XiControl.Wmi;
+using XiControl.Wmi;
 
 namespace XiControl.Ui;
 
