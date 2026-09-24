@@ -1,4 +1,4 @@
-﻿using System.Drawing.Drawing2D;
+using System.Drawing.Drawing2D;
 using XiControl.Config;
 using XiControl.Localization;
 using XiControl.Wmi;

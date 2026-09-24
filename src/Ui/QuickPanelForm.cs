@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using XiControl.Config;
 using XiControl.Localization;
 using XiControl.SystemIntegration;

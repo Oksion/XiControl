@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using XiControl.Config;
 using XiControl.Localization;
 using XiControl.SystemIntegration;
