@@ -518,7 +518,13 @@ rate is set with `ChangeDisplaySettingsEx` — no driver needed):
   strips: it uses the same stock Windows curtain zone as the bottom dead zone. A movement that
   began in the middle of the pad continues into the strips as usual and never becomes a slider —
   one gesture does one thing. Two fingers still scroll. Sensitivity has three presets, and
-  brightness and volume move in step. Requires a Windows Precision Touchpad.
+  brightness and volume move in step. Requires a Windows Precision Touchpad. On touchpads with
+  the Xiaomi vendor channel (the same one used for vibration strength below) every step comes
+  with a short click of the motor, like in Xiaomi PC Manager — on by default. Next to the
+  sliders: a toggle, the click strength (light / medium / strong; separate from the click
+  vibration and also stored in the touchpad) and the click rate (every step / every other step /
+  rarely, like PC Manager; any value from 50 to 500 ms via `TouchpadEdgeHapticsMs` in
+  `config.json`).
 - **No such key on your model?** The same cycle is available as the assignable action `hz`
   ("Cycle screen refresh rate") in Settings → Keys, so it can be put on the Mi button or any other
   remappable key. It obeys the same **Refresh rate control** toggle: with the feature off, nothing

@@ -47,11 +47,31 @@ public sealed class TouchpadTab : SettingsPane
         swap.Enabled = cfg.TouchpadEdgeSliders;
         ui.AddRow(this, "settings.touchpad.edges.swap", "settings.touchpad.edges.swap.desc", swap);
 
+        // Щелчок на шаге (XIC-73) — только там, где тачпад ответил по вендорскому каналу:
+        // на другой модели тумблер ничего бы не делал, а молча неработающая опция хуже никакой
+        var haptics = act.GetTouchpadHaptics();
+        if (haptics is not null)
+        {
+            // rebuild: тумблер гасит/зажигает силу и частоту щелчка
+            var click = ui.Toggle(cfg.TouchpadEdgeHaptics, on => { act.SetTouchpadEdgeHaptics(on); rebuild(); });
+            click.Enabled = cfg.TouchpadEdgeSliders;
+            ui.AddRow(this, "settings.touchpad.edges.haptics", "settings.touchpad.edges.haptics.desc", click);
+
+            bool clicking = cfg.TouchpadEdgeSliders && cfg.TouchpadEdgeHaptics;
+            var strength = StrengthCombo(haptics.Slide, act.SetTouchpadSlideStrength);
+            strength.Enabled = clicking;
+            ui.AddRow(this, "settings.touchpad.edges.haptics.strength", "settings.touchpad.edges.haptics.strength.desc", strength);
+
+            var step = StepCombo(cfg.TouchpadEdgeHapticsMs, act.SetTouchpadEdgeHapticsMs);
+            step.Enabled = clicking;
+            ui.AddRow(this, "settings.touchpad.edges.haptics.step", "settings.touchpad.edges.haptics.step.desc", step);
+        }
+
         ui.AddNote(this, "settings.touchpad.edges.note");
 
         // Тактильный отклик (XIC-77): живёт в самом тачпаде, поэтому показываем прочитанное из
         // него, а не из конфига. Не ответил на старте (другая модель) — раздела нет вовсе.
-        if (act.GetTouchpadHaptics() is { } haptics)
+        if (haptics is not null)
         {
             ui.AddGroup(this, "settings.touchpad.haptics");
             ui.AddRow(this, "settings.touchpad.vibration", "settings.touchpad.vibration.desc",
@@ -60,6 +80,29 @@ public sealed class TouchpadTab : SettingsPane
                 PressureCombo(haptics.Pressure, act.SetTouchpadPressure));
             ui.AddNote(this, "settings.touchpad.haptics.note");
         }
+    }
+
+    /// <summary>Сила щелчка краевых ползунков: вниз от заводской, 128 на каждом шаге — перебор.
+    /// Чужое значение из тачпада добавляется как есть — по образцу MmCombo.</summary>
+    private ComboBox StrengthCombo(int current, Action<int> apply)
+    {
+        int[] presets = TouchpadHapticsProtocol.SlidePresets;
+        int[] values = presets.Contains(current) ? presets : [.. presets.Append(current).Order()];
+        string[] names = [.. values.Select(v => presets.Contains(v)
+            ? Loc.T($"settings.touchpad.edges.haptics.strength.{v}") : Loc.T("settings.touchpad.pressure.custom", v))];
+        return Ui.Combo(names, Array.IndexOf(values, current), i => apply(values[i]), Ui.Sc(170));
+    }
+
+    /// <summary>Частота щелчков: не чаще раза за столько мс. 50 — каждая порция шагов (чаще
+    /// ползунок не применяет), 250 — как у PC Manager. Значение из config.json вне списка
+    /// показывается как есть.</summary>
+    private ComboBox StepCombo(int current, Action<int> apply)
+    {
+        int[] presets = [50, 100, 250];
+        int[] values = presets.Contains(current) ? presets : [.. presets.Append(current).Order()];
+        string[] names = [.. values.Select(v => presets.Contains(v)
+            ? Loc.T($"settings.touchpad.edges.haptics.step.{v}") : Loc.T("settings.touchpad.edges.haptics.step.custom", v))];
+        return Ui.Combo(names, Array.IndexOf(values, current), i => apply(values[i]), Ui.Sc(170));
     }
 
     /// <summary>Сила вибрации — три ступени PC Manager. Пара вне ступеней (выставлена чужим

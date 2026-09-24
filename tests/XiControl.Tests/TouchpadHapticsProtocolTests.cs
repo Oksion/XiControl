@@ -42,6 +42,23 @@ public sealed class TouchpadHapticsProtocolTests
     public void Commit_frame_is_command_01_with_complement(byte cmd, string expected) =>
         CommitFrame(cmd).Should().Equal(Padded(expected));
 
+    // щелчок из PluginGesture.dll PC Manager — этот кадр мотор TM2424 отработал (XIC-73)
+    [Fact]
+    public void Pulse_frame_matches_bytes_from_PluginGesture() =>
+        PulseFrame().Should().Equal(Padded("0D 09 FD 01 00 03 00 00 02 32 CE"));
+
+    // сила щелчка 0x58: запись 40 и подтверждение — ровно то, что тачпад принял и вернул 40;
+    // подтверждение совпадает с кадром из PluginGesture.dll
+    [Fact]
+    public void Slide_strength_frames_match_live_bytes()
+    {
+        WriteFrame(CmdSlide, [40]).Should().Equal(Padded("0D 09 74 00 00 03 00 00 58 28 00"));
+        CommitFrame(CmdSlide).Should().Equal(Padded("0D 09 F4 01 00 03 00 00 01 58 A8"));
+        ReadRequest(CmdSlide, 1).Should().Equal(Padded("0D 07 5B 01 00 01 00 02 58"));
+        ParseResponse(Padded("0D 04 29 00 28 00"), 1).Should().Equal(40);
+        ParseResponse(Padded("0D 04 51 00 50 00"), 1).Should().Equal(80); // заводское
+    }
+
     [Fact]
     public void Read_request_matches_ReadMotorGears() =>
         ReadRequest(CmdVibration, 2).Should().Equal(Padded("0D 07 5A 01 00 01 00 04 5D"));
