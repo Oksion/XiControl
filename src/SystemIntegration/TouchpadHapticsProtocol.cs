@@ -28,6 +28,12 @@ public static class TouchpadHapticsProtocol
     public const byte CmdVibration = 0x5D;   // 2 short: пара «передач» мотора
     public const byte CmdPressure = 0x5B;    // 4 short: порог, порог×0.33, 500, 400
     public const byte CmdSlide = 0x58;       // 1 short: сила щелчка PulseFrame (XIC-73)
+    public const byte CmdHeavyPress = 0x59;  // 1 short: второй щелчок прошивки на сильном нажатии (XIC-78)
+
+    /// <summary>Значения 0x59 — ровно как шлёт PC Manager (<c>WriteEnableHeavyPress</c>):
+    /// 1 — прошивка щёлкает второй раз, когда нажатие продавлено, 2 — не щёлкает (заводское).
+    /// Само распознавание от флага не зависит: давление приходит в обычном вводе всегда.</summary>
+    public const ushort HeavyPressOn = 1, HeavyPressOff = 2;
 
     /// <summary>Сила щелчка краевых ползунков: PC Manager ставит 80. Шкала та же, что у мотора
     /// кликов (56…128), но щелчок на каждом шаге и 128 на живом пальце — перебор, а 40 —

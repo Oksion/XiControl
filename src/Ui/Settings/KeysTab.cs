@@ -6,16 +6,17 @@ namespace XiControl.Ui.Settings;
 /// <summary>Вкладка «Клавиши»: действия Mi-кнопки и «мёртвых» клавиш (per-slot из конфига).</summary>
 public sealed class KeysTab : SettingsPane
 {
-    // Общий список действий для всех клавиш; порядок = порядок в комбо
-    private static readonly string[] KeyActionValues =
+    // Общий список действий для всех клавиш — и для сильного нажатия тачпада (XIC-78);
+    // порядок = порядок в комбо
+    internal static readonly string[] KeyActionValues =
     [
         "modes", "charge", "panel", "owl", "monitor", "travel", "touchpad", "touchscreen",
-        "autobright", "hz", "projection", "settings", "copilot", "play", "next", "prev", "stop",
+        "autobright", "hz", "projection", "screenshot", "settings", "copilot", "play", "next", "prev", "stop",
         "calc", "launch", "none",
     ];
 
     // Единственное действие с полем ввода команды — по нему решаем, пересобирать ли слот.
-    private const string Launch = "launch";
+    internal const string Launch = "launch";
 
     private readonly AppConfig _cfg;
     private readonly Action _rebuild;

@@ -8,8 +8,10 @@ public enum TouchpadEdge { None, Left, Right }
 /// Доля, а не миллиметры, намеренно: физические единицы PTP объявляются в дюймах с показателем
 /// (на TM2424 <c>Units=0x13</c>, <c>UnitExponent=-2</c>), и пересчёт «на глазок» уже однажды дал
 /// 54,7 мм вместо 139 — доля от логического диапазона от этой трактовки не зависит вовсе.
+/// <paramref name="Pressure"/> — сырой Tip Pressure прошивки (0 — поля нет или это ладонь), для
+/// сильного нажатия (XIC-78). На TM2424: касание 35–55, клик 125–150, сильное нажатие 900–1200.
 /// </summary>
-public readonly record struct TouchContact(int Id, double X, double Y);
+public readonly record struct TouchContact(int Id, double X, double Y, int Pressure = 0);
 
 /// <summary>
 /// Распознавание жеста «ползунок у края тачпада» (XIC-61): палец, опустившийся в краевую полосу,

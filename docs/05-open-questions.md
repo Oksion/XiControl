@@ -140,6 +140,12 @@ PC Manager шлёт её на каждом шаге яркости/громко�
 скольжения», 1 short; PC Manager держит 80, на TM2424 так и стоит). Проверено на железе и сделано:
 щелчок на шаге наших краевых ползунков.
 
+**Сильное нажатие (XIC-78)** вендорского канала не требует вовсе: PC Manager распознаёт его по
+Tip Pressure (`0x0D/0x30`) в обычном PTP-вводе — давление контакта с Confidence больше 500. Замер
+на TM2424: касание 35–55, клик 125–150, сильное 900–1200, и давление приходит всегда, при любом
+`0x59`. Сам `0x59` (`[01|02, 00]`) — только второй щелчок прошивки в момент продавливания. Сделано
+назначаемым действием.
+
 Источники: [Precision touchpad tuning](https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-tuning-guidelines),
 [Input Device Haptics Implementation Guide](https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/input-haptics-implementation-guide).
 

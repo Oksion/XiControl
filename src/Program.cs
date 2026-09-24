@@ -39,6 +39,8 @@ internal static class Program
         services.AddSingleton<TouchpadDeadZone>();
         services.AddSingleton<TouchpadEdgeSliders>();
         services.AddSingleton<TouchpadHaptics>();
+        services.AddSingleton<TouchpadInput>();       // один читатель касаний на процесс (XIC-78)
+        services.AddSingleton<TouchpadHeavyPress>();
         // «В дорогу» временно снимает защиту (заряд до 100%) — гард бережёт 80% только когда travel выключен
         services.AddSingleton(sp =>
         {

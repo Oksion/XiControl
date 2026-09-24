@@ -137,6 +137,7 @@ public sealed class KeyRouter
             case "autobright": if (AutoBrightnessAvailable()) ToggleAutoBrightness?.Invoke(); break; // нет датчика — нечего включать
             case "hz": if (_cfg.RefreshRateFeature) CycleRefreshRate?.Invoke(); break; // фича убрана — экран не трогаем
             case "projection": Projection?.Invoke(); break;
+            case "screenshot": Screenshot?.Invoke(); break; // Win+Shift+S; и для сильного нажатия тачпада (XIC-78)
             case "settings": OpenSettings?.Invoke(); break;
             case "copilot": Copilot?.Invoke(); break;
             case "play": MediaPlayPause?.Invoke(); break;

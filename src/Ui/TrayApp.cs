@@ -318,6 +318,10 @@ public sealed class TrayApp : IDisposable
             PanelVisible = () => _panel.Visible,
         };
         _events.KeyPressed += OnKey;
+        // Сильное нажатие на тачпад (XIC-78) — назначаемое действие по тем же правилам, что у
+        // клавиш, и тем же путём: из потока касаний в UI-поток, там — роутер
+        _controller.TouchpadHeavyPressed = () => _panel.BeginInvoke(() =>
+            _router.Run(_cfg.TouchpadHeavyPressAction, _cfg.TouchpadHeavyPressCommand));
 
         // Реакция на смену темы Windows
         SystemEvents.UserPreferenceChanged += OnUserPref;
@@ -805,6 +809,8 @@ public sealed class TrayApp : IDisposable
                 SetTouchpadEdgeHaptics = _controller.SetTouchpadEdgeHaptics,
                 SetTouchpadEdgeHapticsMs = _controller.SetTouchpadEdgeHapticsMs,
                 SetTouchpadSlideStrength = _controller.SetTouchpadSlideStrength,
+                SetTouchpadHeavyPress = _controller.SetTouchpadHeavyPress,
+                SetTouchpadHeavyPressCommand = _controller.SetTouchpadHeavyPressCommand,
                 GetTouchpadHaptics = () => _controller.TouchpadHaptics,
                 SetTouchpadVibration = _controller.SetTouchpadVibration,
                 SetTouchpadPressure = _controller.SetTouchpadPressure,

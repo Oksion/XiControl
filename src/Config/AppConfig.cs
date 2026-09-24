@@ -190,6 +190,13 @@ public sealed class AppConfig
     /// PC Manager держит 250, но так щелчки отстают от пальца и ощущаются странно.</summary>
     public int TouchpadEdgeHapticsMs { get; set; } = 50;
 
+    /// <summary>Действие на сильное нажатие тачпада (XIC-78) — те же значения, что у клавиш
+    /// (*Action), плюс "screenshot". "none" — фича выключена (по умолчанию).</summary>
+    public string? TouchpadHeavyPressAction { get; set; } = "none";
+
+    /// <summary>Команда для действия "launch" (путь + аргументы), как у клавиш.</summary>
+    public string? TouchpadHeavyPressCommand { get; set; }
+
     /// <summary>
     /// Отладка: читать температуру из ACPI-термозоны, даже если Intel DPTF доступен (XIC-41).
     /// Только правкой config.json — на Intel-машине путь фолбэка иначе не прогнать, он работает

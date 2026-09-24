@@ -29,6 +29,7 @@ public sealed class AppController
     private readonly TouchpadDeadZone _deadZone;
     private readonly TouchpadEdgeSliders _edges;
     private readonly TouchpadHaptics? _haptics;
+    private readonly TouchpadHeavyPress? _heavy;
 
     private PerfMode[] _modes = [];
     private bool _autoStart;   // кэш состояния автозапуска (не дёргаем schtasks на каждое меню)
@@ -56,13 +57,14 @@ public sealed class AppController
     public Action<bool>? TouchpadToggled;      // тачпад вкл/выкл (колбэк с фонового потока!)
     public Action<bool>? TouchscreenToggled;   // сенсорный экран вкл/выкл (тоже фон)
     public Action? FirmwareFailed;             // команда прошивке не прошла — UI показывает честную ошибку
+    public Action? TouchpadHeavyPressed;       // сильное нажатие на тачпад (поток касаний!) — XIC-78
 
     public AppController(IMifsClient mifs, AppConfig cfg, IPowerEvents power, ILocalizer loc,
         ChargeGuard charge, RefreshRateGuard hz, PowerProfileGuard profiles, BrightnessCapGuard capGuard,
         AutoBrightnessGuard autoGuard, AlsWatcher als,
         TravelChargeMonitor travel, TouchpadControl touchpad, TouchscreenControl touchscreen,
         TouchpadDeadZone deadZone, TouchpadEdgeSliders edges,
-        TouchpadHaptics? haptics = null)
+        TouchpadHaptics? haptics = null, TouchpadHeavyPress? heavy = null)
     {
         _mifs = mifs;
         _cfg = cfg;
@@ -81,6 +83,8 @@ public sealed class AppController
         _deadZone = deadZone;
         _edges = edges;
         _haptics = haptics; // null в тестах: юниты не должны писать в настоящий тачпад
+        _heavy = heavy;     // тоже null в тестах — касаний настоящего тачпада там нет
+        if (_heavy is not null) _heavy.Pressed += () => TouchpadHeavyPressed?.Invoke();
         ApplyModeVisibility();
     }
 
@@ -159,6 +163,8 @@ public sealed class AppController
         // Краевые ползунки тачпада (XIC-61): реестр на старте НЕ трогаем (зоны там уже лежат
         // с прошлого включения), поднимаем только чтение касаний.
         _edges.Start();
+        // Сильное нажатие (XIC-78): то же — только чтение касаний, в тачпад на старте не пишем
+        _heavy?.Start();
 
         // «Режим совы»: восстановить после сбоя, включить заново, либо погасить, если фичу отключили
         if (_cfg.Awake && !_cfg.OwlMode) { AwakeMode.Disable(_cfg); _cfg.Awake = false; _cfg.Save(); }
@@ -187,6 +193,7 @@ public sealed class AppController
     {
         if (_cfg.Awake) { AwakeMode.Disable(_cfg); _cfg.Save(); }
         _edges.Stop();
+        _heavy?.Dispose();
     }
 
     // ---- Заряд и «в дорогу» ----
@@ -921,6 +928,25 @@ public sealed class AppController
     public void SetTouchpadEdgeHaptics(bool on)
     {
         _cfg.TouchpadEdgeHaptics = on;
+        _cfg.Save();
+    }
+
+    /// <summary>Действие на сильное нажатие тачпада (XIC-78). Смена одного действия на другое —
+    /// только конфиг; включение/выключение фичи ещё и переключает второй щелчок прошивки (0x59)
+    /// и подписку на касания — в фоне, запись в тачпад ~0,5 с.</summary>
+    public void SetTouchpadHeavyPress(string action)
+    {
+        bool was = _heavy?.Enabled ?? false;
+        _cfg.TouchpadHeavyPressAction = action;
+        _cfg.Save();
+        if (_heavy is { } heavy && heavy.Enabled != was)
+            Task.Run(() => Safe(() => { heavy.Apply(); return true; }, false));
+    }
+
+    /// <summary>Команда для действия «Запустить программу» на сильном нажатии.</summary>
+    public void SetTouchpadHeavyPressCommand(string? command)
+    {
+        _cfg.TouchpadHeavyPressCommand = command;
         _cfg.Save();
     }
 

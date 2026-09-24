@@ -239,6 +239,16 @@ public sealed class KeyRouterTests
         _hits.Should().BeEmpty();
     }
 
+    // «Скриншот» — действие для любого слота и для сильного нажатия тачпада (XIC-78);
+    // раньше был доступен только штатной клавише скриншота
+    [Fact]
+    public void Run_Screenshot_Fires()
+    {
+        _router.Run("screenshot", null);
+
+        _hits.Should().Equal("screenshot");
+    }
+
     [Fact]
     public void Run_EnabledFeatures_Fire()
     {
