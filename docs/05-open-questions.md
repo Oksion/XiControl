@@ -122,9 +122,17 @@ Get-Event -SourceIdentifier mifs | ForEach-Object { $_.SourceEventArgs.NewEvent.
    пэд **не haptic** в понимании Windows, а лежащие в HKCU `FeedbackEnabled`/`FeedbackIntensity`/
    `ClickForceSensitivity` до железа не доходят.
 
-Незакрытая ниточка на будущее: вендорский канал Bitland — feature `0xFF00/0xC5` в самой PTP-коллекции
-плюс коллекции `COL04` (`0xFF00`) / `COL05` (`0xFF01`), по 33 байта in/out. Без документации писать
-туда наугад нельзя (правило В6, как с неизвестными MIFS-командами) — только отдельной RE-задачей.
+**Дополнение (2026-09-24, XIC-77): вендорский канал разобран.** Коллекция `COL05` (`0xFF01`,
+Report ID `0x0D`, 33 байта in/out) — канал Xiaomi PC Manager к прошивке тачпада. Протокол
+восстановлен из кода `SvrCModule.dll` (PC Manager 5.8.0.74, `sc::TouchSettingManager`), а не
+угадан, и проверен на TM2424: версия прошивки из ответа (v44.25.11.0) совпала с логом PC Manager.
+Формат кадров — в `src/SystemIntegration/TouchpadHapticsProtocol.cs`. PC Manager знает ровно четыре
+команды, и все — глобальные настройки: версия прошивки `0x10`, сила вибрации `0x5D`, порог
+нажатия `0x5B` (второе значение прошивка пересчитывает сама), «сильное нажатие» `0x59`. Вибрация
+и порог сделаны (Настройки → Тачпад → «Тактильный отклик»). **Вывод этого вопроса не меняется:**
+зонального параметра для кнопки нет и там, а команды «вибрировать сейчас» (для отклика краевых
+ползунков, XIC-73) тоже нет — искать её можно только перебором ID записью вслепую, чего не
+делаем (правило В6). `COL04` (`0xFF00`, Report ID `0x0E`) — другой канал, не трогаем.
 
 Источники: [Precision touchpad tuning](https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-tuning-guidelines),
 [Input Device Haptics Implementation Guide](https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/input-haptics-implementation-guide).

@@ -48,6 +48,38 @@ public sealed class TouchpadTab : SettingsPane
         ui.AddRow(this, "settings.touchpad.edges.swap", "settings.touchpad.edges.swap.desc", swap);
 
         ui.AddNote(this, "settings.touchpad.edges.note");
+
+        // Тактильный отклик (XIC-77): живёт в самом тачпаде, поэтому показываем прочитанное из
+        // него, а не из конфига. Не ответил на старте (другая модель) — раздела нет вовсе.
+        if (act.GetTouchpadHaptics() is { } haptics)
+        {
+            ui.AddGroup(this, "settings.touchpad.haptics");
+            ui.AddRow(this, "settings.touchpad.vibration", "settings.touchpad.vibration.desc",
+                VibrationCombo(haptics.Vibration, act.SetTouchpadVibration));
+            ui.AddRow(this, "settings.touchpad.pressure", "settings.touchpad.pressure.desc",
+                PressureCombo(haptics.Pressure, act.SetTouchpadPressure));
+            ui.AddNote(this, "settings.touchpad.haptics.note");
+        }
+    }
+
+    /// <summary>Сила вибрации — три ступени PC Manager. Пара вне ступеней (выставлена чужим
+    /// софтом) показывается пустым выбором: выдумывать ей название честнее не надо.</summary>
+    private ComboBox VibrationCombo(HapticsVibration? current, Action<HapticsVibration> apply)
+    {
+        var levels = Enum.GetValues<HapticsVibration>();
+        string[] names = [.. levels.Select(l => Loc.T($"settings.touchpad.vibration.{l.ToString().ToLowerInvariant()}"))];
+        return Ui.Combo(names, current is { } c ? Array.IndexOf(levels, c) : -1, i => apply(levels[i]), Ui.Sc(170));
+    }
+
+    /// <summary>Порог нажатия: лёгкий / заводской / тугой; нестандартное значение из тачпада
+    /// (например, 120 от PC Manager) добавляется в список как есть — по образцу MmCombo.</summary>
+    private ComboBox PressureCombo(int current, Action<int> apply)
+    {
+        int[] presets = TouchpadHapticsProtocol.PressurePresets;
+        int[] values = presets.Contains(current) ? presets : [.. presets.Append(current).Order()];
+        string[] names = [.. values.Select(v => presets.Contains(v)
+            ? Loc.T($"settings.touchpad.pressure.{v}") : Loc.T("settings.touchpad.pressure.custom", v))];
+        return Ui.Combo(names, Array.IndexOf(values, current), i => apply(values[i]), Ui.Sc(170));
     }
 
     /// <summary>Чувствительность: сколько проходов вдоль края покрывают шкалу целиком.

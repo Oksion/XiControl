@@ -61,6 +61,9 @@ public sealed class SettingsActions
     public required Action<int> SetTouchpadEdgeWidthMm;       // ширина краевых полос в мм
     public required Action<int> SetTouchpadEdgeSwipes;        // чувствительность: проходов на всю шкалу
     public required Action<bool> SetTouchpadEdgeSwap;         // поменять края местами
+    public required Func<TouchpadHapticsState?> GetTouchpadHaptics; // прочитанное из тачпада; null — раздела нет (XIC-77)
+    public required Action<HapticsVibration> SetTouchpadVibration;  // сила вибрации (пишется в сам тачпад)
+    public required Action<int> SetTouchpadPressure;          // порог нажатия, единицы прошивки
     public required Action<bool> SetOwlFeature;
     public required Action<int> SetCareLimit;                // порог «беречь батарею», % (применить на железе)
     public required Action SoftChargeApplied;                // программный порог изменён — перевзвести наблюдение (XIC-74)
