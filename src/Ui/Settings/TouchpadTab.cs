@@ -79,7 +79,39 @@ public sealed class TouchpadTab : SettingsPane
             ui.AddRow(this, "settings.touchpad.pressure", "settings.touchpad.pressure.desc",
                 PressureCombo(haptics.Pressure, act.SetTouchpadPressure));
             ui.AddNote(this, "settings.touchpad.haptics.note");
+
+            // Сильное нажатие (XIC-78): порог давления и второй щелчок — прошивочные, у этого
+            // тачпада, поэтому раздел живёт там же, где вендорский канал
+            ui.AddGroup(this, "settings.touchpad.heavy");
+            AddHeavyPressSlot(cfg, act, rebuild);
+            ui.AddNote(this, "settings.touchpad.heavy.note");
         }
+    }
+
+    /// <summary>Действие на сильное нажатие — список общий с клавишами, «Запустить программу»
+    /// добавляет поле команды (как слот клавиши на вкладке «Клавиши»).</summary>
+    private void AddHeavyPressSlot(AppConfig cfg, SettingsActions act, Action rebuild)
+    {
+        string[] values = KeysTab.KeyActionValues;
+        string cur = cfg.TouchpadHeavyPressAction ?? "none";
+        int idx = Array.IndexOf(values, cur);
+        if (idx < 0) idx = Array.IndexOf(values, "none"); // неизвестное значение из конфига
+        string prev = cur;
+        Ui.AddRow(this, "settings.touchpad.heavy.action", "settings.touchpad.heavy.action.desc",
+            Ui.Combo([.. values.Select(a => Loc.T("settings.act." + a))], idx, i =>
+            {
+                string val = values[i];
+                act.SetTouchpadHeavyPress(val);
+                // пересборка — только чтобы показать/убрать поле команды
+                bool again = prev == KeysTab.Launch || val == KeysTab.Launch;
+                prev = val;
+                if (again) rebuild();
+            }, Ui.Sc(210)));
+        if (cur != KeysTab.Launch) return;
+        var tf = Ui.TextField(cfg.TouchpadHeavyPressCommand ?? "", Ui.Sc(300),
+            s => act.SetTouchpadHeavyPressCommand(string.IsNullOrWhiteSpace(s) ? null : s.Trim()));
+        tf.PlaceholderText = "\"C:\\Program Files\\App\\app.exe\" --flag";
+        Controls.Add(Ui.SubRow("settings.key.command", tf));
     }
 
     /// <summary>Сила щелчка краевых ползунков: вниз от заводской, 128 на каждом шаге — перебор.

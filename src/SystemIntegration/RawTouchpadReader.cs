@@ -26,6 +26,7 @@ public sealed class RawTouchpadReader : IDisposable
     private const uint RID_INPUT = 0x10000003, RIM_TYPEHID = 2, RIDI_PREPARSEDDATA = 0x20000005;
     private const ushort PageGeneric = 0x01, UsageX = 0x30, UsageY = 0x31;
     private const ushort PageDigitizer = 0x0D, UsageTouchPad = 0x05, UsageTipSwitch = 0x42, UsageContactId = 0x51;
+    private const ushort UsageTipPressure = 0x30, UsageConfidence = 0x47;
     private const int HidpSuccess = 0x00110000;
     private static readonly IntPtr HwndMessage = new(-3);
 
@@ -40,6 +41,11 @@ public sealed class RawTouchpadReader : IDisposable
     private volatile bool _stopping;
 
     public RawTouchpadReader(Action<IReadOnlyList<TouchContact>> onFrame) => _onFrame = onFrame;
+
+    /// <summary>Читать ли давление (XIC-78). Выключено, пока оно никому не нужно: краевым
+    /// ползункам хватает координат, и лишний разбор поля на каждый контакт каждого кадра
+    /// — это сотни вызовов в секунду впустую.</summary>
+    public volatile bool ReadPressure;
 
     /// <summary>Читаем ли мы сейчас касания.</summary>
     public bool Running => _thread is not null;
@@ -183,7 +189,8 @@ public sealed class RawTouchpadReader : IDisposable
                     // Tip Switch — это КНОПКА, а не значение: HidP_GetUsageValue на ней всегда
                     // отвечает ошибкой, и строгая проверка отбрасывала бы каждый контакт.
                     // Нажатые кнопки коллекции отдаёт HidP_GetUsages списком usage-кодов.
-                    if (!IsTouching(info.Preparsed, link, report, reportSize)) continue;
+                    var (touching, confident) = Buttons(info.Preparsed, link, report, reportSize);
+                    if (!touching) continue;
                     if (HidP_GetUsageValue(0, PageGeneric, link, UsageX, out uint x,
                             info.Preparsed, report, reportSize) != HidpSuccess) continue;
                     if (HidP_GetUsageValue(0, PageGeneric, link, UsageY, out uint y,
@@ -193,8 +200,14 @@ public sealed class RawTouchpadReader : IDisposable
                     int id = HidP_GetUsageValue(0, PageDigitizer, link, UsageContactId, out uint raw,
                         info.Preparsed, report, reportSize) == HidpSuccess ? (int)raw : link;
 
+                    // Давление (Tip Pressure) — для сильного нажатия (XIC-78). Только у контакта с
+                    // Confidence: без него прошивка считает касание ладонью, и её вес не должен
+                    // сойти за продавленный палец. Нет поля в дескрипторе — просто 0.
+                    int pressure = ReadPressure && confident && HidP_GetUsageValue(0, PageDigitizer, link, UsageTipPressure,
+                        out uint p, info.Preparsed, report, reportSize) == HidpSuccess ? (int)p : 0;
+
                     _frame.Add(new TouchContact(id,
-                        Fraction(x, info.XMin, info.XMax), Fraction(y, info.YMin, info.YMax)));
+                        Fraction(x, info.XMin, info.XMax), Fraction(y, info.YMin, info.YMax), pressure));
                 }
                 _onFrame(_frame);
             }
@@ -202,18 +215,23 @@ public sealed class RawTouchpadReader : IDisposable
         finally { pin.Free(); }
     }
 
-    // Палец на панели: ищем Tip Switch среди нажатых кнопок этой коллекции. Буфер с запасом —
-    // кнопок в PTP-коллекции единицы, а перевыделять его на каждый контакт незачем.
+    // Кнопки контакта: Tip Switch (палец на панели) и Confidence (палец, а не ладонь) — оба в
+    // списке нажатых usage-кодов коллекции. Буфер с запасом: кнопок в PTP-коллекции единицы,
+    // а перевыделять его на каждый контакт незачем.
     private readonly ushort[] _usages = new ushort[32];
 
-    private bool IsTouching(IntPtr preparsed, ushort link, byte[] report, uint reportSize)
+    private (bool Touching, bool Confident) Buttons(IntPtr preparsed, ushort link, byte[] report, uint reportSize)
     {
         uint length = (uint)_usages.Length;
         if (HidP_GetUsages(0, PageDigitizer, link, _usages, ref length, preparsed, report, reportSize) != HidpSuccess)
-            return false;
+            return (false, false);
+        bool touching = false, confident = false;
         for (uint i = 0; i < length; i++)
-            if (_usages[i] == UsageTipSwitch) return true;
-        return false;
+        {
+            touching |= _usages[i] == UsageTipSwitch;
+            confident |= _usages[i] == UsageConfidence;
+        }
+        return (touching, confident);
     }
 
     private static double Fraction(uint raw, int min, int max) =>

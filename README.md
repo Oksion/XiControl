@@ -266,7 +266,7 @@ touchscreen, refresh-rate control), Battery (charge threshold with a hint, "trav
 lock-screen sound and toast, charger-wattage OSD, "weak PSU" threshold, battery health), Display
 (brightness limit and memory; auto refresh rate, "Keep refresh rate" and the rates — the section is
 hidden if refresh-rate control is off), Touchpad (bottom dead zone, edge sliders, vibration
-strength and click force), Performance (mode visibility,
+strength and click force, force press), Performance (mode visibility,
 separately for AC and battery, with a switch above the list; startup mode, power profiles),
 Keys (remapping), Notifications (where popups appear, how long
 they stay, which lock-key popups to show), HTTP API (port, token, permissions) and About
@@ -603,6 +603,14 @@ The values live in the touchpad itself, so they survive sleep and reboots and ar
 checking every write by reading it back. On a laptop with a different touchpad the section
 simply doesn't appear.
 
+**Force press.** Press the touchpad noticeably harder than a normal click to run any action —
+the same list as for keys, plus "Screenshot (Win+Shift+S)" (Settings → Touchpad → "Force press",
+`TouchpadHeavyPressAction` in `config.json`). Like in Xiaomi PC Manager, where it takes a
+screenshot. The press is recognised from the finger pressure the touchpad already reports
+(normal click ≈ 130, force press ≈ 1000, threshold 500), and while the action is on the firmware
+clicks a second time so you feel it went through. The normal click still happens as well. With
+"No action" nothing extra runs: pressure isn't even parsed.
+
 ### Key remapping
 
 Each key gets its own action: **Settings → Keys**. The slots are the single click, double click and
@@ -638,9 +646,9 @@ never touches: disable the touchscreen in Device Manager and it stays that way.
   the launched program inherits them.
 
 In `config.json` these are `*Action`/`*Command` pairs (`MiClick`, `MiDouble`, `MiHold`,
-`SettingsKey`, `AiKey`, `ProjKey`); action values: `modes`, `charge`, `panel`, `owl`, `monitor`,
-`touchpad`, `touchscreen`, `autobright`, `hz`, `travel`, `projection`, `settings`, `copilot`, `play`, `next`, `prev`,
-`stop`, `calc`, `launch`, `none`:
+`SettingsKey`, `AiKey`, `ProjKey`, and `TouchpadHeavyPress` for a force press); action values:
+`modes`, `charge`, `panel`, `owl`, `monitor`, `touchpad`, `touchscreen`, `autobright`, `hz`, `travel`,
+`projection`, `screenshot`, `settings`, `copilot`, `play`, `next`, `prev`, `stop`, `calc`, `launch`, `none`:
 
 ```json
 "MiClickAction": "modes",

@@ -59,6 +59,17 @@ public sealed class TouchpadHapticsProtocolTests
         ParseResponse(Padded("0D 04 51 00 50 00"), 1).Should().Equal(80); // заводское
     }
 
+    // второй щелчок на сильном нажатии 0x59 (XIC-78): включение — кадр, который тачпад принял
+    // и вернул 1; до включения читалось заводское 2
+    [Fact]
+    public void Heavy_press_frames_match_live_bytes()
+    {
+        WriteFrame(CmdHeavyPress, [HeavyPressOn]).Should().Equal(Padded("0D 09 5C 00 00 03 00 00 59 01 00"));
+        CommitFrame(CmdHeavyPress).Should().Equal(Padded("0D 09 FE 01 00 03 00 00 01 59 A7"));
+        ParseResponse(Padded("0D 04 02 00 01 00"), 1).Should().Equal(HeavyPressOn);
+        ParseResponse(Padded("0D 04 03 00 02 00"), 1).Should().Equal(HeavyPressOff);
+    }
+
     [Fact]
     public void Read_request_matches_ReadMotorGears() =>
         ReadRequest(CmdVibration, 2).Should().Equal(Padded("0D 07 5A 01 00 01 00 04 5D"));

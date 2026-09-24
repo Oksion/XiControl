@@ -42,7 +42,9 @@ public sealed class TouchpadEdgeSliders : IDisposable
     private readonly AppConfig _cfg;
     private readonly TouchpadControl _pad;
     private TouchpadEdgeGesture _gesture;
-    private readonly RawTouchpadReader _reader;
+    private readonly TouchpadInput _input;
+    private readonly bool _ownsInput;  // свой источник только в тестах — общий диспоузит DI
+    private bool _attached;            // подписаны и держим читатель (Start/Stop зовутся парами не всегда)
     private readonly Action<int> _volume;
     private readonly Action<int> _brightness;
     private EdgeSlideScale _scale;
@@ -64,7 +66,7 @@ public sealed class TouchpadEdgeSliders : IDisposable
 
     public TouchpadEdgeSliders(AppConfig cfg, TouchpadControl pad,
         Action<int>? volume = null, Action<int>? brightness = null, IAppTimer? pump = null,
-        TouchpadHaptics? haptics = null)
+        TouchpadHaptics? haptics = null, TouchpadInput? input = null)
     {
         _cfg = cfg;
         _pad = pad;
@@ -74,7 +76,10 @@ public sealed class TouchpadEdgeSliders : IDisposable
         _gesture = new TouchpadEdgeGesture(WidthFraction(cfg), EdgeSlideScale.StepFraction);
         _scale = new EdgeSlideScale(cfg.TouchpadEdgeSwipesPerRange);
         // дальше их пересобирает Reconfigure — настройки живут не только на старте
-        _reader = new RawTouchpadReader(OnFrame);
+        // Касания — из общего источника (XIC-78): читатель у процесса может быть только один,
+        // его делят с сильным нажатием
+        _ownsInput = input is null;
+        _input = input ?? new TouchpadInput();
 
         // Применение вынесено с потока чтения намеренно. Первая версия звала WMI прямо в
         // обработчике кадра: синхронный Brightness.Get на каждый шаг плюс Task.Run на каждую
@@ -102,7 +107,12 @@ public sealed class TouchpadEdgeSliders : IDisposable
         // Apply перезапускал чтение, но считали его прежние объекты со старыми числами.
         Reconfigure();
         if (!_cfg.TouchpadEdgeSliders || !Available) return;
-        _reader.Start();
+        if (!_attached)
+        {
+            _input.Frame += OnFrame;
+            _input.Acquire();
+            _attached = true;
+        }
         _pump.Start();
     }
 
@@ -110,7 +120,12 @@ public sealed class TouchpadEdgeSliders : IDisposable
     public void Stop()
     {
         _pump.Stop();
-        _reader.Stop();
+        if (_attached)
+        {
+            _input.Frame -= OnFrame;
+            _input.Release();
+            _attached = false;
+        }
         _gesture.Reset();
         ResetPending();
     }
@@ -299,7 +314,8 @@ public sealed class TouchpadEdgeSliders : IDisposable
 
     public void Dispose()
     {
+        Stop();
         _pump.Dispose();
-        _reader.Dispose();
+        if (_ownsInput) _input.Dispose();
     }
 }

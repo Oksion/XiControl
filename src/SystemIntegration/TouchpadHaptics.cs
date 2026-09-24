@@ -55,6 +55,14 @@ public sealed class TouchpadHaptics
     public bool SetSlide(int strength) =>
         Write(CmdSlide, [(ushort)strength], v => v[0] == strength);
 
+    /// <summary>Второй щелчок прошивки на сильном нажатии (команда 0x59, XIC-78) — тактильное
+    /// «продавлено». Живёт в тачпаде, как остальные настройки.</summary>
+    public bool SetHeavyPress(bool on)
+    {
+        ushort value = on ? HeavyPressOn : HeavyPressOff;
+        return Write(CmdHeavyPress, [value], v => v[0] == value);
+    }
+
     /// <summary>Один щелчок мотора (XIC-73). Зовётся на шаге краевого ползунка, поэтому не
     /// ждёт: если в этот момент идёт запись настроек (~0,5 с), щелчок просто пропускается —
     /// жест важнее отклика. false — не отправлен.</summary>
