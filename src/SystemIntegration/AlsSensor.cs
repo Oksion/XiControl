@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
+using XiControl.Config;
 
 namespace XiControl.SystemIntegration;
 
@@ -15,19 +17,54 @@ namespace XiControl.SystemIntegration;
 /// Люксы снимает лёгким опросом (GetCurrentReading раз в 1.5 с — локальный вызов, дёшево)
 /// выделенный фоновый MTA-поток, живущий до Dispose; дедуп по значению превращает опрос
 /// в события. На машине без датчика Start молча не взводится — фича скрыта.
+///
+/// Драйверу не доверяем: после сна он подмешивает в поток нули и «половинки» (XIC-76), поэтому
+/// наружу идут не сырые чтения, а уровень, прошедший <see cref="LuxGate"/>. Для разбора таких
+/// историй — трассировка сырого потока (<see cref="AlsTrace"/>, поле AlsTrace в config.json).
 /// </summary>
 public sealed class AlsWatcher : IDisposable
 {
     private const int PollMs = 1500;
+    private const int HeartbeatPolls = 40; // сводка трассировки раз в ~минуту
     private const string ClassName = "Windows.Devices.Sensors.LightSensor";
 
     /// <summary>Освещённость изменилась (фоновый поток!). Отрицательных значений не бывает.</summary>
     public event Action<float>? LuxChanged;
 
+    private readonly AppConfig? _cfg;
+    private readonly IPowerEvents? _power;
+    private readonly LuxGate _gate = new();
+    private readonly object _pollLock = new(); // Poll зовут двое: цикл опроса и колбэк события
+    private long _lastTs;                      // метка последнего чтения — свежее ли оно (для трассировки)
+    private int _events, _fresh;               // счётчики сводки трассировки
+    private float _tracedLevel = float.NaN;    // последний уровень, о котором написали в трассировку
     private Thread? _thread;
     private readonly ManualResetEventSlim _stop = new();
     private volatile bool _started;
     private volatile bool _disposed;
+
+    /// <summary>Оба параметра опциональны: без конфига нет трассировки, без событий питания —
+    /// паузы после сна (тесты собирают watcher голым, COM трогает только Start).</summary>
+    public AlsWatcher(AppConfig? cfg = null, IPowerEvents? power = null)
+    {
+        _cfg = cfg;
+        _power = power;
+        if (_power is not null) _power.PowerModeChanged += OnPowerModeChanged;
+    }
+
+    private bool Tracing => _cfg?.AlsTrace == true;
+
+    // После сна драйвер перезапускает сенсор, а переходный процесс старта — главный подозреваемый
+    // в мусоре (XIC-76): даём ему отстояться той же паузой, что и при нашем старте.
+    private void OnPowerModeChanged(PowerModes mode)
+    {
+        if (mode is not (PowerModes.Resume or PowerModes.Suspend)) return;
+        lock (_pollLock)
+        {
+            if (mode == PowerModes.Resume) _gate.Restart(Environment.TickCount64);
+            if (Tracing) AlsTrace.Write(mode == PowerModes.Resume ? "== выход из сна: пауза ворот" : "== уход в сон");
+        }
+    }
 
     /// <summary>Есть ли датчик (после Start; до — false).</summary>
     public bool Available => _started;
@@ -75,17 +112,25 @@ public sealed class AlsWatcher : IDisposable
             // остаётся страховкой на случай, если события в elevated-процессе не доедут.
             _ = sensor.GetMinimumReportInterval(out uint minMs);
             _ = sensor.PutReportInterval(Math.Max(minMs, 1000));
-            var sink = new ReadingSink(() => Poll(sensor));
+            var sink = new ReadingSink(() => Poll(sensor, fromEvent: true));
             long token = 0;
             int hrSub = sensor.AddReadingChanged(sink, out token);
             if (hrSub < 0) Log.Write($"AlsWatcher: подписка ReadingChanged не удалась (0x{hrSub:X8}) — остаёмся на опросе");
 
+            lock (_pollLock)
+            {
+                _gate.Restart(Environment.TickCount64); // наш старт — тоже перезапуск сенсора
+                if (Tracing) AlsTrace.Write($"== старт: интервал {Math.Max(minMs, 1000)} мс (мин. {minMs}), подписка {(hrSub < 0 ? $"НЕ удалась 0x{hrSub:X8}" : "есть")}");
+            }
+
             _started = true;
             ready?.Invoke(true);
 
+            int polls = 0;
             do
             {
-                Poll(sensor);
+                Poll(sensor, fromEvent: false);
+                if (++polls % HeartbeatPolls == 0) Heartbeat();
             }
             while (!_stop.Wait(PollMs)); // поток-хозяин: умрёт он — умрут квартира, RCW и подписка
 
@@ -99,23 +144,61 @@ public sealed class AlsWatcher : IDisposable
         }
     }
 
-    private void Poll(ILightSensor sensor)
+    private void Poll(ILightSensor sensor, bool fromEvent)
     {
         try
         {
             if (sensor.GetCurrentReading(out ILightSensorReading? reading) < 0 || reading is null) return;
             if (reading.GetIlluminanceInLux(out float lux) < 0 || lux < 0) return;
-            // шлём КАЖДЫЙ сэмпл, без дедупа: медианному фильтру авто-яркости нужен равномерный
-            // поток (дедуп исказил бы взвешивание по времени); подписчикам события дёшевы
-            LastLux = lux;
-            if (!_disposed) LuxChanged?.Invoke(lux);
+            _ = reading.GetTimestamp(out long ts); // не отдал — 0: для трассировки не беда
+
+            float level;
+            lock (_pollLock)
+            {
+                level = _gate.Accept(Environment.TickCount64, lux);
+                bool fresh = ts != _lastTs;
+                _lastTs = ts;
+                if (fromEvent) _events++;
+                if (fresh) _fresh++;
+                // копии кэша на ровном свету не пишем — иначе файл распухнет ни о чём
+                if (Tracing && (fresh || fromEvent))
+                    AlsTrace.Write($"{(fromEvent ? "событие" : "опрос  ")} {lux,8:0.#} лк  ts={Stamp(ts)}{(fresh ? "" : " (копия)")}  → {(float.IsNaN(level) ? "—" : $"{level:0.#}")}");
+                // решение ворот видно и тогда, когда его принесла копия (её строку не пишем)
+                if (!float.IsNaN(level) && !LuxGate.Same(level, _tracedLevel))
+                {
+                    if (Tracing) AlsTrace.Write($"== ворота приняли уровень {level:0.#} лк (был {(float.IsNaN(_tracedLevel) ? "—" : $"{_tracedLevel:0.#}")})");
+                    _tracedLevel = level;
+                }
+            }
+            if (float.IsNaN(level)) return; // ворота ещё не приняли ни одного уровня
+
+            // шлём КАЖДЫЙ сэмпл, без дедупа по значению: медианному фильтру авто-яркости нужен
+            // равномерный поток (дедуп исказил бы взвешивание по времени) — ворота поток не
+            // прореживают, а лишь держат прежний уровень, пока новый не подтвердится
+            LastLux = level;
+            if (!_disposed) LuxChanged?.Invoke(level);
         }
         catch (Exception ex) { Log.Ex("AlsWatcher.Poll", ex); }
     }
 
+    // Сводка раз в минуту: живы ли события после сна — главный вопрос шага 0 XIC-76
+    private void Heartbeat()
+    {
+        lock (_pollLock)
+        {
+            if (Tracing) AlsTrace.Write($"-- за минуту: событий {_events}, свежих чтений {_fresh}");
+            _events = _fresh = 0;
+        }
+    }
+
+    // DateTime.UniversalTime WinRT = FILETIME (тики с 1601 года, UTC)
+    private static string Stamp(long universalTime) =>
+        universalTime <= 0 ? "?" : $"{DateTime.FromFileTimeUtc(universalTime).ToLocalTime():HH:mm:ss.fff}";
+
     public void Dispose()
     {
         _disposed = true;
+        if (_power is not null) _power.PowerModeChanged -= OnPowerModeChanged;
         _stop.Set(); // поток-хозяин завершится и отпустит датчик
     }
 
@@ -192,5 +275,110 @@ public sealed class AlsWatcher : IDisposable
         [PreserveSig] int GetTrustLevel(out int level);                  // IInspectable
         [PreserveSig] int GetTimestamp(out long universalTime);          // get_Timestamp (DateTime.UniversalTime)
         [PreserveSig] int GetIlluminanceInLux(out float lux);            // get_IlluminanceInLux
+    }
+}
+
+/// <summary>
+/// Ворота потока люксов (XIC-76): наружу идёт не сырое чтение, а уровень, который ПРОДЕРЖАЛСЯ.
+///
+/// Драйвер датчика на TM2424 после сна подмешивает в поток нули и «половинки» (проба: 181 → 92 →
+/// 0 → 181, у каждого своя свежая метка времени, мусор живёт 1–2 с). Медиана «инерции» тут
+/// бессильна: мусора набегает около половины окна, она прыгает между 0 и 180, экран мигает.
+///
+/// Правило: <b>отклонение от текущего уровня принимается, только если продержалось
+/// <see cref="ConfirmMs"/></b>. Подтверждать надо именно временем, а не числом чтений: датчик
+/// выдаёт новое чтение лишь при смене света, и в погасшей комнате придёт одно «0», а дальше —
+/// копии с замершей меткой. Эти копии и есть подтверждение («значение всё ещё такое»), поэтому
+/// ворота смотрят на значение, а не на метку. Порог по малости значения (как MIN_PLAUSIBLE_LUX
+/// у micontrol) не годится — честные 0 лк в тёмной комнате бывают.
+///
+/// Пока отклонение не подтверждено, наружу отдаётся ПРЕЖНИЙ уровень: медианное окно
+/// авто-яркости взвешивает свет по времени (docs/13 §8), и дырки в потоке обесценили бы
+/// инерцию. После (пере)запуска сенсора — наш старт, выход из сна — ворота <see cref="SettleMs"/>
+/// не принимают ничего: переходный процесс старта — главный подозреваемый в мусоре.
+///
+/// Время передаётся снаружи (мс, монотонно) — ворота чистые, под тестами.
+/// </summary>
+public sealed class LuxGate
+{
+    /// <summary>Сколько отклонение должно продержаться. Самый долгий мусор в пробе — 2 с.</summary>
+    public const int ConfirmMs = 3000;
+
+    /// <summary>Пауза после (пере)запуска сенсора.</summary>
+    public const int SettleMs = 3000;
+
+    // ±25 % — порядок гистерезиса авто-яркости по умолчанию (0.1 в лог-шкале ≈ 26 %): мельче —
+    // дрожание датчика, а не смена условий. Пол в 1 лк держит околонулевые значения.
+    private const float Tolerance = 0.25f;
+
+    private float _level = float.NaN;     // принятый уровень
+    private float _candidate = float.NaN; // отклонение, ждущее подтверждения
+    private long _since;                  // с какого момента кандидат держится
+    private long _quietUntil = long.MinValue;
+
+    /// <summary>Считаем ли два чтения «одним и тем же светом».</summary>
+    public static bool Same(float a, float b) =>
+        Math.Abs(a - b) <= Math.Max(1f, Tolerance * Math.Max(a, b));
+
+    /// <summary>Сенсор (пере)запущен: <see cref="SettleMs"/> чтения не принимаются,
+    /// недоподтверждённый кандидат забывается. Принятый уровень остаётся.</summary>
+    public void Restart(long nowMs)
+    {
+        _quietUntil = nowMs + SettleMs;
+        _candidate = float.NaN;
+    }
+
+    /// <summary>Пропустить чтение. Возврат — уровень для потребителей (само чтение либо
+    /// удержанный прежний); NaN — ни один уровень ещё не принят.</summary>
+    public float Accept(long nowMs, float lux)
+    {
+        if (nowMs < _quietUntil) return _level;
+
+        if (!float.IsNaN(_level) && Same(lux, _level))
+        {
+            _candidate = float.NaN;
+            return _level = lux;              // свет прежний — плавный дрейф идёт без задержки
+        }
+        if (float.IsNaN(_candidate) || !Same(lux, _candidate))
+        {
+            _candidate = lux;                 // новое отклонение: засекаем, наружу — прежний
+            _since = nowMs;
+            return _level;
+        }
+        _candidate = lux;
+        if (nowMs - _since < ConfirmMs) return _level;
+
+        _candidate = float.NaN;               // продержалось — свет правда изменился
+        return _level = lux;
+    }
+}
+
+/// <summary>
+/// Трассировка сырого потока датчика в als-trace.txt рядом с log.txt (диагностика XIC-76,
+/// включается полем AlsTrace в config.json). Отдельный файл, а не log.txt: при мусоре поток
+/// идёт ~раз в секунду и за час вытеснил бы из общего лога всё остальное.
+/// </summary>
+internal static class AlsTrace
+{
+    private const long MaxBytes = 1024 * 1024;
+    private static readonly object Sync = new();
+
+    private static string Path_ => Path.Combine(AppPaths.DataDir, "als-trace.txt");
+
+    public static void Write(string message)
+    {
+        try
+        {
+            lock (Sync)
+            {
+                string path = Path_;
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                // ротация переименованием, а не удалением: свежий сон не должен пропасть целиком
+                if (File.Exists(path) && new FileInfo(path).Length > MaxBytes)
+                    File.Move(path, Path.ChangeExtension(path, ".old.txt"), overwrite: true);
+                File.AppendAllText(path, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}");
+            }
+        }
+        catch { /* диагностика не должна ронять приложение */ }
     }
 }

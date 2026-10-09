@@ -301,6 +301,11 @@ public sealed class AppConfig
     /// (только config.json). Сбрасывается блокировкой, сном и сменой питания.</summary>
     public int AutoBrightnessRevertBackoffMin { get; set; } = 120;
 
+    /// <summary>Диагностика датчика освещённости (только config.json, XIC-76): сырой поток
+    /// люксов с метками времени, источником (опрос/событие) и отметками сна — в als-trace.txt
+    /// рядом с log.txt. Читается на лету, но файл конфига перечитывается только при запуске.</summary>
+    public bool AlsTrace { get; set; }
+
     /// <summary>Запомненная яркость экрана (0–100) от сети; null — ещё не запомнена.</summary>
     public int? AcBrightness { get; set; }
 
