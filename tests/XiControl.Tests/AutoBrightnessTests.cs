@@ -606,6 +606,13 @@ public sealed class AutoBrightnessTests
         gate.Accept(t + 2000 + LuxGate.SettleMs + LuxGate.ConfirmMs, 0).Should().Be(0);
     }
 
+    [Theory]
+    [InlineData(1_500, false)]   // обычный проход цикла
+    [InlineData(9_000, false)]   // тяжёлый затык планировщика — ещё не сон
+    [InlineData(136_000, true)]  // Modern Standby 18:39:51 → 18:42:07 из трассировки
+    public void AlsWatcher_SleepGap_DetectedByPollPause(int gapMs, bool slept) =>
+        AlsWatcher.IsSleepGap(TimeSpan.FromMilliseconds(gapMs)).Should().Be(slept);
+
     // ---- Медианный фильтр («инерция») ----
 
     [Fact]

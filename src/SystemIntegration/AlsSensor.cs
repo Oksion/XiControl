@@ -55,7 +55,8 @@ public sealed class AlsWatcher : IDisposable
     private bool Tracing => _cfg?.AlsTrace == true;
 
     // После сна драйвер перезапускает сенсор, а переходный процесс старта — главный подозреваемый
-    // в мусоре (XIC-76): даём ему отстояться той же паузой, что и при нашем старте.
+    // в мусоре (XIC-76): даём ему отстояться той же паузой, что и при нашем старте. Событие
+    // доходит не всегда (короткий Modern Standby — нет), основной признак сна — IsSleepGap.
     private void OnPowerModeChanged(PowerModes mode)
     {
         if (mode is not (PowerModes.Resume or PowerModes.Suspend)) return;
@@ -127,8 +128,12 @@ public sealed class AlsWatcher : IDisposable
             ready?.Invoke(true);
 
             int polls = 0;
+            DateTime prev = DateTime.UtcNow;
             do
             {
+                DateTime now = DateTime.UtcNow;
+                if (IsSleepGap(now - prev)) OnSleepGap(now - prev);
+                prev = now;
                 Poll(sensor, fromEvent: false);
                 if (++polls % HeartbeatPolls == 0) Heartbeat();
             }
@@ -179,6 +184,26 @@ public sealed class AlsWatcher : IDisposable
             if (!_disposed) LuxChanged?.Invoke(level);
         }
         catch (Exception ex) { Log.Ex("AlsWatcher.Poll", ex); }
+    }
+
+    /// <summary>Порог «машина спала»: цикл просыпается раз в 1.5 с, и даже тяжёлый затык
+    /// планировщика до 10 с не дотягивает.</summary>
+    public const int SleepGapMs = 10_000;
+
+    /// <summary>Спала ли машина между двумя проходами цикла опроса. Свой признак сна, а не
+    /// событие Resume: на коротком Modern Standby SystemEvents его не доставляет (проверено
+    /// трассировкой на TM2424, XIC-76), а процесс при этом замораживается. Часы — настенные:
+    /// они идут при любом виде сна; сдвиг времени синхронизацией даст ложное срабатывание,
+    /// но его цена — лишь 3 с паузы ворот.</summary>
+    public static bool IsSleepGap(TimeSpan sincePrevPoll) => sincePrevPoll.TotalMilliseconds > SleepGapMs;
+
+    private void OnSleepGap(TimeSpan gap)
+    {
+        lock (_pollLock)
+        {
+            _gate.Restart(Environment.TickCount64);
+            if (Tracing) AlsTrace.Write($"== опрос стоял {gap.TotalSeconds:0} с — машина спала: пауза ворот");
+        }
     }
 
     // Сводка раз в минуту: живы ли события после сна — главный вопрос шага 0 XIC-76
