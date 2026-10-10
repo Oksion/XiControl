@@ -514,6 +514,144 @@ public sealed class AutoBrightnessTests
         _ramps.Should().BeEmpty();
     }
 
+    // ---- Ворота потока люксов (XIC-76) ----
+
+    // Ворота, уже принявшие уровень: старт, пауза, кандидат продержался.
+    private static LuxGate GateAt(float lux, out long now)
+    {
+        var gate = new LuxGate();
+        gate.Restart(0);
+        for (now = LuxGate.SettleMs; now <= LuxGate.SettleMs + LuxGate.ConfirmMs; now += 1500)
+            gate.Accept(now, lux);
+        gate.Accept(now, lux).Should().Be(lux, "предусловие: уровень принят");
+        return gate;
+    }
+
+    [Fact]
+    public void LuxGate_FirstLevel_NeedsSettleAndConfirm()
+    {
+        var gate = new LuxGate();
+        gate.Restart(0);
+
+        gate.Accept(1000, 180).Should().Be(float.NaN, "пауза после старта сенсора");
+        gate.Accept(LuxGate.SettleMs, 180).Should().Be(float.NaN, "первое значение — тоже кандидат");
+        gate.Accept(LuxGate.SettleMs + LuxGate.ConfirmMs, 180).Should().Be(180, "продержалось — принято");
+    }
+
+    // Живая запись с TM2424 после сна: 92 и 0 со свежими метками, мусор живёт 1–2 с.
+    [Fact]
+    public void LuxGate_PostResumeGarbage_NeverReachesConsumer()
+    {
+        var gate = GateAt(181, out long t);
+
+        gate.Accept(t + 1000, 92).Should().Be(181);
+        gate.Accept(t + 2000, 0).Should().Be(181);
+        gate.Accept(t + 3000, 0).Should().Be(181, "ноль держится лишь 1 с из нужных 3");
+        gate.Accept(t + 4000, 181).Should().Be(181);
+    }
+
+    [Fact]
+    public void LuxGate_SteadyAlternation_StaysOnLevel()
+    {
+        var gate = GateAt(181, out long t);
+
+        // худший случай из лога: мусор ~50 % потока, чередование каждую секунду, 5 минут
+        for (int i = 1; i <= 300; i++)
+            gate.Accept(t + i * 1000, i % 2 == 0 ? 0 : 181).Should().Be(181);
+    }
+
+    // Датчик шлёт новое чтение лишь при смене света: в погасшей комнате — одно «0»,
+    // дальше опрос видит его копию. Подтверждение обязано прийти временем.
+    [Fact]
+    public void LuxGate_RealDarkness_FrozenReading_AcceptedByTime()
+    {
+        var gate = GateAt(180, out long t);
+
+        gate.Accept(t + 1500, 0).Should().Be(180, "одиночный ноль неотличим от мусора");
+        gate.Accept(t + 3000, 0).Should().Be(180);
+        gate.Accept(t + 4500, 0).Should().Be(0, "ноль продержался 3 с — свет правда погас");
+        gate.Accept(t + 6000, 0).Should().Be(0);
+    }
+
+    [Fact]
+    public void LuxGate_SlowDrift_PassesWithoutDelay()
+    {
+        var gate = GateAt(200, out long t);
+
+        // сумерки: каждое чтение в пределах допуска от предыдущего
+        gate.Accept(t + 1500, 185).Should().Be(185);
+        gate.Accept(t + 3000, 165).Should().Be(165);
+        gate.Accept(t + 4500, 140).Should().Be(140);
+    }
+
+    [Fact]
+    public void LuxGate_RealJump_ArrivesAfterConfirm()
+    {
+        var gate = GateAt(200, out long t);
+
+        gate.Accept(t + 1500, 1500).Should().Be(200, "включили яркий свет — ждём подтверждения");
+        gate.Accept(t + 3000, 1450).Should().Be(200, "кандидат держится (в допуске)");
+        gate.Accept(t + 4500, 1520).Should().Be(1520, "3 с — принято");
+    }
+
+    // Ночная трассировка 10.10: крышку закрыли в темноте (0 лк), открыли утром — первые 8 с
+    // после пробуждения датчик нёс 836 → 457 → 10 → 55 → 10 → 2 → 4 → 37, затем устоялся 48.
+    [Fact]
+    public void LuxGate_Restart_ForgetsStaleLevel_AndRejectsWakeTransient()
+    {
+        var gate = GateAt(0, out long t);
+
+        gate.Restart(t);
+        float[] transient = [836, 457, 10, 55, 10, 2, 4, 37];
+        for (int i = 0; i < transient.Length; i++)
+            gate.Accept(t + i * 1000, transient[i]).Should().Be(float.NaN,
+                "темнота до сна устарела, а мусор старта не подтверждается — наружу ничего");
+
+        gate.Accept(t + 8000, 48).Should().Be(float.NaN);
+        gate.Accept(t + 8000 + LuxGate.ConfirmMs, 48).Should().Be(48, "свежий свет продержался 3 с");
+    }
+
+    // ---- Забыть свет после сна (XIC-76) ----
+
+    // Трассировка 10.10: через секунду после пробуждения пересчёт по разблокировке увёл экран
+    // «46% → 10% (0 лк)» — по темноте, в которой крышку закрыли вечером.
+    [Fact]
+    public void Guard_ForgetLux_WakeEvaluateDoesNotUseStaleDarkness()
+    {
+        using var g = NewGuard();
+        g.OnLux(0);
+        _settle.Fire();                  // вечер: под темноту уже подстроились
+        _ramps.Clear();
+        _brightness = 46;                // утром яркость другая
+
+        g.ForgetLux();                   // проснулись
+        g.Evaluate();                    // пересчёт по разблокировке
+
+        _ramps.Should().BeEmpty("свет неизвестен — экран не трогаем");
+        _settle.Running.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Guard_ForgetLux_FirstFreshLevel_IsSignificantEvenIfSameAsBefore()
+    {
+        using var g = NewGuard();
+        g.OnLux(0);
+        _settle.Fire();
+        g.ForgetLux();
+
+        // свет тот же, что до сна, но яркость за ночь могли поменять — сверка обязана случиться
+        g.OnLux(0);
+
+        _settle.Running.Should().BeTrue("база гистерезиса сброшена вместе со светом");
+    }
+
+    [Theory]
+    [InlineData(1_500, false)]   // обычный проход цикла
+    [InlineData(9_000, false)]   // тяжёлый затык планировщика — ещё не сон
+    [InlineData(136_000, true)]  // Modern Standby 18:39:51 → 18:42:07 из трассировки
+    public void AlsWatcher_SleepGap_DetectedByPollPause(int gapMs, bool slept) =>
+        AlsWatcher.IsSleepGap(TimeSpan.FromMilliseconds(gapMs)).Should().Be(slept);
+
     // ---- Медианный фильтр («инерция») ----
 
     [Fact]
