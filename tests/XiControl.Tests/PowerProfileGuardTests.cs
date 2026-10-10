@@ -26,10 +26,10 @@ public sealed class PowerProfileGuardTests
     // Лимит и авто-яркость на фейках: без WMI-чтений и без реальных таймеров (сами они
     // проверяются своими тестами, здесь — лишь обязательные зависимости guard-а профилей)
     private BrightnessCapGuard NewCap(AppConfig cfg) =>
-        new(cfg, _power, new FakeTimer(), new FakeTimer(), () => null, (_, _, _) => { }, _ => false);
+        new(cfg, _power, new FakeTimer(), new FakeTimer(), () => null, (_, _, _) => Task.CompletedTask, _ => false);
 
     private AutoBrightnessGuard NewAuto(AppConfig cfg) =>
-        new(cfg, _power, new FakeTimer(), new FakeTimer(), () => null, (_, _, _) => { }, _ => false, (l, _) => l);
+        new(cfg, _power, new FakeTimer(), new FakeTimer(), () => null, (_, _, _) => Task.CompletedTask, _ => false, (l, _) => l);
 
     [Fact]
     public void Reapply_OnAc_AppliesAcMode()

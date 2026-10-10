@@ -216,7 +216,7 @@ public sealed class AutoBrightnessTests
         if (_cfg.AutoBrightnessPointsBattery.Count == 0)
             _cfg.AutoBrightnessPointsBattery.AddRange(BrightnessCurve.DefaultPoints());
         return new AutoBrightnessGuard(_cfg, _power, _settle, _learn,
-            () => _brightness, (f, t, _) => _ramps.Add((f, t)), _ => _adaptive, (l, _) => l, clock,
+            () => _brightness, (f, t, _) => { _ramps.Add((f, t)); return Task.CompletedTask; }, _ => _adaptive, (l, _) => l, clock,
             _converge, _backoff);
     }
 
@@ -710,7 +710,7 @@ public sealed class AutoBrightnessTests
         _cfg.AutoBrightnessPointsAc.AddRange(BrightnessCurve.DefaultPoints());
         _cfg.AutoBrightnessPointsBattery.AddRange(BrightnessCurve.DefaultPoints());
         using var g = new AutoBrightnessGuard(_cfg, _power, _settle, _learn,
-            () => _brightness, (f, t, _) => _ramps.Add((f, t)), _ => false,
+            () => _brightness, (f, t, _) => { _ramps.Add((f, t)); return Task.CompletedTask; }, _ => false,
             (level, _) => Math.Min(level, 70)); // лимит яркости как фильтр на выходе
 
         g.OnLux(2000); // кривая хочет 100

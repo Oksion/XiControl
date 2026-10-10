@@ -80,17 +80,19 @@ public static class Brightness
     /// непрерывная, проверено на TM2424). Весь путь занимает ~<paramref name="durationMs"/>
     /// независимо от дельты. Идёт в фоне: WmiSetBrightness небыстрый, спуск на 30% — 30 вызовов,
     /// UI-поток их не ждёт. Отмена — пользователь схватил ползунок или сменились условия.
+    /// Возвращает задачу хода: токен нужен ходу до последнего шага, поэтому владелец
+    /// (RampSlot) освобождает источник отмены только по её завершении.
     /// </summary>
-    public static void Ramp(int from, int to, int durationMs, CancellationToken ct)
+    public static Task Ramp(int from, int to, int durationMs, CancellationToken ct)
     {
         from = Math.Clamp(from, 0, 100);
         to = Math.Clamp(to, 0, 100);
         int delta = Math.Abs(from - to);
-        if (delta == 0) return;
+        if (delta == 0) return Task.CompletedTask;
         int interval = Math.Max(30, durationMs / delta); // пол на случай кривого config.json
         int step = to > from ? 1 : -1;
         Own.NoteStep(from); // запоздалое событие исходного уровня во время хода — эхо, не действие человека
-        Task.Run(() =>
+        return Task.Run(() =>
         {
             try
             {
