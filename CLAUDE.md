@@ -208,7 +208,10 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   (события питания и экрана за швами, одно скрытое окно-маршалер), `IAppTimer`/`UiTimer`/
   `WorkerTimer` (пул-таймер для логики вне UI-потока: WinForms-таймер, стартованный с потока
   WMI-событий, не тикает никогда),
-  `Brightness` (WMI ACPI-подсветка: `Get`/`Apply`/`Ramp`-плавный ход; `Own` — метки своих записей
+  `Brightness` (WMI ACPI-подсветка: `Get`/`Apply`/`Ramp`-плавный ход; ход отменяется через
+  `RampSlot` — общий для лимита и авто-яркости: новый ход отменяет прежний, а источник отмены
+  освобождается только по завершении задачи хода, иначе `ct.WaitHandle` внутри хода падал;
+  `Own` — метки своих записей
   по TTL, НЕ одноразовые — WMI-события дублируются; `AdaptiveBrightness` — детект ADAPTBRIGHT
   через powrprof.dll), `TouchpadControl`/`TouchscreenControl` (вкл/выкл через
   SetupAPI/CfgMgr32 — отключается родительский узел I2C HID, без PERSIST; общая механика в
