@@ -36,6 +36,7 @@ public sealed class AlsWatcher : IDisposable
     private readonly LuxGate _gate = new();
     private readonly object _pollLock = new(); // Poll зовут двое: цикл опроса и колбэк события
     private long _lastTs;                      // метка последнего чтения — свежее ли оно (для трассировки)
+    private DateTime _lastPollUtc;             // когда читали в последний раз — признак сна (IsSleepGap)
     private int _events, _fresh;               // счётчики сводки трассировки
     private float _tracedLevel = float.NaN;    // последний уровень, о котором написали в трассировку
     private Thread? _thread;
@@ -59,7 +60,7 @@ public sealed class AlsWatcher : IDisposable
     // доходит не всегда (короткий Modern Standby — нет), основной признак сна — IsSleepGap.
     private void OnPowerModeChanged(PowerModes mode)
     {
-        if (mode == PowerModes.Resume) Woke("== выход из сна: пауза ворот, свет до сна забыт");
+        if (mode == PowerModes.Resume) lock (_pollLock) WokeLocked("== выход из сна: пауза ворот, свет до сна забыт");
         else if (mode == PowerModes.Suspend && Tracing) lock (_pollLock) AlsTrace.Write("== уход в сон");
     }
 
@@ -67,21 +68,20 @@ public sealed class AlsWatcher : IDisposable
     /// забыт, следующий придёт, когда ворота подтвердят свежий свет (~6 с).</summary>
     public event Action? LuxLost;
 
-    // Проснулись (событие Resume или пауза цикла опроса — что раньше; второе лишь продлит паузу,
+    // Проснулись (событие Resume или пауза между чтениями — что раньше; второе лишь продлит паузу,
     // LuxLost повторно не придёт): свет до сна устарел, сенсор перезапускается — пауза ворот и
     // забыть уровень.
-    private void Woke(string trace)
+    // Звать под _pollLock. LuxLost — тоже под ним, как и LuxChanged: так подписчик видит события
+    // строго по порядку (уровень до сна не догонит «забудь»). Подписчик (авто-яркость) в нас
+    // не зовёт — взаимной блокировки нет.
+    private void WokeLocked(string trace)
     {
-        bool had;
-        lock (_pollLock)
-        {
-            had = !float.IsNaN(LastLux);
-            _gate.Restart(Environment.TickCount64);
-            _tracedLevel = float.NaN;
-            LastLux = float.NaN;
-            if (Tracing) AlsTrace.Write(trace);
-        }
-        if (had && !_disposed) LuxLost?.Invoke(); // вне замка: подписчик берёт свой
+        bool had = !float.IsNaN(LastLux);
+        _gate.Restart(Environment.TickCount64);
+        _tracedLevel = float.NaN;
+        LastLux = float.NaN;
+        if (Tracing) AlsTrace.Write(trace);
+        if (had && !_disposed) LuxLost?.Invoke();
     }
 
     /// <summary>Есть ли датчик (после Start; до — false).</summary>
@@ -145,12 +145,8 @@ public sealed class AlsWatcher : IDisposable
             ready?.Invoke(true);
 
             int polls = 0;
-            DateTime prev = DateTime.UtcNow;
             do
             {
-                DateTime now = DateTime.UtcNow;
-                if (IsSleepGap(now - prev)) OnSleepGap(now - prev);
-                prev = now;
                 Poll(sensor, fromEvent: false);
                 if (++polls % HeartbeatPolls == 0) Heartbeat();
             }
@@ -177,6 +173,15 @@ public sealed class AlsWatcher : IDisposable
             float level;
             lock (_pollLock)
             {
+                // Сон замечаем здесь, под замком, а не в цикле опроса: после разморозки первым
+                // может проснуться поток события — и без этой проверки ворота засчитали бы часы
+                // сна как «кандидат продержался» и приняли бы свет до сна (поймано трассировкой:
+                // «1 лк» при закрытии крышки принят как уровень через 13 с сна).
+                DateTime nowUtc = DateTime.UtcNow;
+                if (_lastPollUtc != default && IsSleepGap(nowUtc - _lastPollUtc))
+                    WokeLocked($"== датчик молчал {(nowUtc - _lastPollUtc).TotalSeconds:0} с — машина спала: пауза ворот, свет до сна забыт");
+                _lastPollUtc = nowUtc;
+
                 level = _gate.Accept(Environment.TickCount64, lux);
                 bool fresh = ts != _lastTs;
                 _lastTs = ts;
@@ -196,7 +201,7 @@ public sealed class AlsWatcher : IDisposable
                 // шлём КАЖДЫЙ сэмпл, без дедупа по значению: медианному фильтру авто-яркости нужен
                 // равномерный поток (дедуп исказил бы взвешивание по времени) — ворота поток не
                 // прореживают, а лишь держат прежний уровень, пока новый не подтвердится.
-                // Под замком: иначе уровень до сна, вычисленный за миг до Woke, ушёл бы
+                // Под замком: иначе уровень до сна, вычисленный за миг до пробуждения, ушёл бы
                 // подписчику уже после LuxLost. Подписчик (авто-яркость) в нас не зовёт —
                 // взаимной блокировки нет.
                 LastLux = level;
@@ -210,15 +215,13 @@ public sealed class AlsWatcher : IDisposable
     /// планировщика до 10 с не дотягивает.</summary>
     public const int SleepGapMs = 10_000;
 
-    /// <summary>Спала ли машина между двумя проходами цикла опроса. Свой признак сна, а не
+    /// <summary>Спала ли машина между двумя чтениями датчика (опросом или событием — цикл опроса
+    /// гарантирует чтение не реже раза в 1.5 с). Свой признак сна, а не
     /// событие Resume: на коротком Modern Standby SystemEvents его не доставляет (проверено
     /// трассировкой на TM2424, XIC-76), а процесс при этом замораживается. Часы — настенные:
     /// они идут при любом виде сна; сдвиг времени синхронизацией даст ложное срабатывание,
     /// но его цена — лишь 3 с паузы ворот.</summary>
     public static bool IsSleepGap(TimeSpan sincePrevPoll) => sincePrevPoll.TotalMilliseconds > SleepGapMs;
-
-    private void OnSleepGap(TimeSpan gap) =>
-        Woke($"== опрос стоял {gap.TotalSeconds:0} с — машина спала: пауза ворот, свет до сна забыт");
 
     // Сводка раз в минуту: живы ли события после сна — главный вопрос шага 0 XIC-76
     private void Heartbeat()
