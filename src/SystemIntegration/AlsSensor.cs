@@ -59,12 +59,29 @@ public sealed class AlsWatcher : IDisposable
     // доходит не всегда (короткий Modern Standby — нет), основной признак сна — IsSleepGap.
     private void OnPowerModeChanged(PowerModes mode)
     {
-        if (mode is not (PowerModes.Resume or PowerModes.Suspend)) return;
+        if (mode == PowerModes.Resume) Woke("== выход из сна: пауза ворот, свет до сна забыт");
+        else if (mode == PowerModes.Suspend && Tracing) lock (_pollLock) AlsTrace.Write("== уход в сон");
+    }
+
+    /// <summary>Свет снова неизвестен — машина проснулась (фоновый поток!). Уровень до сна
+    /// забыт, следующий придёт, когда ворота подтвердят свежий свет (~6 с).</summary>
+    public event Action? LuxLost;
+
+    // Проснулись (событие Resume или пауза цикла опроса — что раньше; второе лишь продлит паузу,
+    // LuxLost повторно не придёт): свет до сна устарел, сенсор перезапускается — пауза ворот и
+    // забыть уровень.
+    private void Woke(string trace)
+    {
+        bool had;
         lock (_pollLock)
         {
-            if (mode == PowerModes.Resume) _gate.Restart(Environment.TickCount64);
-            if (Tracing) AlsTrace.Write(mode == PowerModes.Resume ? "== выход из сна: пауза ворот" : "== уход в сон");
+            had = !float.IsNaN(LastLux);
+            _gate.Restart(Environment.TickCount64);
+            _tracedLevel = float.NaN;
+            LastLux = float.NaN;
+            if (Tracing) AlsTrace.Write(trace);
         }
+        if (had && !_disposed) LuxLost?.Invoke(); // вне замка: подписчик берёт свой
     }
 
     /// <summary>Есть ли датчик (после Start; до — false).</summary>
@@ -174,14 +191,17 @@ public sealed class AlsWatcher : IDisposable
                     if (Tracing) AlsTrace.Write($"== ворота приняли уровень {level:0.#} лк (был {(float.IsNaN(_tracedLevel) ? "—" : $"{_tracedLevel:0.#}")})");
                     _tracedLevel = level;
                 }
-            }
-            if (float.IsNaN(level)) return; // ворота ещё не приняли ни одного уровня
+                if (float.IsNaN(level)) return; // уровня нет: старт или пробуждение, ворота ждут
 
-            // шлём КАЖДЫЙ сэмпл, без дедупа по значению: медианному фильтру авто-яркости нужен
-            // равномерный поток (дедуп исказил бы взвешивание по времени) — ворота поток не
-            // прореживают, а лишь держат прежний уровень, пока новый не подтвердится
-            LastLux = level;
-            if (!_disposed) LuxChanged?.Invoke(level);
+                // шлём КАЖДЫЙ сэмпл, без дедупа по значению: медианному фильтру авто-яркости нужен
+                // равномерный поток (дедуп исказил бы взвешивание по времени) — ворота поток не
+                // прореживают, а лишь держат прежний уровень, пока новый не подтвердится.
+                // Под замком: иначе уровень до сна, вычисленный за миг до Woke, ушёл бы
+                // подписчику уже после LuxLost. Подписчик (авто-яркость) в нас не зовёт —
+                // взаимной блокировки нет.
+                LastLux = level;
+                if (!_disposed) LuxChanged?.Invoke(level);
+            }
         }
         catch (Exception ex) { Log.Ex("AlsWatcher.Poll", ex); }
     }
@@ -197,14 +217,8 @@ public sealed class AlsWatcher : IDisposable
     /// но его цена — лишь 3 с паузы ворот.</summary>
     public static bool IsSleepGap(TimeSpan sincePrevPoll) => sincePrevPoll.TotalMilliseconds > SleepGapMs;
 
-    private void OnSleepGap(TimeSpan gap)
-    {
-        lock (_pollLock)
-        {
-            _gate.Restart(Environment.TickCount64);
-            if (Tracing) AlsTrace.Write($"== опрос стоял {gap.TotalSeconds:0} с — машина спала: пауза ворот");
-        }
-    }
+    private void OnSleepGap(TimeSpan gap) =>
+        Woke($"== опрос стоял {gap.TotalSeconds:0} с — машина спала: пауза ворот, свет до сна забыт");
 
     // Сводка раз в минуту: живы ли события после сна — главный вопрос шага 0 XIC-76
     private void Heartbeat()
@@ -320,7 +334,10 @@ public sealed class AlsWatcher : IDisposable
 /// Пока отклонение не подтверждено, наружу отдаётся ПРЕЖНИЙ уровень: медианное окно
 /// авто-яркости взвешивает свет по времени (docs/13 §8), и дырки в потоке обесценили бы
 /// инерцию. После (пере)запуска сенсора — наш старт, выход из сна — ворота <see cref="SettleMs"/>
-/// не принимают ничего: переходный процесс старта — главный подозреваемый в мусоре.
+/// не принимают ничего: переходный процесс старта даёт мусор (ночная трассировка: 20–32 лк при
+/// закрытой крышке, 836 → 457 → 10 лк при открытии). И забывают уровень до сна — он устарел
+/// (закрыли крышку в темноте, открыли утром): до первого подтверждённого свежего уровня наружу
+/// не идёт ничего.
 ///
 /// Время передаётся снаружи (мс, монотонно) — ворота чистые, под тестами.
 /// </summary>
@@ -345,11 +362,12 @@ public sealed class LuxGate
     public static bool Same(float a, float b) =>
         Math.Abs(a - b) <= Math.Max(1f, Tolerance * Math.Max(a, b));
 
-    /// <summary>Сенсор (пере)запущен: <see cref="SettleMs"/> чтения не принимаются,
-    /// недоподтверждённый кандидат забывается. Принятый уровень остаётся.</summary>
+    /// <summary>Сенсор (пере)запущен: <see cref="SettleMs"/> чтения не принимаются, уровень и
+    /// кандидат забыты — до первого подтверждённого свежего уровня <see cref="Accept"/> отдаёт NaN.</summary>
     public void Restart(long nowMs)
     {
         _quietUntil = nowMs + SettleMs;
+        _level = float.NaN;
         _candidate = float.NaN;
     }
 

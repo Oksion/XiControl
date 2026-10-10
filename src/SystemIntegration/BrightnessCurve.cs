@@ -135,6 +135,9 @@ public sealed class MedianWindow
         return sorted.Length % 2 == 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2f;
     }
 
+    /// <summary>Забыть всё: свет до сна к свету после пробуждения отношения не имеет (XIC-76).</summary>
+    public void Clear() => _samples.Clear();
+
     private void Prune(long nowMs, int windowMs) =>
         _samples.RemoveAll(s => nowMs - s.Ms > Math.Max(0, windowMs));
 }

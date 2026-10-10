@@ -594,16 +594,55 @@ public sealed class AutoBrightnessTests
         gate.Accept(t + 4500, 1520).Should().Be(1520, "3 с — принято");
     }
 
+    // Ночная трассировка 10.10: крышку закрыли в темноте (0 лк), открыли утром — первые 8 с
+    // после пробуждения датчик нёс 836 → 457 → 10 → 55 → 10 → 2 → 4 → 37, затем устоялся 48.
     [Fact]
-    public void LuxGate_Restart_HoldsLevelAndDropsCandidate()
+    public void LuxGate_Restart_ForgetsStaleLevel_AndRejectsWakeTransient()
     {
-        var gate = GateAt(180, out long t);
-        gate.Accept(t + 1000, 0); // кандидат до сна
+        var gate = GateAt(0, out long t);
 
-        gate.Restart(t + 2000);   // выход из сна
-        gate.Accept(t + 3000, 0).Should().Be(180, "пауза: переходный мусор старта не принимаем");
-        gate.Accept(t + 2000 + LuxGate.SettleMs, 0).Should().Be(180, "кандидат после паузы — новый");
-        gate.Accept(t + 2000 + LuxGate.SettleMs + LuxGate.ConfirmMs, 0).Should().Be(0);
+        gate.Restart(t);
+        float[] transient = [836, 457, 10, 55, 10, 2, 4, 37];
+        for (int i = 0; i < transient.Length; i++)
+            gate.Accept(t + i * 1000, transient[i]).Should().Be(float.NaN,
+                "темнота до сна устарела, а мусор старта не подтверждается — наружу ничего");
+
+        gate.Accept(t + 8000, 48).Should().Be(float.NaN);
+        gate.Accept(t + 8000 + LuxGate.ConfirmMs, 48).Should().Be(48, "свежий свет продержался 3 с");
+    }
+
+    // ---- Забыть свет после сна (XIC-76) ----
+
+    // Трассировка 10.10: через секунду после пробуждения пересчёт по разблокировке увёл экран
+    // «46% → 10% (0 лк)» — по темноте, в которой крышку закрыли вечером.
+    [Fact]
+    public void Guard_ForgetLux_WakeEvaluateDoesNotUseStaleDarkness()
+    {
+        using var g = NewGuard();
+        g.OnLux(0);
+        _settle.Fire();                  // вечер: под темноту уже подстроились
+        _ramps.Clear();
+        _brightness = 46;                // утром яркость другая
+
+        g.ForgetLux();                   // проснулись
+        g.Evaluate();                    // пересчёт по разблокировке
+
+        _ramps.Should().BeEmpty("свет неизвестен — экран не трогаем");
+        _settle.Running.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Guard_ForgetLux_FirstFreshLevel_IsSignificantEvenIfSameAsBefore()
+    {
+        using var g = NewGuard();
+        g.OnLux(0);
+        _settle.Fire();
+        g.ForgetLux();
+
+        // свет тот же, что до сна, но яркость за ночь могли поменять — сверка обязана случиться
+        g.OnLux(0);
+
+        _settle.Running.Should().BeTrue("база гистерезиса сброшена вместе со светом");
     }
 
     [Theory]

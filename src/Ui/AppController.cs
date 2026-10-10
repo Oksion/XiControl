@@ -77,6 +77,7 @@ public sealed class AppController
         _autoGuard = autoGuard;
         _als = als;
         _als.LuxChanged += _autoGuard.OnLux; // датчик → авто-яркость (оба живут в DI весь сеанс)
+        _als.LuxLost += _autoGuard.ForgetLux; // проснулись — свет до сна устарел (XIC-76)
         _travel = travel;
         _touchpad = touchpad;
         _touchscreen = touchscreen;
