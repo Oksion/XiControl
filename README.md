@@ -776,7 +776,8 @@ The MIFS protocol is reverse-engineered and documented in [docs/](docs/):
 - [03-architecture.md](docs/03-architecture.md) — the app architecture;
 - [07-keymap.md](docs/07-keymap.md) — the key-code map;
 - [13-auto-brightness.md](docs/13-auto-brightness.md) — the math behind the learned auto-brightness curve 🤓;
-- [15-http-api.md](docs/15-http-api.md) — the whole HTTP API: routes, response codes, the webhook and a Home Assistant setup.
+- [15-http-api.md](docs/15-http-api.md) — the whole HTTP API: routes, response codes, the webhook and a Home Assistant setup;
+- [16-oem-driver-check.md](docs/16-oem-driver-check.md) — how the OEM checks for driver and BIOS updates: the reverse-engineered request, its signature and the response catalog.
 
 In short: the `MiInterface` method takes a 32-byte buffer
 (`[1]` — GET `0xFA` / SET `0xFB`, `[3]` — command, `[4]/[6]` — arguments) and returns a
