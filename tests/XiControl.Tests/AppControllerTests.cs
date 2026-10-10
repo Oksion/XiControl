@@ -27,9 +27,9 @@ public sealed class AppControllerTests
         // лимит и авто-яркость — на фейках: без WMI и реальных таймеров (тестируются отдельно);
         // AlsWatcher без Start безопасен — COM трогается только при запуске
         var cap = new BrightnessCapGuard(_cfg, _power,
-            new FakeTimer(), new FakeTimer(), () => null, (_, _, _) => { }, _ => false);
+            new FakeTimer(), new FakeTimer(), () => null, (_, _, _) => Task.CompletedTask, _ => false);
         var auto = new AutoBrightnessGuard(_cfg, _power,
-            new FakeTimer(), new FakeTimer(), () => null, (_, _, _) => { }, _ => false, (l, _) => l);
+            new FakeTimer(), new FakeTimer(), () => null, (_, _, _) => Task.CompletedTask, _ => false, (l, _) => l);
         _c = new AppController(_mifs, _cfg, _power, new Localizer(),
             new ChargeGuard(_mifs, _power, () => _cfg.ChargeCare ? _cfg.CarePercent() : 100, new FakeTimer()),
             new RefreshRateGuard(_cfg, _power, new FakeDisplayEvents(), new FakeTimer()),

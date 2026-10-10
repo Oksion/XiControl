@@ -54,7 +54,7 @@ public sealed class AutoBrightnessGuard : IDisposable
     private bool _converging;              // эпизод торга: таймер шагов взведён (XIC-37)
     private bool _stepped;                 // в эпизоде уже был наш шаг → новая правка = осознанный протест
     private bool _backoff;                 // уступили: до конца паузы/разблокировки яркость не трогаем
-    private CancellationTokenSource? _rampCts;
+    private readonly RampSlot _rampSlot = new();
 
     public AutoBrightnessGuard(AppConfig cfg, IPowerEvents power,
         IAppTimer? settle = null, IAppTimer? learn = null,
@@ -386,7 +386,7 @@ public sealed class AutoBrightnessGuard : IDisposable
         }
         Log.Write("AutoBrightness: кривые обучения сброшены к умолчанию");
         _cfg.Save();
-        // CancellationToken.None намеренно (S8949): _rampCts отменяет ПЛАВНЫЙ ХОД яркости, и
+        // CancellationToken.None намеренно (S8949): _rampSlot отменяет ПЛАВНЫЙ ХОД яркости, и
         // подставить его сюда было бы ошибкой — сверка по свежей кривой обязана доработать
         // независимо от того, жив ли предыдущий ход.
         if (_cfg.AutoBrightness) Task.Run(Evaluate, CancellationToken.None);
@@ -423,19 +423,9 @@ public sealed class AutoBrightnessGuard : IDisposable
 
     private double Hysteresis() => Math.Max(0.01, _cfg.AutoBrightnessHysteresis);
 
-    private void StartRampLocked(int from, int to)
-    {
-        CancelRampLocked();
-        _rampCts = new CancellationTokenSource();
-        _ramp(from, to, _rampCts.Token);
-    }
+    private void StartRampLocked(int from, int to) => _rampSlot.Start(ct => _ramp(from, to, ct));
 
-    private void CancelRampLocked()
-    {
-        _rampCts?.Cancel();
-        _rampCts?.Dispose();
-        _rampCts = null;
-    }
+    private void CancelRampLocked() => _rampSlot.Cancel();
 
     public void Dispose()
     {

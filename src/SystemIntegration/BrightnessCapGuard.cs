@@ -20,7 +20,7 @@ namespace XiControl.SystemIntegration;
 public sealed class BrightnessCapGuard : IDisposable
 {
     /// <summary>Плавный ход яркости; шов для тестов (прод — Brightness.Ramp).</summary>
-    public delegate void RampFn(int from, int to, CancellationToken ct);
+    public delegate Task RampFn(int from, int to, CancellationToken ct);
 
     private readonly AppConfig _cfg;
     private readonly IPowerEvents _power;
@@ -35,7 +35,7 @@ public sealed class BrightnessCapGuard : IDisposable
     private bool _converging;   // таймер схождения взведён (у IAppTimer нет IsRunning)
     private bool _stepped;      // в этом эпизоде уже был наш шаг вниз → подъём = осознанный протест
     private bool _backoff;      // отступили: до конца паузы яркость не трогаем
-    private CancellationTokenSource? _rampCts;
+    private readonly RampSlot _rampSlot = new();
 
     public BrightnessCapGuard(AppConfig cfg, IPowerEvents power,
         IAppTimer? converge = null, IAppTimer? backoff = null,
@@ -228,19 +228,9 @@ public sealed class BrightnessCapGuard : IDisposable
         _backoffTimer.Start();
     }
 
-    private void StartRampLocked(int from, int to)
-    {
-        CancelRampLocked();
-        _rampCts = new CancellationTokenSource();
-        _ramp(from, to, _rampCts.Token);
-    }
+    private void StartRampLocked(int from, int to) => _rampSlot.Start(ct => _ramp(from, to, ct));
 
-    private void CancelRampLocked()
-    {
-        _rampCts?.Cancel();
-        _rampCts?.Dispose();
-        _rampCts = null;
-    }
+    private void CancelRampLocked() => _rampSlot.Cancel();
 
     public void Dispose()
     {

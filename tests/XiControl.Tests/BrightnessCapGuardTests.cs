@@ -24,7 +24,7 @@ public sealed class BrightnessCapGuardTests
 
     private BrightnessCapGuard NewGuard() =>
         new(_cfg, _power, _converge, _backoff,
-            () => _brightness, (f, t, _) => _ramps.Add((f, t)), _ => _adaptive);
+            () => _brightness, (f, t, _) => { _ramps.Add((f, t)); return Task.CompletedTask; }, _ => _adaptive);
 
     // ---- Чистая арифметика схождения ----
 
