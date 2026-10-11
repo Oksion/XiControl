@@ -788,16 +788,19 @@ curl -X POST http://192.168.1.50:58125/travel \
 
 ## Как это работает
 
-Протокол MIFS разобран и задокументирован в [docs/](docs/):
+Протокол MIFS разобран и задокументирован в [docs/](docs/) (полное оглавление —
+[docs/README.md](docs/README.md)):
 
-- [01-wmi-protocol.md](docs/01-wmi-protocol.md) — транспорт, формат буфера, коды команд, события клавиш (**главный документ**);
-- [02-feature-catalog.md](docs/02-feature-catalog.md) — каталог функций;
-- [03-architecture.md](docs/03-architecture.md) — архитектура приложения;
+- [01-wmi-protocol.md](docs/01-wmi-protocol.md) — транспорт, формат буфера, коды команд, события клавиш, driver-free каналы мимо WMI (**главный документ**);
+- [05-open-questions.md](docs/05-open-questions.md) — что можно и чего нельзя driver-free и как каждый ответ проверялся на железе;
 - [07-keymap.md](docs/07-keymap.md) — карта кодов клавиш;
+- [09-power-monitoring.md](docs/09-power-monitoring.md) — откуда «Монитор» берёт ватты, температуры, загрузку GPU и NPU;
+- [12-charge-levels.md](docs/12-charge-levels.md) — уровни лимита заряда, которые принимает прошивка;
 - [13-auto-brightness.md](docs/13-auto-brightness.md) — математика обучаемой кривой авто-яркости 🤓;
 - [15-http-api.md](docs/15-http-api.md) — протокол HTTP API целиком: маршруты, коды ответов, вебхук и сценарий для Home Assistant;
 - [16-oem-driver-check.md](docs/16-oem-driver-check.md) — как OEM проверяет обновления драйверов и BIOS: разобранный запрос, его подпись и каталог в ответе;
-- [17-oem-services.md](docs/17-oem-services.md) — службы Xiaomi MiService и MiDeviceService: что делают, чем мешают XiControl и как их отключить.
+- [17-oem-services.md](docs/17-oem-services.md) — службы Xiaomi MiService и MiDeviceService: что делают, чем мешают XiControl и как их отключить;
+- записи этапа планирования: [02-feature-catalog.md](docs/02-feature-catalog.md) (каталог функций и что из него вышло), [03-architecture.md](docs/03-architecture.md) (почему без службы).
 
 Коротко: метод `MiInterface` принимает 32-байтовый буфер
 (`[1]` — GET `0xFA` / SET `0xFB`, `[3]` — команда, `[4]/[6]` — аргументы) и возвращает
