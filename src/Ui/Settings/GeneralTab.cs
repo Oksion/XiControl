@@ -53,7 +53,10 @@ public sealed class GeneralTab : SettingsPane
                 cfg.Save();
                 act.TrayMetricApplied();
             }));
-        string[] metricValues = ["power", "cpu", "gpu", "ram", "temp"];
+        // NPU — только если он в ноутбуке есть (XIC-86): пункт с вечным прочерком был бы шумом
+        string[] metricValues = SystemIntegration.NpuLoad.Present
+            ? ["power", "cpu", "gpu", "npu", "ram", "temp"]
+            : ["power", "cpu", "gpu", "ram", "temp"];
         int curMetric = Math.Max(0, Array.IndexOf(metricValues, cfg.TrayMetricKind ?? "power"));
         ui.AddRow(this, "settings.traymetric.metric", "settings.traymetric.metric.desc",
             ui.Combo([.. metricValues.Select(v => Loc.T("traymetric." + v))], curMetric, i =>

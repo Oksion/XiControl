@@ -362,6 +362,7 @@ public sealed class TrayMetricSource : IDisposable
     private GpuTelemetry? _gpu;
     private TemperatureSource? _temp;
     private NpuLoad? _npu;
+    private bool? _npuPresent; // реестр спрашиваем один раз, а не на каждом тике
     private readonly bool _forceAcpiTemp;
 
     public TrayMetricSource(TrayMetric kind, bool forceAcpiTemp = false)
@@ -386,11 +387,19 @@ public sealed class TrayMetricSource : IDisposable
         TrayMetric.Gpu => ReadGpu(),
         TrayMetric.Ram => MemoryLoad.TryRead(out float r, out _, out _) ? r : float.NaN,
         TrayMetric.Temp => ReadTemp(),
-        // в настройках индикатора NPU пока не предлагается (только компактный «Монитор», XIC-86),
-        // но метрика общая — руками правленный config.json не должен показать ватты под её именем
-        TrayMetric.Npu => (_npu ??= new NpuLoad()).TryRead(out float n) ? n : float.NaN,
+        TrayMetric.Npu => ReadNpu(),
         _ => ReadPower(),
     };
+
+    // NPU нет (конфиг переехал с другой машины) — прочерк, а не «0%»: счётчики «GPU Engine»
+    // есть и без нейропроцессора, и ноль читался бы как «NPU простаивает» (XIC-86).
+    // Первое открытие запроса PDH ~215 мс — индикатор меряет на пуле, это не UI.
+    private float ReadNpu()
+    {
+        _npuPresent ??= NpuLoad.Present;
+        if (_npuPresent != true) return float.NaN;
+        return (_npu ??= new NpuLoad()).TryRead(out float n) ? n : float.NaN;
+    }
 
     // Правило фолбэка — в TrayMetricFormat.UsesCpuPackageFallback (там же и объяснение,
     // почему нулевой ток не повод). Проверено на TM2424: в розетке без заряда IOCTL отдаёт
