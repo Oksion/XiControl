@@ -245,7 +245,10 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   образца `XiControl` мигрирует при следующем переключении; самопочинка на старте чинит и пропавший
   путь, и устаревшую версию exe, дев-сборки `0.0.0` в сверке не участвуют), `AwakeMode` («режим совы»: всегда
   `ES_SYSTEM_REQUIRED` + крышка на AC, экран держится `ES_DISPLAY_REQUIRED` — кроме
-  `OwlIgnoreDisplay: true` в config.json, тогда только «не спать»),
+  `OwlIgnoreDisplay: true` в config.json, тогда только «не спать»; исходное действие крышки
+  хранится вместе со схемой питания и возвращается в неё, а не в активную; запись
+  сохраняется до правки плана и не стирается, пока возврат не удался; любой сбой включения
+  откатывает крышку — XIC-82, логика под тестами на фейке `IPowerPlan`),
   `MicControl`, `KeyActions`, `Sound` (WAV-джинглы), `BatteryInfo`, `PowerDraw`,
   `GpuTelemetry` (загрузка/ватты/частота iGPU через **Intel IGCL** — user-mode API драйвера Intel,
   `ControlLib.dll` из System32; driver-free, без админа, ленивая инициализация; не Intel → ряд GPU
