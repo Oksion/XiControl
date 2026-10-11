@@ -278,7 +278,7 @@
   "settings.drivers.package": "{0}, {1} МБ",
   "settings.drivers.firmware.title": "Прошивка: {0}",
   "settings.drivers.firmware.desc": "В каталоге версия {0} · {1}. Текущую версию прошивки прочитать нечем — сравнить не можем.",
-  "settings.drivers.download": "Скачать",
+  "settings.drivers.download": "Открыть ссылку",
   "settings.drivers.download.confirm": "Открыть в браузере?",
   "settings.drivers.nolink": "нет ссылки",
   "settings.drivers.samepackage": "тот же пакет",
