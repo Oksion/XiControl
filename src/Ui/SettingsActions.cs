@@ -56,6 +56,8 @@ public sealed class SettingsActions
     public required Func<ReleaseInfo?> GetUpdate;            // найденный релиз (из проверки на старте)
     public required Func<UpdateStatus> GetUpdateStatus;      // чем кончилась последняя проверка
     public required Action<Action> CheckUpdatesNow;          // проверить по кнопке; колбэк — перерисовать вкладку
+    public required Func<DriverCheckResult> GetDriverCheck;  // последняя проверка драйверов у OEM (XIC-95)
+    public required Action<Action> CheckDriversNow;          // проверить по кнопке; колбэк — перерисовать вкладку
     public required Action<bool> SetTouchpadDeadZone;        // мёртвая зона у нижнего края тачпада
     public required Action<int> SetTouchpadDeadZoneMm;       // её высота в мм
     public required Action<bool> SetTouchpadEdgeSliders;      // края тачпада как ползунки (XIC-61)

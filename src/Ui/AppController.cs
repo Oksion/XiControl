@@ -876,6 +876,32 @@ public sealed class AppController
         if (on) _ = Task.Run(() => CheckUpdatesAsync(force: true));
     }
 
+    // ---- Драйверы и BIOS у OEM (XIC-95) ----
+
+    /// <summary>Последняя проверка драйверов — на всю сессию, как и <see cref="Update"/>: вкладка
+    /// пересобирается на каждый показ, а в сеть ходим только по кнопке.</summary>
+    public DriverCheckResult DriverCheck { get; private set; } = DriverCheckResult.None;
+
+    private int _driverCheckRunning;
+
+    /// <summary>Проверить у Xiaomi (только по явному нажатию). Повторное нажатие во время
+    /// проверки ничего не делает. Звать из фонового потока.</summary>
+    public async Task CheckDriversAsync()
+    {
+        if (Interlocked.Exchange(ref _driverCheckRunning, 1) == 1) return;
+        var previous = DriverCheck;
+        DriverCheck = previous with { Status = DriverCheckStatus.Running };
+        // Task.Run: синхронная часть проверки (WMI-перечень драйверов) длится секунды — вызывающий
+        // должен сразу получить задачу и успеть показать «Проверяю…»
+        try { DriverCheck = await Task.Run(() => OemDriverCheck.RunAsync()).ConfigureAwait(false); }
+        catch (Exception ex)
+        {
+            Log.Ex("CheckDrivers", ex);
+            DriverCheck = previous with { Status = DriverCheckStatus.Failed, CheckedAt = DateTime.Now };
+        }
+        finally { Volatile.Write(ref _driverCheckRunning, 0); }
+    }
+
     /// <summary>
     /// Мёртвая зона у нижнего края тачпада вкл/выкл. Реестр правим только отсюда — то есть
     /// только по явному переключению пользователем; перезапуск узла тачпада (сотни мс, панель
