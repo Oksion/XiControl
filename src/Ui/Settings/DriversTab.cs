@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using XiControl.Localization;
 using XiControl.SystemIntegration;
@@ -136,7 +135,7 @@ public sealed class DriversTab : SettingsPane
                 b.ForeColor = ui.T.Accent;
                 return;
             }
-            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { /* нет браузера */ }
+            ShellOpen.OpenUrl(url); // браузер без админского токена: пакет качается от имени пользователя
         });
         // Ширина — сразу под длинную надпись второго шага: карточка раскладывает описание под
         // ширину кнопки в момент постройки, и выросшая потом кнопка уходила под текст
