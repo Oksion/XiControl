@@ -169,7 +169,8 @@ public sealed class AppController
 
         // «Режим совы»: восстановить после сбоя, включить заново, либо погасить, если фичу отключили
         if (_cfg.Awake && !_cfg.OwlMode) { AwakeMode.Disable(_cfg); _cfg.Awake = false; _cfg.Save(); }
-        else if (_cfg.Awake) { AwakeMode.Enable(_cfg); _cfg.Save(); }
+        // не включилась — не притворяемся: в меню и панели сова честно выключена (XIC-82)
+        else if (_cfg.Awake) { _cfg.Awake = AwakeMode.Enable(_cfg); _cfg.Save(); }
         else if (_cfg.AwakeSavedLidAc is not null) { AwakeMode.Disable(_cfg); _cfg.Save(); }
 
         // Страховка «не залипает»: если тачпад/экран пришлось отключить персистентно,
@@ -191,10 +192,11 @@ public sealed class AppController
     }
 
     /// <summary>Завершение работы: вернуть действие крышки; флаг Awake в конфиге не трогаем —
-    /// при следующем запуске режим включится снова.</summary>
+    /// при следующем запуске режим включится снова. Возвращаем и без Awake, если осталась запись
+    /// восстановления (прошлый возврат не удался) — XIC-82.</summary>
     public void Shutdown()
     {
-        if (_cfg.Awake) { AwakeMode.Disable(_cfg); _cfg.Save(); }
+        if (_cfg.Awake || _cfg.AwakeSavedLidAc is not null) { AwakeMode.Disable(_cfg); _cfg.Save(); }
         _edges.Stop();
         _heavy?.Dispose();
     }

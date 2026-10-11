@@ -417,6 +417,11 @@ public sealed class AppConfig
     /// <summary>Исходное действие крышки (AC) до включения «Не спать» — для восстановления, в т.ч. после сбоя.</summary>
     public int? AwakeSavedLidAc { get; set; }
 
+    /// <summary>Схема питания, в которой меняли действие крышки (XIC-82): возвращать надо туда,
+    /// а не в ту, что активна на момент выключения — схему могли сменить, пока сова включена.
+    /// null — запись от версии до XIC-82: возвращаем в активную, как раньше.</summary>
+    public Guid? AwakeSavedLidScheme { get; set; }
+
     /// <summary>Позиция окна «Монитор» (виджет перетаскивается мышью); null — по центру.</summary>
     public int? MonitorX { get; set; }
     public int? MonitorY { get; set; }
