@@ -253,7 +253,7 @@
   "settings.updates.open": "打开发布页面",
   "settings.updates.now": "检查更新",
   "settings.drivers.sub": "小米为此机型提供的驱动与已安装版本的对比。",
-  "settings.drivers.privacy": "仅在点击按钮时才会连接小米服务器。发送的内容为笔记本型号、语言和 Windows 版本号，不发送序列号。XiControl 本身不会下载或安装任何内容。",
+  "settings.drivers.privacy": "仅在点击按钮时才会连接小米服务器。发送的内容为笔记本型号、Windows 语言、地区和版本号以及 BIOS 版本，不发送序列号。XiControl 本身不会下载或安装任何内容。",
   "settings.drivers.check": "向小米查询",
   "settings.drivers.check.btn": "检查",
   "settings.drivers.status.never": "尚未检查",
