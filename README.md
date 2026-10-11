@@ -783,6 +783,11 @@ None of this runs or spends resources while the API is off (the server simply is
   `GPU Engine` (engines of type `Neural`), no driver or administrator rights. The row appears only
   if Windows lists a neural processor (device class *Compute accelerators*, e.g. Intel AI Boost on
   Core Ultra).
+- **Xiaomi's MiDeviceService service interferes with brightness.** It comes preinstalled and stays
+  after PC Manager is uninstalled. When you leave Eco mode, the service restores the brightness
+  you had when entering it: a manual change made in the meantime is lost, and with auto-brightness
+  the screen visibly jumps. XiControl does not need this service and it can be disabled — see
+  [docs/17-oem-services.md](docs/17-oem-services.md) for what it does and how to turn it off.
 
 ## How it works
 
@@ -794,7 +799,8 @@ The MIFS protocol is reverse-engineered and documented in [docs/](docs/):
 - [07-keymap.md](docs/07-keymap.md) — the key-code map;
 - [13-auto-brightness.md](docs/13-auto-brightness.md) — the math behind the learned auto-brightness curve 🤓;
 - [15-http-api.md](docs/15-http-api.md) — the whole HTTP API: routes, response codes, the webhook and a Home Assistant setup;
-- [16-oem-driver-check.md](docs/16-oem-driver-check.md) — how the OEM checks for driver and BIOS updates: the reverse-engineered request, its signature and the response catalog.
+- [16-oem-driver-check.md](docs/16-oem-driver-check.md) — how the OEM checks for driver and BIOS updates: the reverse-engineered request, its signature and the response catalog;
+- [17-oem-services.md](docs/17-oem-services.md) — Xiaomi's MiService and MiDeviceService services: what they do, how they get in XiControl's way and how to disable them.
 
 In short: the `MiInterface` method takes a 32-byte buffer
 (`[1]` — GET `0xFA` / SET `0xFB`, `[3]` — command, `[4]/[6]` — arguments) and returns a
