@@ -113,8 +113,13 @@ where there are no watts to show, you can watch load or degrees instead.*
   **never installed automatically** — this is a notification only (grab it from the release page or
   run `winget upgrade Oksion.XiControl`). With the toggle off the app makes **no network requests at
   all**, and a one-off check is available on a button.
+- 🧩 **Driver and BIOS check with Xiaomi** — the Drivers tab asks Xiaomi's server what it offers for
+  this model and compares it with what is installed, device by device: what matches, where you are
+  already newer (that is normal) and where an update exists — with a link to the package. BIOS is a
+  notice only. No Xiaomi PC Manager or its services; the network is used **only on the button**, the
+  serial number is not sent, and XiControl itself downloads and installs nothing.
 - ⚙️ **Settings window** in Windows 11 style — all options across tabs (General / Features /
-  Battery / Display / Touchpad / Performance / Keys / Notifications / HTTP API / About),
+  Battery / Display / Touchpad / Performance / Keys / Notifications / HTTP API / Drivers / About),
   dark and light themes.
   The **Features** tab controls what to show: "Owl mode", touchpad, touchscreen and refresh-rate
   control; a disabled feature disappears from the menu and panel entirely.
@@ -269,7 +274,7 @@ hidden if refresh-rate control is off), Touchpad (bottom dead zone, edge sliders
 strength and click force, force press), Performance (mode visibility,
 separately for AC and battery, with a switch above the list; startup mode, power profiles),
 Keys (remapping), Notifications (where popups appear, how long
-they stay, which lock-key popups to show), HTTP API (port, token, permissions) and About
+they stay, which lock-key popups to show), HTTP API (port, token, permissions), Drivers (check with Xiaomi on a button) and About
 (version, model with the board code, BIOS, serial number — masked by default, click to reveal).
 The quick toggles (charge, "travel", owl, refresh rate, Monitor,
 mode) stay in the tray menu and the panel.

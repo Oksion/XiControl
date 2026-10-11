@@ -248,6 +248,7 @@ public sealed class SettingsForm : Form
         AddTab("settings.tab.keys", NavGlyph.Keys, () => new KeysTab(_ui, _cfg, rebuild));
         AddTab("settings.tab.osd", NavGlyph.Osd, () => new OsdTab(_ui, _cfg, _act, rebuild));
         AddTab("settings.tab.api", NavGlyph.Api, () => new ApiTab(_ui, _cfg, _act, rebuild));
+        AddTab("settings.tab.drivers", NavGlyph.Drivers, () => new DriversTab(_ui, _act, rebuild));
         AddTab("settings.tab.about", NavGlyph.About, () => new AboutTab(_ui, _act, rebuild));
 
         _nav.Tabs = [.. tabs];

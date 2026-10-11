@@ -801,6 +801,14 @@ public sealed class TrayApp : IDisposable
                     // перерисовать вкладку с найденной версией — обратно в UI-поток
                     _osd.BeginInvoke(done);
                 }),
+                GetDriverCheck = () => _controller.DriverCheck,
+                CheckDriversNow = done => _ = Task.Run(async () =>
+                {
+                    var run = _controller.CheckDriversAsync();
+                    _osd.BeginInvoke(done); // сразу — показать «Проверяю…»
+                    await run.ConfigureAwait(false);
+                    _osd.BeginInvoke(done); // и с результатом
+                }),
                 SetTouchpadDeadZone = _controller.SetTouchpadDeadZone,
                 SetTouchpadDeadZoneMm = _controller.SetTouchpadDeadZoneMm,
                 SetTouchpadEdgeSliders = _controller.SetTouchpadEdgeSliders,

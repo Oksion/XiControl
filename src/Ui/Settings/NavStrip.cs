@@ -4,7 +4,7 @@ using XiControl.Localization;
 namespace XiControl.Ui.Settings;
 
 /// <summary>Глифы навигации (рисуем сами — без иконочных шрифтов и ресурсов).</summary>
-public enum NavGlyph { General, Features, Battery, Display, Touchpad, Perf, Keys, Osd, Api, About }
+public enum NavGlyph { General, Features, Battery, Display, Touchpad, Perf, Keys, Osd, Api, Drivers, About }
 
 /// <summary>
 /// Левая навигация окна настроек (кастомная отрисовка): подсветка hover/выбора,
@@ -181,6 +181,16 @@ public sealed class NavStrip : Panel
                 g.DrawEllipse(pen, x + w * 0.14f, y + h * 0.14f, w * 0.72f, h * 0.72f);
                 g.DrawLine(pen, x + w * 0.14f, y + h * 0.5f, x + w * 0.86f, y + h * 0.5f);
                 g.DrawEllipse(pen, x + w * 0.35f, y + h * 0.14f, w * 0.3f, h * 0.72f);
+                break;
+            case NavGlyph.Drivers:
+                // микросхема: корпус и по три вывода с боков — драйверы и прошивки железа
+                g.DrawRectangle(pen, x + w * 0.28f, y + h * 0.28f, w * 0.44f, h * 0.44f);
+                for (int d = 0; d < 3; d++)
+                {
+                    float py = y + h * (0.36f + d * 0.14f);
+                    g.DrawLine(pen, x + w * 0.12f, py, x + w * 0.28f, py);
+                    g.DrawLine(pen, x + w * 0.72f, py, x + w * 0.88f, py);
+                }
                 break;
             case NavGlyph.About:
                 g.DrawEllipse(pen, x + w * 0.15f, y + h * 0.15f, w * 0.7f, h * 0.7f);
