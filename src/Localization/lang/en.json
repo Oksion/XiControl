@@ -278,7 +278,7 @@
   "settings.drivers.package": "{0}, {1} MB",
   "settings.drivers.firmware.title": "Firmware: {0}",
   "settings.drivers.firmware.desc": "Catalog version {0} · {1}. The current firmware version cannot be read, so it cannot be compared.",
-  "settings.drivers.download": "Download",
+  "settings.drivers.download": "Open link",
   "settings.drivers.download.confirm": "Open in browser?",
   "settings.drivers.nolink": "no link",
   "settings.drivers.samepackage": "same package",
