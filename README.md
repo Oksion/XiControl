@@ -629,8 +629,9 @@ stuck disabled. Their cells are also in the quick panel, next to auto refresh ra
 cell only if a touchscreen is present).
 
 If you don't need a device at all, Settings → Features has a **"Keep it off across restarts"**
-toggle (one for the touchpad, one for the touchscreen). Then we won't switch it back on at startup;
-you can bring it back with the same toggle in the panel or menu. What the app did *not* turn off it
+toggle (one for the touchpad, one for the touchscreen). Then it stays off after a reboot too (if it
+comes back on its own, the app turns it off again at startup); you can bring it back with the same
+toggle in the panel or menu. What the app did *not* turn off it
 never touches: disable the touchscreen in Device Manager and it stays that way.
 
 - Holding the Mi button opens the quick panel by default, but it can be remapped — e.g. put the
