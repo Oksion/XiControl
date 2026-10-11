@@ -14,6 +14,7 @@ public sealed class TouchscreenControl(AppConfig cfg) : HidNodeToggle
     protected override string LogName => "Touchscreen";
     protected override string? DeviceId { get => cfg.TouchscreenDeviceId; set => cfg.TouchscreenDeviceId = value; }
     protected override bool PersistOff { get => cfg.TouchscreenPersistOff; set => cfg.TouchscreenPersistOff = value; }
+    protected override bool SoftOff { get => cfg.TouchscreenSoftOff; set => cfg.TouchscreenSoftOff = value; }
     protected override bool KeepOff => cfg.TouchscreenKeepOff;
     protected override void SaveConfig() => cfg.Save();
 }

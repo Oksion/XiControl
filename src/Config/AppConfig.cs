@@ -548,6 +548,12 @@ public sealed class AppConfig
     /// Ставится/снимается автоматически.</summary>
     public bool TouchpadPersistOff { get; set; }
 
+    /// <summary>Тачпад погашен НАМИ мягким путём — до перезагрузки. Тоже бухгалтерия: после
+    /// перезагрузки устройство возвращается само, и только по этой отметке видно, что гасить
+    /// его снова — наше дело, если стоит <see cref="TouchpadKeepOff"/> (XIC-79).
+    /// Ставится/снимается автоматически.</summary>
+    public bool TouchpadSoftOff { get; set; }
+
     /// <summary>Оставлять тачпад выключенным между перезагрузками (XIC-53). По умолчанию
     /// false — прежнее поведение «выключение до перезагрузки».</summary>
     public bool TouchpadKeepOff { get; set; }
@@ -580,6 +586,12 @@ public sealed class AppConfig
     /// намерение: включать ли обратно на старте, решает <see cref="TouchscreenKeepOff"/>.
     /// Ставится/снимается автоматически.</summary>
     public bool TouchscreenPersistOff { get; set; }
+
+    /// <summary>Сенсорный экран погашен НАМИ мягким путём — до перезагрузки. Тоже
+    /// бухгалтерия: после перезагрузки устройство возвращается само, и только по этой отметке
+    /// видно, что гасить его снова — наше дело, если стоит <see cref="TouchscreenKeepOff"/>
+    /// (XIC-79). Ставится/снимается автоматически.</summary>
+    public bool TouchscreenSoftOff { get; set; }
 
     /// <summary>
     /// Оставлять сенсорный экран выключенным между перезагрузками (XIC-53, issue #39).
