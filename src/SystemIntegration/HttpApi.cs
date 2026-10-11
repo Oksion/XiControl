@@ -13,6 +13,14 @@ public sealed class HttpApi : IDisposable
 {
     private const int MaxBodyBytes = 4096; // команды — крошечный JSON; всё крупнее не читаем
 
+    /// <summary>Потолок на весь обмен — чтение тела и запись ответа. Запросы обслуживаются по
+    /// одному, поэтому клиент, присылающий тело по байту, без потолка держал бы API для всех
+    /// (XIC-80). Командам хватает миллисекунд — 10 с с запасом на медленный Wi-Fi.</summary>
+    private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(10);
+
+    // JSON — всегда UTF-8 (RFC 8259); битые байты — ошибка, а не тихие «?» в значении команды
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+
     private readonly HttpListener _listener = new();
     private readonly ApiRouter _router;
 
@@ -40,19 +48,24 @@ public sealed class HttpApi : IDisposable
                 Log.Ex("HttpApi.Accept", ex);
                 continue;
             }
-            try { Serve(ctx); }
+            using var deadline = new CancellationTokenSource(Deadline);
+            try { await Serve(ctx, deadline.Token).ConfigureAwait(false); }
             catch (Exception ex)
             {
-                Log.Ex("HttpApi.Serve", ex);
+                // по таймауту не шумим стеком: медленный клиент — не сбой приложения
+                if (deadline.IsCancellationRequested) Log.Write("HttpApi: клиент не уложился в 10 с — соединение сброшено");
+                else Log.Ex("HttpApi.Serve", ex);
+                // Abort рвёт соединение — заодно прерывает брошенное по таймауту чтение
                 try { ctx.Response.Abort(); } catch { /* соединение уже мертво */ }
             }
         }
     }
 
-    private void Serve(HttpListenerContext ctx)
+    private async Task Serve(HttpListenerContext ctx, CancellationToken ct)
     {
         int code;
         string json;
+        // Токен — до чтения тела: без него тело не читаем вовсе, сколько бы его ни прислали
         if (!_router.CheckToken(ctx.Request.Headers["Authorization"]))
         {
             (code, json) = (401, """{"error":"unauthorized"}""");
@@ -64,19 +77,52 @@ public sealed class HttpApi : IDisposable
         }
         else
         {
-            string body = "";
-            if (ctx.Request.HasEntityBody)
-                using (var r = new StreamReader(ctx.Request.InputStream, ctx.Request.ContentEncoding))
-                    body = r.ReadToEnd();
-            (code, json) = _router.Handle(ctx.Request.HttpMethod, ctx.Request.Url?.AbsolutePath ?? "/", body);
+            var (body, error) = ctx.Request.HasEntityBody
+                ? await ReadBody(ctx.Request.InputStream, MaxBodyBytes, ct).ConfigureAwait(false)
+                : ("", BodyError.None);
+            (code, json) = error switch
+            {
+                BodyError.TooLarge => (413, """{"error":"body too large"}"""),
+                BodyError.BadUtf8 => (400, """{"error":"bad request"}"""),
+                _ => _router.Handle(ctx.Request.HttpMethod, ctx.Request.Url?.AbsolutePath ?? "/", body),
+            };
         }
 
+        // Тело могло остаться недочитанным (401/413) — keep-alive на таком соединении не держим
+        if (code is 401 or 413) ctx.Response.KeepAlive = false;
         byte[] buf = Encoding.UTF8.GetBytes(json);
         ctx.Response.StatusCode = code;
         ctx.Response.ContentType = "application/json";
         ctx.Response.ContentLength64 = buf.Length;
-        ctx.Response.OutputStream.Write(buf);
+        await ctx.Response.OutputStream.WriteAsync(buf, ct).AsTask().WaitAsync(ct).ConfigureAwait(false);
         ctx.Response.Close();
+    }
+
+    internal enum BodyError { None, TooLarge, BadUtf8 }
+
+    /// <summary>
+    /// Прочитать тело не больше <paramref name="maxBytes"/> (XIC-80). Проверки по Content-Length
+    /// мало: у chunked-запроса длины нет вовсе, и прежний <c>ReadToEnd</c> читал сколько пришлют.
+    /// Читаем в буфер на байт больше лимита — переполнение видно без дочитывания хвоста.
+    /// <paramref name="ct"/> обрывает и зависшее чтение: <c>WaitAsync</c> бросает его, сокет
+    /// закрывает вызывающий (поток http.sys отмену сам не слушает).
+    /// </summary>
+    internal static async Task<(string Body, BodyError Error)> ReadBody(Stream input, int maxBytes, CancellationToken ct)
+    {
+        byte[] buf = new byte[maxBytes + 1];
+        int count = 0;
+        while (count < buf.Length)
+        {
+            int read = await input.ReadAsync(buf.AsMemory(count), ct).AsTask().WaitAsync(ct).ConfigureAwait(false);
+            if (read == 0) break;
+            count += read;
+        }
+        if (count > maxBytes) return ("", BodyError.TooLarge);
+
+        // BOM снимал прежний StreamReader — клиентам, что его шлют, ничего не ломаем
+        int start = count >= 3 && buf[0] == 0xEF && buf[1] == 0xBB && buf[2] == 0xBF ? 3 : 0;
+        try { return (StrictUtf8.GetString(buf, start, count - start), BodyError.None); }
+        catch (DecoderFallbackException) { return ("", BodyError.BadUtf8); }
     }
 
     public void Dispose()
