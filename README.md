@@ -42,8 +42,8 @@ auto refresh rate and "owl mode" (stay awake).*
 </p>
 
 *In full view — live graphs: power draw (W), CPU, **GPU** (clock and watts under the percentage),
-RAM, **hotspot temperature** (hot zone in cherry red) and the connected adapter's wattage. Collapses
-into a compact line (Power / CPU / GPU / RAM) or a single large readout — via the "view" button or a
+**NPU** (if the laptop has one), RAM, **hotspot temperature** (hot zone in cherry red) and the
+connected adapter's wattage. Collapses into a compact line (Power / CPU / GPU / NPU / RAM) or a single large readout — via the "view" button or a
 double-click; current direction is shown by color (charging green / discharging orange). In the
 smallest view you pick the metric with a right-click: power, CPU, GPU, RAM or temperature — on AC,
 where there are no watts to show, you can watch load or degrees instead.*
@@ -767,6 +767,10 @@ None of this runs or spends resources while the API is off (the server simply is
   System32, installed with the Intel driver; no administrator rights needed). On machines without
   Intel graphics the GPU row simply does not appear. This channel exposes no temperature or fan RPM
   for integrated GPUs — only usage, power and clock.
+- **NPU usage** is read the same way Task Manager does it — from the Windows performance counters
+  `GPU Engine` (engines of type `Neural`), no driver or administrator rights. The row appears only
+  if Windows lists a neural processor (device class *Compute accelerators*, e.g. Intel AI Boost on
+  Core Ultra).
 
 ## How it works
 
