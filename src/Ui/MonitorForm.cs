@@ -132,7 +132,7 @@ public sealed class MonitorForm : FlyoutForm
         Sample(full: true); // первая точка сразу (заодно определит наличие DPTF-температур и IGCL до ApplyView)
         // выбранной метрики на этой машине может не быть вовсе (GPU на не-Intel) — тогда
         // показываем потребление, а не вечный прочерк
-        _compact = SystemIntegration.TrayMetricFormat.Available(_compact, _hasGpu, _hasTemp);
+        _compact = SystemIntegration.TrayMetricFormat.Available(_compact, _hasGpu, _hasTemp, _hasNpu);
 
         ApplyView();
 
@@ -232,10 +232,11 @@ public sealed class MonitorForm : FlyoutForm
         menu.ForeColor = DarkPalette.Text;
         foreach (var m in (SystemIntegration.TrayMetric[])[
             SystemIntegration.TrayMetric.Power, SystemIntegration.TrayMetric.Cpu,
-            SystemIntegration.TrayMetric.Gpu, SystemIntegration.TrayMetric.Ram,
+            SystemIntegration.TrayMetric.Gpu, SystemIntegration.TrayMetric.Npu, SystemIntegration.TrayMetric.Ram,
             SystemIntegration.TrayMetric.Temp])
         {
             if (m == SystemIntegration.TrayMetric.Gpu && !_hasGpu) continue;
+            if (m == SystemIntegration.TrayMetric.Npu && !_hasNpu) continue;
             if (m == SystemIntegration.TrayMetric.Temp && !_hasTemp) continue;
             var metric = m; // замыкание на копию
             var item = new ToolStripMenuItem(Loc.T("traymetric." + SystemIntegration.TrayMetricFormat.Key(m)))
@@ -353,7 +354,7 @@ public sealed class MonitorForm : FlyoutForm
         bool hadTemp = _hasTemp;
         if (all || _compact == SystemIntegration.TrayMetric.Cpu) Push(_cpu, SampleCpu());
         if (all || _compact == SystemIntegration.TrayMetric.Gpu) Push(_gpu, SampleGpu());
-        if (all && _hasNpu) Push(_npu, SampleNpu()); // в компактном виде NPU не выбирается
+        if ((all || _compact == SystemIntegration.TrayMetric.Npu) && _hasNpu) Push(_npu, SampleNpu());
         if (all || _compact == SystemIntegration.TrayMetric.Ram) Push(_ram, SampleRam());
         if (all || _compact == SystemIntegration.TrayMetric.Power) Push(_power, SamplePowerWatts());
         if (all || _compact == SystemIntegration.TrayMetric.Temp) Push(_temp, SampleTempC());
@@ -362,7 +363,7 @@ public sealed class MonitorForm : FlyoutForm
         if (_hasTemp && !hadTemp && Visible)
         {
             _compact = SystemIntegration.TrayMetricFormat.Available(
-                SystemIntegration.TrayMetricFormat.ParseKind(_cfg.MonitorCompactMetric), _hasGpu, _hasTemp);
+                SystemIntegration.TrayMetricFormat.ParseKind(_cfg.MonitorCompactMetric), _hasGpu, _hasTemp, _hasNpu);
             ApplyView();
         }
         if (!all) return; // ватты адаптера показывает только полный вид
@@ -596,6 +597,7 @@ public sealed class MonitorForm : FlyoutForm
         {
             SystemIntegration.TrayMetric.Cpu => (Pct(_cpu), CpuCol),
             SystemIntegration.TrayMetric.Gpu => (Pct(_gpu), GpuCol),
+            SystemIntegration.TrayMetric.Npu => (Pct(_npu), NpuCol),
             SystemIntegration.TrayMetric.Ram => (Pct(_ram), RamCol),
             SystemIntegration.TrayMetric.Temp => TempCompact(),
             _ => (float.IsNaN(pw) ? "—" : Loc.T("monitor.watts.scale", MathF.Abs(pw)), pColor),

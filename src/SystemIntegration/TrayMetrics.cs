@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace XiControl.SystemIntegration;
 
 /// <summary>Метрика индикатора в трее (XIC-35). Одновременно показывается одна.</summary>
-public enum TrayMetric { Power, Cpu, Gpu, Ram, Temp }
+public enum TrayMetric { Power, Cpu, Gpu, Ram, Temp, Npu }
 
 /// <summary>
 /// Чистая логика индикатора: парсинг метрики из конфига и компактный текст для значка
@@ -19,6 +19,7 @@ public static class TrayMetricFormat
     {
         "cpu" => TrayMetric.Cpu,
         "gpu" => TrayMetric.Gpu,
+        "npu" => TrayMetric.Npu,
         "ram" => TrayMetric.Ram,
         "temp" => TrayMetric.Temp,
         _ => TrayMetric.Power,
@@ -29,6 +30,7 @@ public static class TrayMetricFormat
     {
         TrayMetric.Cpu => "cpu",
         TrayMetric.Gpu => "gpu",
+        TrayMetric.Npu => "npu",
         TrayMetric.Ram => "ram",
         TrayMetric.Temp => "temp",
         _ => "power",
@@ -40,9 +42,10 @@ public static class TrayMetricFormat
     /// нет ни DPTF, ни ACPI-зоны, означали бы вечный прочерк вместо числа. Молча откатываемся
     /// к потреблению — оно есть везде (XIC-70).
     /// </summary>
-    public static TrayMetric Available(TrayMetric want, bool hasGpu, bool hasTemp) => want switch
+    public static TrayMetric Available(TrayMetric want, bool hasGpu, bool hasTemp, bool hasNpu) => want switch
     {
         TrayMetric.Gpu when !hasGpu => TrayMetric.Power,
+        TrayMetric.Npu when !hasNpu => TrayMetric.Power, // нейропроцессора нет (XIC-86)
         TrayMetric.Temp when !hasTemp => TrayMetric.Power,
         _ => want,
     };
@@ -358,6 +361,7 @@ public sealed class TrayMetricSource : IDisposable
     private CpuLoad? _cpu;
     private GpuTelemetry? _gpu;
     private TemperatureSource? _temp;
+    private NpuLoad? _npu;
     private readonly bool _forceAcpiTemp;
 
     public TrayMetricSource(TrayMetric kind, bool forceAcpiTemp = false)
@@ -382,6 +386,9 @@ public sealed class TrayMetricSource : IDisposable
         TrayMetric.Gpu => ReadGpu(),
         TrayMetric.Ram => MemoryLoad.TryRead(out float r, out _, out _) ? r : float.NaN,
         TrayMetric.Temp => ReadTemp(),
+        // в настройках индикатора NPU пока не предлагается (только компактный «Монитор», XIC-86),
+        // но метрика общая — руками правленный config.json не должен показать ватты под её именем
+        TrayMetric.Npu => (_npu ??= new NpuLoad()).TryRead(out float n) ? n : float.NaN,
         _ => ReadPower(),
     };
 
@@ -424,5 +431,6 @@ public sealed class TrayMetricSource : IDisposable
         _energyMeter?.Dispose();
         _gpu?.Dispose();
         _temp?.Dispose();
+        _npu?.Dispose();
     }
 }

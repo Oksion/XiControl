@@ -270,6 +270,7 @@
   "traymetric.power.cpu": "Потребление CPU",
   "traymetric.cpu": "Загрузка CPU",
   "traymetric.gpu": "Загрузка GPU",
+  "traymetric.npu": "Загрузка NPU",
   "traymetric.ram": "Память (RAM)",
   "traymetric.temp": "Температура",
   "traymetric.temp.zone": "Температура платы",
