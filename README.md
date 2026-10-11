@@ -101,12 +101,14 @@ where there are no watts to show, you can watch load or degrees instead.*
   Which of these exist depends on the model — a laptop that never sends a code simply never shows
   that OSD.
 - 🖱️ **Touchpad on/off** — an action for any key + a cell in the panel. Disabling is done the
-  stock way (like in Device Manager, no drivers) and does not survive a reboot — the touchpad
-  can't get stuck disabled.
+  stock way (like in Device Manager, no drivers) and by default does not survive a reboot — the
+  touchpad can't get stuck disabled; if you don't need it at all, "Keep it off across restarts"
+  (Settings → Features) turns it off again after a reboot.
 - 📳 **Touchpad vibration strength and click force** — like in Xiaomi PC Manager, over the same
   channel and without drivers; the settings are stored in the touchpad itself.
 - 👆 **Touchscreen on/off** — same for the laptop's touchscreen: an action for a key,
-  a cell in the panel, stock driver-free disabling and auto re-enable after a reboot.
+  a cell in the panel, stock driver-free disabling and auto re-enable after a reboot (unless
+  "Keep it off across restarts" is on).
   The cell appears only if a touchscreen is present in the system.
 - 🔔 **Update check** (on by default) — once a day the app asks GitHub whether a new version is out
   and shows a toast linking to the release; the notice also appears on the "About" tab. Updates are
@@ -116,8 +118,9 @@ where there are no watts to show, you can watch load or degrees instead.*
 - 🧩 **Driver and BIOS check with Xiaomi** — the Drivers tab asks Xiaomi's server what it offers for
   this model and compares it with what is installed, device by device: what matches, where you are
   already newer (that is normal) and where an update exists — with a link to the package (the BIOS
-  link comes with a separate at-your-own-risk warning). No Xiaomi PC Manager or its services; the network is used **only on the button**, the
-  serial number is not sent, and XiControl itself downloads and installs nothing.
+  link comes with a separate at-your-own-risk warning). No Xiaomi PC Manager or its services; the network is used **only on the button**.
+  What is sent: the model (board code), Windows language, region and build number, and the BIOS
+  version — the serial number is not; XiControl itself downloads and installs nothing.
 - ⚙️ **Settings window** in Windows 11 style — all options across tabs (General / Features /
   Battery / Display / Touchpad / Performance / Keys / Notifications / HTTP API / Drivers / About),
   dark and light themes.
@@ -266,10 +269,10 @@ Launch `XiControl.exe` (confirm the UAC prompt) — a tray icon appears.
 | Keyboard backlight key | OSD with the level (off / 50% / 100% / auto) |
 
 All options live in the **Settings…** window (tray menu item): tabs General (language,
-autostart, panel theme, update check, logging), Features (owl, touchpad,
+autostart, panel theme, update check, logging, tray indicator), Features (owl, touchpad,
 touchscreen, refresh-rate control), Battery (charge threshold with a hint, "travel" sound and file,
 lock-screen sound and toast, charger-wattage OSD, "weak PSU" threshold, battery health), Display
-(brightness limit and memory; auto refresh rate, "Keep refresh rate" and the rates — the section is
+(brightness limit and memory, auto-brightness by sensor with the curve graph; auto refresh rate, "Keep refresh rate" and the rates — the section is
 hidden if refresh-rate control is off), Touchpad (bottom dead zone, edge sliders, vibration
 strength and click force, force press), Performance (mode visibility,
 separately for AC and battery, with a switch above the list; startup mode, power profiles),
@@ -752,6 +755,9 @@ Security (the utility runs as administrator, so — deliberately and with caveat
 - **The API settings live in `%ProgramData%\XiControl\api.json` under a "write only for
   administrators" ACL**: a non-elevated third-party process can neither enable the server nor swap
   the token.
+- **Small bodies, short exchanges**: a request body over 4 KB is answered `413` (chunked bodies
+  too), and the whole exchange gets 10 seconds — a stalled client is dropped instead of holding the
+  API for everyone else.
 - Plaintext HTTP (no TLS) is a deliberate trade-off: the allowlist's blast radius is small.
 
 None of this runs or spends resources while the API is off (the server simply isn't started).
@@ -817,7 +823,8 @@ reference/      PowerShell probes, firmware research logs
 How the code is structured (the command layer, seams for tests, the guard pattern) — [CLAUDE.md](CLAUDE.md),
 how to contribute — [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Diagnostics: errors are written to `%APPDATA%\XiControl\log.txt`.
+Diagnostics: errors are written to `%APPDATA%\XiControl\log.txt` (in portable mode — `log.txt`
+next to the exe).
 
 Changelog: [CHANGELOG.md](CHANGELOG.md) · Plans: [ROADMAP.md](ROADMAP.md)
 

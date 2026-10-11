@@ -109,23 +109,29 @@ xi_control/
  ├─ src/
  │   ├─ Program.cs          — вход: single-instance mutex → DI (MS.DI, все синглтоны,
  │   │                         провайдер владеет Dispose) → TrayApp.Start → Application.Run
- │   ├─ Config/             — AppConfig, IConfigStore/JsonConfigStore, AppPaths (портативный
- │   │                         режим XIC-34: данные рядом с exe по метке .portable/portable.txt)
- │   ├─ Wmi/                — Mifs.cs (константы протокола), IMifsClient/MifsClient,
- │   │                         IKeyEventSource/MifsEventWatcher
- │   ├─ Input/              — MiButtonGesture (жесты Mi-кнопки), KeyRouter (клавиша → действие)
+ │   ├─ Config/             — AppConfig (POCO + миграции), IConfigStore/JsonConfigStore,
+ │   │                         LegacyLanguageConverter, AppPaths (портативный режим XIC-34:
+ │   │                         данные рядом с exe по метке .portable/portable.txt)
+ │   ├─ Wmi/                — Mifs.cs (константы протокола), MifsDialect, IMifsClient/MifsClient,
+ │   │                         IKeyEventSource/MifsEventWatcher, WmiEventSubscription +
+ │   │                         WmiRetry (живучесть WMI-подписок: ограниченный ретрай первого
+ │   │                         старта, бессрочное переподключение — XIC-83)
+ │   ├─ Input/              — MiButtonGesture (жесты Mi-кнопки), KeyRouter (клавиша → действие),
+ │   │                         KeyMap (код → смысл, переопределение кодов под модель — XIC-38)
  │   ├─ Ui/                 — AppController (командный слой — все Set*/Toggle*, честные ошибки),
  │   │                         TrayApp (тонкий монтажник), TrayMenuBuilder, TrayIconController,
  │   │                         QuickPanelForm, OsdForm (+OsdPlacement — сетка 3×3, под тестами),
  │   │                         MonitorForm, FlyoutForm(+FlyoutPalette),
  │   │                         FormChrome, ModeUi, UiNav (чистая навигация — под тестами),
  │   │                         SettingsForm, SettingsActions, ToggleSwitch,
- │   │                         ScaledFonts, SvgIcons, FlyoutTip, Draw, TrayIcons, DarkMenu
+ │   │                         ScaledFonts, SvgIcons, FlyoutTip, Draw, TrayIcons, DarkMenu,
+ │   │                         TrayMetricIcon (индикатор-метрика в трее, XIC-35)
  │   ├─ Ui/Settings/        — SettingsToolkit (фабрика виджетов: карточки, тумблеры, комбо,
  │   │                         сегментный SegmentPicker, двухэтажная FieldCard), SettingsTheme,
  │   │                         NavStrip, SettingsPane (база вкладок; не подкручивает список
  │   │                         под контрол, получивший фокус мышью), вкладки-контролы
- │   │                         General/Features/Battery/Display/Touchpad/Perf/Keys/Osd/Api/AboutTab,
+ │   │                         General/Features/Battery/Display/Touchpad/Perf/Keys/Osd/Api/
+ │   │                         Drivers/AboutTab (DriversTab — проверка драйверов и BIOS у OEM, XIC-95),
  │   │                         CurveEditor (правка кривой авто-яркости мышью, XIC-33/66)
  │   ├─ SystemIntegration/  — ChargeGuard, RefreshRate(+Guard), PowerProfileGuard,
  │   │                         BrightnessCapGuard (лимит яркости, XIC-29),
@@ -134,15 +140,19 @@ xi_control/
  │   │                         TravelChargeMonitor, IPowerEvents+IDisplayEvents/SystemEventsSource,
  │   │                         IAppTimer/UiTimer/WorkerTimer, Brightness (+Ramp/Own/
  │   │                         AdaptiveBrightness), TouchpadControl/TouchscreenControl
- │   │                         (общий HidNodeToggle), TouchpadDeadZone, AwakeMode, MicControl,
- │   │                         KeyActions, AutoStart, UpdateCheck, Sound, BatteryInfo, PowerDraw,
- │   │                         GpuTelemetry,
+ │   │                         (общий HidNodeToggle), TouchpadDeadZone, TouchpadHaptics(+Protocol),
+ │   │                         TouchpadInput/RawTouchpadReader, TouchpadEdgeSliders,
+ │   │                         TouchpadHeavyPress + HeavyPressDetector, AwakeMode (сова — подписанный
+ │   │                         запрос питания, XIC-93), MicControl, KeyActions, ShellOpen (веб-ссылки — браузер
+ │   │                         с обычными правами через Explorer), AutoStart, UpdateCheck,
+ │   │                         Sound, BatteryInfo, PowerDraw, GpuTelemetry, NpuLoad (загрузка NPU,
+ │   │                         XIC-86), TrayMetrics (источники индикатора трея), LatestValue<T>
+ │   │                         (медленный WMI-источник на пуле, XIC-81), OemDrivers (проверка
+ │   │                         драйверов и BIOS у OEM, XIC-95 — см. docs/16),
  │   │                         HttpApi/ApiRouter/ApiSettings/ApiFirewall (opt-in HTTP API, XIC-13),
  │   │                         ChargeLimitWatcher + Webhook (исходящее событие о пороге заряда:
  │   │                         вебхук XIC-75 и предупреждение человеку XIC-74 — см. docs/15),
  │   │                         CurveEdit (правила ручной правки кривой яркости, XIC-33/66)
- │   ├─ Config/             — AppConfig (POCO + миграции), IConfigStore/JsonConfigStore,
- │   │                         LegacyLanguageConverter
  │   └─ Localization/       — lang/{ru,en,zh}.json (переводы, встроены в exe) + Loc.cs (загрузчик,
  │                             Loc.T) и шов ILocalizer
  └─ tests/XiControl.Tests/  — юнит-тесты чистой логики на фейках (Fakes.cs), без железа
