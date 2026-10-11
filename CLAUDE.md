@@ -253,7 +253,10 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   `TrayMetrics` (XIC-35: `TrayMetricFormat` — чистое форматирование под тестами, `CpuLoad`/
   `MemoryLoad`/`TemperatureSource` — источники, общие с «Монитором» (температура двухуровневая:
   Intel DPTF, иначе ACPI-термозона с честной подписью «температура платы», XIC-41), `TrayMetricSource` —
-  ленивый фасад по выбранной метрике);
+  ленивый фасад по выбранной метрике), `LatestValue<T>` (XIC-81: медленный WMI-источник читается
+  на пуле, не больше одного чтения сразу, UI берёт последнее готовое; `Fresh` прячет устаревшее,
+  `WaitFirst` — ограниченное ожидание первого значения ради раскладки. Так «Монитор» читает
+  DPTF, ватты адаптера MIFS и запасной `BatteryStatus` — UI-поток WMI не ждёт);
   **HTTP API (XIC-13, opt-in)** — `HttpApi` (хост на `HttpListener`/http.sys, без ASP.NET Core;
   создаётся только при включённой фиче → выключено = 0 CPU), `ApiRouter` (авторизация Bearer+SHA-256
   constant-time и белый список маршрутов — тестируется на фейках), `ApiSettings`/`ApiSettingsStore`

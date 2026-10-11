@@ -52,7 +52,18 @@ public sealed class MonitorForm : FlyoutForm
     private bool _hasGpu;      // IGCL поднялся → резервируем ряд GPU (иначе виджет как раньше)
     private bool _hasTemp;     // на этой модели DPTF отдаёт температуры → резервируем строку/высоту
     private float _critC;      // критический порог, °C (0 = неизвестен); из ACPI-термозоны, best-effort
-    private bool _critTried;   // порог уже пробовали прочитать (ACPI капризна — не долбим повторно)
+    private bool _critTried;   // порог уже пробовали прочитать (ACPI капризна — не долбим повторно); только пул
+    private volatile float _critRead; // прочитанный порог — пишет задача ReadCriticalOnce, в UI приходит через TempReading
+
+    // WMI-источники читаются на пуле, UI рисует последнее готовое значение (XIC-81): тик в норме
+    // и так дешёвый (DPTF ~18 мс, MIFS ~10 мс), но зависший провайдер (после сна) вешал бы UI-поток,
+    // а с ним глобальный хук мыши панели. Дешёвые чтения (CPU, RAM, IOCTL, IGCL) — как были.
+    private readonly record struct TempReading(float C, bool Present, float CritC);
+    private readonly SystemIntegration.LatestValue<TempReading> _tempWmi;
+    private readonly SystemIntegration.LatestValue<int> _adapterWmi;
+    private readonly SystemIntegration.LatestValue<float> _batteryWmi;
+    private const long StaleMs = 5000;  // старше 5 тиков — уже не «сейчас»: показываем прочерк
+    private const int FirstWaitMs = 300; // первое открытие ждёт температуру ради раскладки, но не дольше
 
     // с этого порога температура «горячая» → вишнёвый цвет; от крита с запасом, иначе разумный дефолт
     private float HotAt => _critC > 0 ? _critC - 15f : 88f;
@@ -83,6 +94,9 @@ public sealed class MonitorForm : FlyoutForm
         _cfg = cfg;
         _mifs = mifs;
         _tempSrc = new SystemIntegration.TemperatureSource(cfg.ForceAcpiTemperature);
+        _tempWmi = new(ReadTemp, new TempReading(float.NaN, false, 0f), "Monitor.Temp");
+        _adapterWmi = new(_mifs.GetAdapterWatts, 0, "Monitor.Adapter");
+        _batteryWmi = new(SamplePowerWattsWmi, float.NaN, "Monitor.Power");
         _tip = new FlyoutTip(this);
         _view = cfg.MonitorView?.ToLowerInvariant() switch
         {
@@ -103,6 +117,9 @@ public sealed class MonitorForm : FlyoutForm
         _power.Clear(); _cpu.Clear(); _gpu.Clear(); _ram.Clear(); _temp.Clear();
         _cpuLoad.Reset(); // база времён CPU протухла, пока виджет был закрыт
         _gpuTel.Reset(); // иначе первая загрузка GPU размажется по времени, что виджет был закрыт
+        // есть ли температуры — решает высоту окна; первое чтение ждём, но ограниченно (XIC-81):
+        // не успело — окно перестроится само, когда ответ придёт (см. Sample)
+        _tempWmi.WaitFirst(FirstWaitMs);
         Sample(full: true); // первая точка сразу (заодно определит наличие DPTF-температур и IGCL до ApplyView)
         // выбранной метрики на этой машине может не быть вовсе (GPU на не-Intel) — тогда
         // показываем потребление, а не вечный прочерк
@@ -323,13 +340,23 @@ public sealed class MonitorForm : FlyoutForm
     private void Sample(bool full = false)
     {
         bool all = full || _view != ViewKind.Power;
+        bool hadTemp = _hasTemp;
         if (all || _compact == SystemIntegration.TrayMetric.Cpu) Push(_cpu, SampleCpu());
         if (all || _compact == SystemIntegration.TrayMetric.Gpu) Push(_gpu, SampleGpu());
         if (all || _compact == SystemIntegration.TrayMetric.Ram) Push(_ram, SampleRam());
         if (all || _compact == SystemIntegration.TrayMetric.Power) Push(_power, SamplePowerWatts());
         if (all || _compact == SystemIntegration.TrayMetric.Temp) Push(_temp, SampleTempC());
+        // температуры нашлись позже раскладки (первое чтение не уложилось в FirstWaitMs) —
+        // нужен ряд под них, а компактному виду можно вернуть выбранную «температуру»
+        if (_hasTemp && !hadTemp && Visible)
+        {
+            _compact = SystemIntegration.TrayMetricFormat.Available(
+                SystemIntegration.TrayMetricFormat.ParseKind(_cfg.MonitorCompactMetric), _hasGpu, _hasTemp);
+            ApplyView();
+        }
         if (!all) return; // ватты адаптера показывает только полный вид
-        try { _adapterWatts = _mifs.GetAdapterWatts(); } catch (Exception ex) { Log.Ex("Monitor.Adapter", ex); _adapterWatts = 0; }
+        _adapterWmi.Request(); // MIFS — WMI-метод: на пуле, рисуем прошлый ответ
+        _adapterWatts = _adapterWmi.Fresh(StaleMs, 0);
     }
 
     /// <summary>
@@ -352,13 +379,28 @@ public sealed class MonitorForm : FlyoutForm
     /// <summary>
     /// Температура «горячей точки» через Intel DPTF — сам опрос вынесен в общий
     /// <see cref="SystemIntegration.DptfTemperature"/> (его же использует индикатор трея XIC-35).
-    /// Здесь остаётся только резервирование строки и чтение крит-порога при первом успехе.
+    /// Здесь остаётся только резервирование строки и крит-порог. Читается на пуле (XIC-81):
+    /// на графике — прошлый ответ, а старше <see cref="StaleMs"/> — прочерк.
     /// </summary>
     private float SampleTempC()
     {
+        _tempWmi.Request();
+        var r = _tempWmi.Latest;
+        if (r.Present && !_hasTemp) _hasTemp = true; // источник есть → строка
+        if (r.CritC > 0) _critC = r.CritC;
+        return _tempWmi.Fresh(StaleMs, r with { C = float.NaN }).C;
+    }
+
+    // На пуле, не больше одного чтения сразу (LatestValue) — _critTried поэтому без замка.
+    private TempReading ReadTemp()
+    {
         float c = _tempSrc.ReadMaxC();
-        if (_tempSrc.Present && !_hasTemp) { _hasTemp = true; ReadCriticalOnce(); } // источник есть → строка + крит-порог
-        return c;
+        bool present = _tempSrc.Present;
+        // источник есть → крит-порог, один раз и отдельной задачей: ACPI-класс капризный и
+        // небыстрый, а первое значение температуры ждёт раскладка окна (FirstWaitMs).
+        // Порог приедет в одном из следующих TempReading.
+        if (present && !_critTried) { _critTried = true; _ = Task.Run(ReadCriticalOnce); }
+        return new TempReading(c, present, _critRead);
     }
 
     /// <summary>
@@ -368,8 +410,6 @@ public sealed class MonitorForm : FlyoutForm
     /// </summary>
     private void ReadCriticalOnce()
     {
-        if (_critTried) return;
-        _critTried = true;
         try
         {
             using var s = new ManagementObjectSearcher(@"root\wmi",
@@ -380,7 +420,7 @@ public sealed class MonitorForm : FlyoutForm
                 o.Dispose();
                 if (v is null) continue;
                 float c = Convert.ToSingle(v, System.Globalization.CultureInfo.InvariantCulture) / 10f - 273.15f;
-                if (c is > 60f and < 120f) { _critC = c; break; } // правдоподобный крит-порог
+                if (c is > 60f and < 120f) { _critRead = c; break; } // правдоподобный крит-порог
             }
         }
         catch (Exception ex) { Log.Ex("Monitor.Crit", ex); }
@@ -403,11 +443,13 @@ public sealed class MonitorForm : FlyoutForm
     private float SamplePowerWatts()
     {
         // Battery IOCTL — живое значение (не «залипает» без сторонних поллеров вроде HWiNFO);
-        // если Battery API недоступен, мягко откатываемся на WMI.
+        // если Battery API недоступен, мягко откатываемся на WMI — его читаем на пуле (XIC-81).
         if (_powerDraw.TryReadWatts(out float w)) return w;
-        return SamplePowerWattsWmi();
+        _batteryWmi.Request();
+        return _batteryWmi.Fresh(StaleMs, float.NaN);
     }
 
+    // На пуле через _batteryWmi, не больше одного чтения сразу — _battery поэтому без замка.
     private float SamplePowerWattsWmi()
     {
         try
