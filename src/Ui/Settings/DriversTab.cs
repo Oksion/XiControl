@@ -93,23 +93,37 @@ public sealed class DriversTab : SettingsPane
     }
 
     /// <summary>
-    /// Служба Xiaomi MiDeviceService (XIC-87, docs/17): состояние и «Отключить / Включить» в два
-    /// нажатия. Здесь, а не в «О программе»: это та самая служба, что проверяет драйверы у родного
-    /// софта, и вкладка про стек Xiaomi. Блок есть всегда — и когда службы нет: пусть человек видит,
+    /// Службы Xiaomi MiDeviceService и MiService (XIC-87, docs/17): состояние и «Отключить / Включить»
+    /// в два нажатия. Здесь, а не в «О программе»: MiDeviceService — та самая служба, что проверяет
+    /// драйверы у родного софта, и вкладка про стек Xiaomi. Блок есть всегда — и когда службы нет: пусть человек видит,
     /// что всё в порядке, а не гадает. Состояние читается на каждый показ (SCM, мгновенно) — служба
     /// может появиться или исчезнуть, пока XiControl работает. Сама служба трогается только по кнопке.
     /// </summary>
     private void AddOemService(SettingsToolkit ui, SettingsActions act, Action rebuild)
     {
-        var v = act.GetOemService();
         ui.AddGroup(this, "settings.drivers.oem.group");
+        // MiDeviceService мешает — она первой и с объяснением чем; MiService не мешает, но отключить
+        // её просят ради приватности, а кто-то уже отключил и ищет, чем вернуть
+        AddOemServiceRow(ui, act, rebuild, OemService.DeviceService, "settings.drivers.oem.");
+        AddOemServiceRow(ui, act, rebuild, OemService.BaseService, "settings.drivers.oem.base.");
 
+        var more = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, ui.Sc(4), 0, 0), BackColor = ui.T.WinBg };
+        more.Controls.Add(Button(ui, "settings.drivers.oem.more",
+            () => ShellOpen.OpenUrl("https://github.com/Oksion/XiControl/blob/main/docs/17-oem-services.md")));
+        Controls.Add(more);
+    }
+
+    // Строка одной службы; тексты «что делает / отключена / не найдена» — свои у каждой (prefix),
+    // состояние, кнопки и ошибки — общие
+    private void AddOemServiceRow(SettingsToolkit ui, SettingsActions act, Action rebuild, string name, string prefix)
+    {
+        var v = act.GetOemService(name);
         string desc;
         Control ctl;
         switch (v.Info.State)
         {
             case OemServiceState.NotInstalled:
-                desc = Loc.T("settings.drivers.oem.missing");
+                desc = Loc.T(prefix + "missing");
                 ctl = ui.ValueLabel(Loc.T("settings.drivers.oem.v.missing"));
                 break;
             case OemServiceState.NoAccess:
@@ -117,13 +131,13 @@ public sealed class DriversTab : SettingsPane
                 ctl = ui.ValueLabel(Loc.T("settings.drivers.oem.v.noaccess"));
                 break;
             case OemServiceState.Disabled:
-                desc = Loc.T("settings.drivers.oem.off");
-                ctl = ui.ConfirmButton("settings.drivers.oem.enable", "settings.drivers.oem.enable.confirm", () => act.SetOemService(true, rebuild));
+                desc = Loc.T(prefix + "off");
+                ctl = ui.ConfirmButton("settings.drivers.oem.enable", "settings.drivers.oem.enable.confirm", () => act.SetOemService(name, true, rebuild));
                 break;
             default: // запущена или остановлена, но не отключена — после перезагрузки поднимется
-                desc = Loc.T("settings.drivers.oem.desc") + "\n"
+                desc = Loc.T(prefix + "desc") + "\n"
                      + Loc.T("settings.drivers.oem.status", OemStateText(v.Info.State), OemStartText(v.Info.StartType));
-                ctl = ui.ConfirmButton("settings.drivers.oem.disable", "settings.drivers.oem.disable.confirm", () => act.SetOemService(false, rebuild));
+                ctl = ui.ConfirmButton("settings.drivers.oem.disable", "settings.drivers.oem.disable.confirm", () => act.SetOemService(name, false, rebuild));
                 break;
         }
         // операция идёт (служба останавливается до ~15 с) — вместо кнопки неактивная надпись
@@ -133,16 +147,11 @@ public sealed class DriversTab : SettingsPane
             b.Enabled = false;
             ctl = b;
         }
-        ctl.AccessibleName = "Xiaomi MiDeviceService";
-        Controls.Add(ui.Row("Xiaomi MiDeviceService", desc, ctl));
+        ctl.AccessibleName = "Xiaomi " + name;
+        Controls.Add(ui.Row("Xiaomi " + name, desc, ctl));
 
         if (v.Error == OemServiceResult.AccessDenied) ui.AddNote(this, "settings.drivers.oem.err.denied");
         else if (v.Error == OemServiceResult.Failed) ui.AddNote(this, "settings.drivers.oem.err.failed");
-
-        var more = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, ui.Sc(4), 0, 0), BackColor = ui.T.WinBg };
-        more.Controls.Add(Button(ui, "settings.drivers.oem.more",
-            () => ShellOpen.OpenUrl("https://github.com/Oksion/XiControl/blob/main/docs/17-oem-services.md")));
-        Controls.Add(more);
     }
 
     private static string OemStateText(OemServiceState s) => Loc.T(s == OemServiceState.Running

@@ -22,24 +22,30 @@ public sealed record OemServiceInfo(OemServiceState State, OemStartType StartTyp
 public sealed record OemServiceView(OemServiceInfo Info, bool? Pending, OemServiceResult? Error);
 
 /// <summary>
-/// Служба Xiaomi MiDeviceService (XIC-87, docs/17): XiControl она не нужна, а на выходе из Eco
-/// откатывает яркость и сама меняет режим питания Windows. Здесь — чтение состояния и
-/// отключение/включение по кнопке; на старте и в фоне ничего не делаем.
+/// Службы Xiaomi (XIC-87, docs/17). MiDeviceService XiControl мешает: на выходе из Eco откатывает
+/// яркость и сама меняет режим питания Windows. MiService — базовая служба стека (аккаунт,
+/// телеметрия, мастер первого запуска): не мешает, но отключить её просят ради приватности, а
+/// кто-то уже отключил и ищет, чем вернуть. Здесь — чтение состояния и отключение/включение по кнопке; на старте
+/// и в фоне ничего не делаем.
 /// Через SCM напрямую, а не sc.exe/WMI: чтение мгновенное (вкладка строится в UI-потоке),
 /// и коды ошибок честные — ERROR_ACCESS_DENIED отличаем от остального. Deny-ACE службы стоит
 /// только на SYSTEM, администратор (а мы — он) останавливает и перенастраивает её штатно.
 /// </summary>
 public static class OemService
 {
-    public const string Name = "MiDeviceService";
+    /// <summary>Мешает XiControl: откат яркости на выходе из Eco, режим питания Windows.</summary>
+    public const string DeviceService = "MiDeviceService";
+
+    /// <summary>Базовая служба стека (аккаунт, телеметрия, OOBE) — нам не мешает, отключение по желанию.</summary>
+    public const string BaseService = "MiService";
 
     /// <summary>Состояние и тип запуска. Быстро (одно обращение к SCM), можно из UI-потока.</summary>
-    public static OemServiceInfo Read()
+    public static OemServiceInfo Read(string name)
     {
         try
         {
             using var scm = OpenScm();
-            using var svc = OpenService(scm, SERVICE_QUERY_STATUS | SERVICE_QUERY_CONFIG);
+            using var svc = OpenServiceW(scm, name, SERVICE_QUERY_STATUS | SERVICE_QUERY_CONFIG);
             if (svc.IsInvalid) return Marshal.GetLastWin32Error() switch
             {
                 ERROR_SERVICE_DOES_NOT_EXIST => OemServiceInfo.Missing,
@@ -52,13 +58,13 @@ public static class OemService
         }
         catch (Exception ex)
         {
-            Log.Ex("OemService.Read", ex);
+            Log.Ex("OemService.Read " + name, ex);
             return new(OemServiceState.NoAccess, OemStartType.Unknown);
         }
     }
 
     /// <summary>Тип запуска Disabled, затем остановка (ждём до ~15 с). Звать из фонового потока.</summary>
-    public static OemServiceResult Disable() => Run("Disable", svc =>
+    public static OemServiceResult Disable(string name) => Run(name, "Disable", svc =>
     {
         // сначала тип запуска: если остановка и не удастся, после перезагрузки служба не поднимется
         if (!ChangeServiceConfig(svc, SERVICE_NO_CHANGE, SERVICE_DISABLED, SERVICE_NO_CHANGE,
@@ -71,7 +77,7 @@ public static class OemService
     });
 
     /// <summary>Вернуть тип запуска <paramref name="start"/> и запустить. Звать из фонового потока.</summary>
-    public static OemServiceResult Enable(OemStartType start) => Run("Enable " + start, svc =>
+    public static OemServiceResult Enable(string name, OemStartType start) => Run(name, "Enable " + start, svc =>
     {
         uint type = start == OemStartType.Manual ? SERVICE_DEMAND_START : SERVICE_AUTO_START;
         if (!ChangeServiceConfig(svc, SERVICE_NO_CHANGE, type, SERVICE_NO_CHANGE,
@@ -109,26 +115,27 @@ public static class OemService
         _ => OemServiceState.Running, // START/STOP_PENDING, RUNNING, PAUSED — процесс жив
     };
 
-    private static OemServiceResult Run(string what, Func<SafeServiceHandle, bool> op)
+    private static OemServiceResult Run(string name, string what, Func<SafeServiceHandle, bool> op)
     {
+        what = name + ": " + what;
         try
         {
             using var scm = OpenScm();
-            using var svc = OpenService(scm, SERVICE_QUERY_STATUS | SERVICE_QUERY_CONFIG | SERVICE_CHANGE_CONFIG | SERVICE_STOP | SERVICE_START);
+            using var svc = OpenServiceW(scm, name, SERVICE_QUERY_STATUS | SERVICE_QUERY_CONFIG | SERVICE_CHANGE_CONFIG | SERVICE_STOP | SERVICE_START);
             if (svc.IsInvalid) return Fail(what, Marshal.GetLastWin32Error());
-            if (op(svc)) { Log.Write($"OemService: {what} — ок"); return OemServiceResult.Ok; }
+            if (op(svc)) { Log.Write($"OemService {what} — ок"); return OemServiceResult.Ok; }
             return Fail(what, Marshal.GetLastWin32Error());
         }
         catch (Exception ex)
         {
-            Log.Ex("OemService." + what, ex);
+            Log.Ex("OemService " + what, ex);
             return OemServiceResult.Failed;
         }
     }
 
     private static OemServiceResult Fail(string what, int err)
     {
-        Log.Write($"OemService: {what} — ошибка {err} ({new Win32Exception(err).Message})");
+        Log.Write($"OemService {what} — ошибка {err} ({new Win32Exception(err).Message})");
         return err switch
         {
             ERROR_ACCESS_DENIED => OemServiceResult.AccessDenied,
@@ -181,8 +188,6 @@ public static class OemService
         var h = OpenSCManager(null, null, SC_MANAGER_CONNECT);
         return h.IsInvalid ? throw new Win32Exception() : h;
     }
-
-    private static SafeServiceHandle OpenService(SafeServiceHandle scm, uint access) => OpenServiceW(scm, Name, access);
 
     // ---- Win32 ----
 

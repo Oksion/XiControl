@@ -902,40 +902,55 @@ public sealed class AppController
         finally { Volatile.Write(ref _driverCheckRunning, 0); }
     }
 
-    // ---- Служба Xiaomi MiDeviceService (XIC-87) ----
+    // ---- Службы Xiaomi: MiDeviceService и MiService (XIC-87) ----
 
-    private int _oemServiceOp; // 0 — ничего, 1 — отключаем, 2 — включаем
+    // Одна операция за раз на обе службы: остановка ждёт до ~15 с, параллельно им незачем
+    private readonly object _oemServiceLock = new();
+    private (string Name, bool On)? _oemServiceOp;
+    private (string Name, OemServiceResult Error)? _oemServiceError;
 
-    /// <summary>Что сейчас делается: null — ничего, false — отключаем, true — включаем.
-    /// Вкладка показывает «Отключаю…»/«Включаю…» вместо кнопки.</summary>
-    public bool? OemServicePending => Volatile.Read(ref _oemServiceOp) switch { 1 => false, 2 => true, _ => null };
-
-    /// <summary>Чем кончилось последнее нажатие; null — не нажимали или всё получилось.</summary>
-    public OemServiceResult? OemServiceError { get; private set; }
+    /// <summary>Состояние службы <paramref name="name"/> для вкладки: SCM сейчас, идёт ли по ней
+    /// операция (null — нет, false — отключаем, true — включаем) и ошибка её последнего нажатия.</summary>
+    public OemServiceView GetOemServiceView(string name)
+    {
+        lock (_oemServiceLock)
+            return new(OemService.Read(name),
+                _oemServiceOp is { } op && op.Name == name ? op.On : null,
+                _oemServiceError is { } e && e.Name == name ? e.Error : null);
+    }
 
     /// <summary>
     /// Отключить (<paramref name="on"/> = false) или включить службу — только по кнопке. Тип
     /// запуска до отключения запоминается здесь, в UI-потоке (конфиг пишем не из пула); сама
-    /// остановка/запуск ждёт службу до ~15 с — на пуле. Повторное нажатие во время операции
+    /// остановка/запуск ждёт службу до ~15 с — на пуле. Нажатие во время другой операции
     /// ничего не делает.
     /// </summary>
-    public Task SetOemServiceAsync(bool on)
+    public Task SetOemServiceAsync(string name, bool on)
     {
-        if (Interlocked.CompareExchange(ref _oemServiceOp, on ? 2 : 1, 0) != 0) return Task.CompletedTask;
-        if (!on && OemService.Read().StartType is var current && OemService.ShouldRemember(current))
+        lock (_oemServiceLock)
         {
-            _cfg.OemServiceStartType = current.ToString();
+            if (_oemServiceOp is not null) return Task.CompletedTask;
+            _oemServiceOp = (name, on);
+        }
+        _cfg.OemServiceStartTypes ??= new(StringComparer.OrdinalIgnoreCase);
+        if (!on && OemService.Read(name).StartType is var current && OemService.ShouldRemember(current))
+        {
+            _cfg.OemServiceStartTypes[name] = current.ToString();
             _cfg.Save();
         }
-        var restore = OemService.RestoreTarget(_cfg.OemServiceStartType);
+        var restore = OemService.RestoreTarget(_cfg.OemServiceStartTypes.GetValueOrDefault(name));
         return Task.Run(() =>
         {
-            try
+            var r = OemServiceResult.Failed;
+            try { r = on ? OemService.Enable(name, restore) : OemService.Disable(name); }
+            finally
             {
-                var r = on ? OemService.Enable(restore) : OemService.Disable();
-                OemServiceError = r == OemServiceResult.Ok ? null : r;
+                lock (_oemServiceLock)
+                {
+                    _oemServiceOp = null;
+                    _oemServiceError = r == OemServiceResult.Ok ? null : (name, r);
+                }
             }
-            finally { Volatile.Write(ref _oemServiceOp, 0); }
         });
     }
 
