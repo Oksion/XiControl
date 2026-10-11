@@ -257,7 +257,10 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   хранится вместе со схемой питания и возвращается в неё, а не в активную; запись
   сохраняется до правки плана и не стирается, пока возврат не удался; любой сбой включения
   откатывает крышку — XIC-82, логика под тестами на фейках `IPowerPlan`/`IKeepAwake`),
-  `MicControl`, `KeyActions`, `Sound` (WAV-джинглы), `BatteryInfo`, `PowerDraw`,
+  `MicControl`, `KeyActions`, `ShellOpen` (**все веб-ссылки — только через `ShellOpen.OpenUrl`**:
+  только http/https, браузер запускает рабочий стол Explorer через `IShellDispatch2::ShellExecute`
+  — medium IL, иначе закрытый браузер стартовал бы от нашего админского токена; откат — прямой
+  ShellExecute), `Sound` (WAV-джинглы), `BatteryInfo`, `PowerDraw`,
   `GpuTelemetry` (загрузка/ватты/частота iGPU через **Intel IGCL** — user-mode API драйвера Intel,
   `ControlLib.dll` из System32; driver-free, без админа, ленивая инициализация; не Intel → ряд GPU
   в «Мониторе» просто не появляется, см. `docs/09`),

@@ -39,7 +39,7 @@ public sealed class AboutTab : SettingsPane
         if (status == UpdateStatus.Available && upd is not null)
         {
             row.Controls.Add(Note(Loc.T("settings.updates.available", upd.Tag), ui.T.Accent));
-            row.Controls.Add(ui.LinkButton("settings.updates.open", () => Open(upd.Url)));
+            row.Controls.Add(ui.LinkButton("settings.updates.open", () => ShellOpen.OpenUrl(upd.Url)));
         }
         else
         {
@@ -69,10 +69,10 @@ public sealed class AboutTab : SettingsPane
         };
 
         var links = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, 0, 0, ui.Sc(14)), BackColor = ui.T.WinBg };
-        links.Controls.Add(ui.LinkButton("GitHub", () => Open("https://github.com/Oksion/XiControl")));
-        links.Controls.Add(ui.LinkButton("settings.about.forum", () => Open("https://4pda.to/forum/index.php?showtopic=1122287")));
-        links.Controls.Add(ui.LinkButton("settings.about.license", () => Open("https://github.com/Oksion/XiControl/blob/main/LICENSE")));
-        links.Controls.Add(ui.LinkButton("settings.about.updates", () => Open("https://github.com/Oksion/XiControl/releases")));
+        links.Controls.Add(ui.LinkButton("GitHub", () => ShellOpen.OpenUrl("https://github.com/Oksion/XiControl")));
+        links.Controls.Add(ui.LinkButton("settings.about.forum", () => ShellOpen.OpenUrl("https://4pda.to/forum/index.php?showtopic=1122287")));
+        links.Controls.Add(ui.LinkButton("settings.about.license", () => ShellOpen.OpenUrl("https://github.com/Oksion/XiControl/blob/main/LICENSE")));
+        links.Controls.Add(ui.LinkButton("settings.about.updates", () => ShellOpen.OpenUrl("https://github.com/Oksion/XiControl/releases")));
         Controls.Add(links);
 
 
@@ -111,7 +111,7 @@ public sealed class AboutTab : SettingsPane
             BackColor = Color.Transparent,
             Cursor = Cursors.Hand,
         };
-        coffee.Click += (_, _) => Open("https://buymeacoffee.com/3CLiAI1");
+        coffee.Click += (_, _) => ShellOpen.OpenUrl("https://buymeacoffee.com/3CLiAI1");
         ui.AddRow(this, "settings.about.support", "settings.about.support.desc", coffee);
     }
 
@@ -129,10 +129,5 @@ public sealed class AboutTab : SettingsPane
         return path.StartsWith(appData, StringComparison.OrdinalIgnoreCase)
             ? "%APPDATA%" + path[appData.Length..]
             : path;
-    }
-
-    private static void Open(string url)
-    {
-        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { /* нет браузера */ }
     }
 }

@@ -142,7 +142,7 @@ public sealed class ApiTab : SettingsPane
         ui.AddNote(this, "settings.api.examples.note");
         // «Подробнее» — на полное описание протокола: коды ответов, вебхук и готовый сценарий
         // для Home Assistant в три экрана настроек не поместятся и не должны
-        var docs = ui.LinkButton("settings.api.docs.btn", () => Open(DocsUrl));
+        var docs = ui.LinkButton("settings.api.docs.btn", () => ShellOpen.OpenUrl(DocsUrl));
         docs.AutoSize = false;
         docs.Width = TextRenderer.MeasureText(docs.Text, docs.Font).Width + ui.Sc(24);
         docs.Height = ui.Sc(30);
@@ -155,12 +155,6 @@ public sealed class ApiTab : SettingsPane
             box.AccessibleName = Loc.T(titleKey);
             Controls.Add(ui.FieldCard(Loc.T(titleKey), null, box)); // заголовка хватает — что делает команда, видно из неё
         }
-    }
-
-    private static void Open(string url)
-    {
-        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
-        catch { /* нет браузера — не повод падать */ }
     }
 
     // Готовые команды: curl (он же есть в Windows 10+ из коробки) и PowerShell — первая

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Win32;
 using XiControl.Config;
 using XiControl.Input;
@@ -245,7 +244,7 @@ public sealed class TrayApp : IDisposable
         {
             if (_pendingUpdateUrl is not string url) return; // тост мог быть и не про обновление
             _pendingUpdateUrl = null;
-            Safe(() => { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); return true; }, false);
+            ShellOpen.OpenUrl(url);
         };
         // тачпад/экран: колбэк приходит с фонового потока — маршалим в UI
         _controller.TouchpadToggled = b => _osd.BeginInvoke(new Action(() =>
