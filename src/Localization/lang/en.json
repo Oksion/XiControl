@@ -253,7 +253,7 @@
   "settings.updates.open": "Open the release page",
   "settings.updates.now": "Check for updates",
   "settings.drivers.sub": "What Xiaomi offers for this model and how it compares with what is installed.",
-  "settings.drivers.privacy": "The check contacts Xiaomi's server only when you press the button. It sends the laptop model, language and Windows build number; the serial number is not sent. XiControl itself downloads and installs nothing.",
+  "settings.drivers.privacy": "The check contacts Xiaomi's server only when you press the button. It sends the laptop model, Windows language, region and build number, and the BIOS version; the serial number is not sent. XiControl itself downloads and installs nothing.",
   "settings.drivers.check": "Check with Xiaomi",
   "settings.drivers.check.btn": "Check",
   "settings.drivers.status.never": "Not checked yet",

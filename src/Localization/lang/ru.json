@@ -253,7 +253,7 @@
   "settings.updates.open": "Открыть страницу релиза",
   "settings.updates.now": "Проверить обновления",
   "settings.drivers.sub": "Что Xiaomi предлагает для этой модели и как это соотносится с установленным.",
-  "settings.drivers.privacy": "Проверка обращается к серверу Xiaomi только по кнопке. Туда уходят модель ноутбука, язык и номер сборки Windows; серийный номер не передаётся. Сам XiControl ничего не скачивает и не устанавливает.",
+  "settings.drivers.privacy": "Проверка обращается к серверу Xiaomi только по кнопке. Туда уходят модель ноутбука, язык, регион и номер сборки Windows и версия BIOS; серийный номер не передаётся. Сам XiControl ничего не скачивает и не устанавливает.",
   "settings.drivers.check": "Проверка у Xiaomi",
   "settings.drivers.check.btn": "Проверить",
   "settings.drivers.status.never": "Ещё не проверяли",
