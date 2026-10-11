@@ -132,12 +132,16 @@ public static class KeyActions
         return (path, string.IsNullOrWhiteSpace(args) ? null : args);
     }
 
-    /// <summary>Запустить произвольную программу/файл/URL (действие "launch" у клавиш).</summary>
+    /// <summary>Запустить произвольную программу/файл/URL (действие "launch" у клавиш).
+    /// http/https-ссылки — через <see cref="ShellOpen.OpenUrl"/>, без прав администратора.</summary>
     public static void Launch(string path, string? args = null)
     {
         try
         {
             path = Environment.ExpandEnvironmentVariables(path.Trim());
+            // веб-ссылка — в браузер без нашего админского токена (аргументы у URL смысла не имеют);
+            // права на передний план выдаём и здесь: клавиша — не ввод, без них окно уйдёт назад (XIC-90)
+            if (ShellOpen.TryWebUrl(path, out _)) { GrantForeground(); ShellOpen.OpenUrl(path); return; }
             var psi = new ProcessStartInfo(path) { UseShellExecute = true };
             if (!string.IsNullOrWhiteSpace(args))
                 psi.Arguments = Environment.ExpandEnvironmentVariables(args);
