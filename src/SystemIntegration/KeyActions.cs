@@ -87,6 +87,8 @@ public static class KeyActions
     public static void TaskView() => WinCombo(VK_TAB);
 
     /// <summary>Открыть Параметры Windows (опция "SettingsKey": "settings").</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "S4036",
+        Justification = "ms-settings: — URI-протокол, его разрешает оболочка, а не поиск exe по PATH")]
     public static void OpenSettings()
     {
         GrantForeground();

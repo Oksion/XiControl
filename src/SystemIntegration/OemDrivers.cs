@@ -78,6 +78,8 @@ public static class OemProtocol
     /// <summary>MD5(appid + body + key), шестнадцатеричный в ВЕРХНЕМ регистре.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA5351",
         Justification = "MD5 задан протоколом сервера OEM — это подпись их API, а не наша защита")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "S4790",
+        Justification = "То же для Sonar: алгоритм подписи выбрал не XiControl, а сервер Xiaomi")]
     internal static string Sign(string body) =>
         Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(AppId + body + Key)));
 
@@ -118,18 +120,10 @@ public static class OemProtocol
                 string name = Text(m, "moduleName") ?? "?";
                 if (!m.TryGetProperty("latestVer", out var latest) || latest.ValueKind != JsonValueKind.Object) continue;
 
-                OemPackage? package = null;
-                if (latest.TryGetProperty("packages", out var pkgs) && pkgs.ValueKind == JsonValueKind.Array)
-                    foreach (var p in pkgs.EnumerateArray())
-                    {
-                        string? url = null;
-                        if (p.TryGetProperty("mirrors", out var mirrors) && mirrors.ValueKind == JsonValueKind.Array)
-                            foreach (var u in mirrors.EnumerateArray())
-                                if (u.GetString() is { } s && s.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) { url = s; break; }
-                        long size = p.TryGetProperty("fileSize", out var fs) && fs.TryGetInt64(out long l) ? l : 0;
-                        package = new OemPackage(Text(p, "fileName") ?? "", size, Text(p, "md5") ?? "", url);
-                        break; // пакет у модуля один — FULL_PACKAGE
-                    }
+                // пакет у модуля один — FULL_PACKAGE
+                OemPackage? package = latest.TryGetProperty("packages", out var pkgs)
+                    && pkgs.ValueKind == JsonValueKind.Array && pkgs.GetArrayLength() > 0
+                    ? ParsePackage(pkgs[0]) : null;
 
                 // настоящая версия — в strategy.hardwareIds[].version; latestVer.version — заглушка "NS"
                 var ids = new List<OemHardwareId>();
@@ -143,6 +137,17 @@ public static class OemProtocol
             return list;
         }
         catch (JsonException) { return null; }
+    }
+
+    private static OemPackage ParsePackage(JsonElement p)
+    {
+        string? url = null;
+        if (p.TryGetProperty("mirrors", out var mirrors) && mirrors.ValueKind == JsonValueKind.Array)
+            foreach (var u in mirrors.EnumerateArray())
+                if (u.ValueKind == JsonValueKind.String && u.GetString() is { } s
+                    && s.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) { url = s; break; }
+        long size = p.TryGetProperty("fileSize", out var fs) && fs.TryGetInt64(out long l) ? l : 0;
+        return new OemPackage(Text(p, "fileName") ?? "", size, Text(p, "md5") ?? "", url);
     }
 
     private static string? Text(JsonElement e, string name) =>
