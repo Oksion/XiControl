@@ -155,10 +155,12 @@ public sealed class AppController
         if (_cfg.BrightnessCapEnabled && !_cfg.RememberBrightness && !_cfg.PowerProfiles)
             Task.Run(_capGuard.Evaluate);
 
-        // Авто-яркость (XIC-30): датчик стартуем всегда (нужен вкладке «Экран», чтобы знать,
-        // показывать ли фичу); первые люксы придут событием и сами дадут сверку через дебаунс.
-        // Кривые сеем и здесь: фичу могли включить правкой config.json мимо SetAutoBrightness.
+        // Авто-яркость (XIC-30): датчик активируем всегда (вкладке «Экран» надо знать, показывать
+        // ли фичу), а стримит он только по спросу (XIC-84); первые люксы придут событием и сами
+        // дадут сверку через дебаунс. Кривые сеем и здесь: фичу могли включить правкой
+        // config.json мимо SetAutoBrightness.
         if (_cfg.AutoBrightness) SeedCurves();
+        _als.SetDemand(_cfg.AutoBrightness);
         _als.Start();
 
         // Краевые ползунки тачпада (XIC-61): реестр на старте НЕ трогаем (зоны там уже лежат
@@ -599,6 +601,7 @@ public sealed class AppController
             _cfg.RememberBrightness = false; // взаимоисключение: два хозяина яркости не нужны
         }
         _cfg.Save();
+        _als.SetDemand(on);                    // выключили — датчик больше не будим (XIC-84)
         if (on) Task.Run(_autoGuard.Evaluate); // сверка может читать WMI — не с UI-потока
         AutoBrightnessChanged?.Invoke(on);     // клавиша ждёт OSD, настройки — перерисовки панели
     }
@@ -637,6 +640,10 @@ public sealed class AppController
 
     /// <summary>Текущая освещённость, лк (NaN — событий ещё не было) — живой индикатор в настройках.</summary>
     public float CurrentLux => _als.LastLux;
+
+    /// <summary>Держать датчик для живого индикатора, пока жива аренда (XIC-84): при выключенной
+    /// авто-яркости он иначе не стримит.</summary>
+    public IDisposable WatchLux() => _als.Watch();
 
     /// <summary>«Инерция» датчика: окно медианы, сек (0 — мгновенные значения). Новые сэмплы
     /// подхватят окно сами — guard дёргать не нужно.</summary>

@@ -205,7 +205,8 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   дебаунс; обучение можно выключить (XIC-37) — тогда правки временные и идёт торг к предсказанию
   по механике лимита; датчик — WinRT LightSensor сырой активацией на выделенном MTA-потоке,
   **классический COM Sensor API в elevated мёртв**, а стрим требует живого подписчика
-  `ReadingChanged` — математика и грабли в `docs/13-auto-brightness.md`),
+  `ReadingChanged`; стримит только по спросу — авто-яркость или аренда `Watch` живого индикатора,
+  XIC-84 — математика и грабли в `docs/13-auto-brightness.md`),
   `TravelChargeMonitor` (ожидание 100%), `IPowerEvents`+`IDisplayEvents`/`SystemEventsSource`
   (события питания и экрана за швами, одно скрытое окно-маршалер), `IAppTimer`/`UiTimer`/
   `WorkerTimer` (пул-таймер для логики вне UI-потока: WinForms-таймер, стартованный с потока

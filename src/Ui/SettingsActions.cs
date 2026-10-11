@@ -42,6 +42,7 @@ public sealed class SettingsActions
     public required Action<string?> SetAutoBrightnessRevert; // возврат к выученному: null/"battery"/"off"
     public required Func<bool> IsAlsAvailable;           // есть ли датчик освещённости (видимость фичи)
     public required Func<float> CurrentLux;              // живые люксы для индикатора (NaN — ещё нет)
+    public required Func<IDisposable> WatchLux;          // держать датчик, пока индикатор на экране (XIC-84)
     public required Action<int> SetBrightnessMedianSec;  // «инерция» датчика: окно медианы, сек (0 — выкл)
     public required Action ResetBrightnessCurve;         // явный сброс кривой обучения
     public required Func<bool, Config.BrightnessPoint[]> BrightnessCurvePoints; // снимок кривой (true=сеть) для графика
