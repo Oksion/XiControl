@@ -19,6 +19,7 @@ public sealed class AppControllerTests
     private readonly FakePowerEvents _power = new();
     private readonly AppConfig _cfg = new();
     private readonly List<string> _events = [];
+    private readonly AlsWatcher _als = new();
     private readonly AppController _c;
 
     public AppControllerTests()
@@ -33,7 +34,7 @@ public sealed class AppControllerTests
         _c = new AppController(_mifs, _cfg, _power, new Localizer(),
             new ChargeGuard(_mifs, _power, () => _cfg.ChargeCare ? _cfg.CarePercent() : 100, new FakeTimer()),
             new RefreshRateGuard(_cfg, _power, new FakeDisplayEvents(), new FakeTimer()),
-            new PowerProfileGuard(_mifs, _cfg, _power, cap, auto, new FakeTimer()), cap, auto, new AlsWatcher(),
+            new PowerProfileGuard(_mifs, _cfg, _power, cap, auto, new FakeTimer()), cap, auto, _als,
             new TravelChargeMonitor(_cfg, _power, new FakeTimer()),
             new TouchpadControl(_cfg), new TouchscreenControl(_cfg),
             new TouchpadDeadZone(_cfg, new TouchpadControl(_cfg)),
@@ -49,6 +50,28 @@ public sealed class AppControllerTests
             ProfileModeApplied = () => _events.Add("profile-applied"),
             ModesReloaded = () => _events.Add("modes-reloaded"),
         };
+    }
+
+    // ---- Авто-яркость: спрос на датчик (XIC-84) ----
+
+    [Fact]
+    public void SetAutoBrightness_DrivesSensorDemand()
+    {
+        _c.SetAutoBrightness(true);
+        _als.Demand.Should().BeTrue("включили авто-яркость — датчик нужен");
+
+        _c.SetAutoBrightness(false);
+        _als.Demand.Should().BeFalse("выключили — сенсорный стек больше не будим");
+    }
+
+    [Fact]
+    public void WatchLux_HoldsSensorWhileAutoBrightnessOff()
+    {
+        var lease = _c.WatchLux();
+        _als.Demand.Should().BeTrue("индикатор люксов на экране");
+
+        lease.Dispose();
+        _als.Demand.Should().BeFalse();
     }
 
     // ---- Заряд / «в дорогу» ----

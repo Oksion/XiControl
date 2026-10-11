@@ -15,8 +15,13 @@ namespace XiControl.SystemIntegration;
 /// работает, под админом available=true и вечная тишина). WinRT-канал под админом работает.
 ///
 /// Люксы снимает лёгким опросом (GetCurrentReading раз в 1.5 с — локальный вызов, дёшево)
-/// выделенный фоновый MTA-поток, живущий до Dispose; дедуп по значению превращает опрос
-/// в события. На машине без датчика Start молча не взводится — фича скрыта.
+/// выделенный фоновый MTA-поток, живущий до Dispose. На машине без датчика Start молча не
+/// взводится — фича скрыта.
+///
+/// Датчик стримит только по спросу (XIC-84): пока включена авто-яркость (<see cref="SetDemand"/>)
+/// или открыт живой индикатор люксов (<see cref="Watch"/>). Без спроса поток спит на событии
+/// без таймаута, подписки и заявленного интервала нет — сенсорный стек не будим. Наличие
+/// датчика (<see cref="Available"/>) известно и так — из активации на старте.
 ///
 /// Драйверу не доверяем: после сна он подмешивает в поток нули и «половинки» (XIC-76), поэтому
 /// наружу идут не сырые чтения, а уровень, прошедший <see cref="LuxGate"/>. Для разбора таких
@@ -41,8 +46,44 @@ public sealed class AlsWatcher : IDisposable
     private float _tracedLevel = float.NaN;    // последний уровень, о котором написали в трассировку
     private Thread? _thread;
     private readonly ManualResetEventSlim _stop = new();
+    private readonly AutoResetEvent _demandChanged = new(false);
     private volatile bool _started;
     private volatile bool _disposed;
+    private volatile bool _wanted;    // авто-яркость включена (SetDemand)
+    private int _viewers;             // открытые живые индикаторы люксов (Watch)
+    private volatile bool _streaming; // подписка и интервал заявлены; иначе запоздалое событие не читаем
+
+    /// <summary>Нужен ли сейчас поток люксов: авто-яркость или хоть один живой индикатор.</summary>
+    internal bool Demand => _wanted || Volatile.Read(ref _viewers) > 0;
+
+    /// <summary>Нужен ли свет авто-яркости. Без спроса (и без <see cref="Watch"/>) датчик
+    /// не стримит; можно звать до <see cref="Start"/>.</summary>
+    public void SetDemand(bool on)
+    {
+        _wanted = on;
+        _demandChanged.Set();
+    }
+
+    /// <summary>Держать датчик, пока жива аренда — для живого индикатора люксов в настройках,
+    /// когда авто-яркость выключена. Dispose повторно безопасен.</summary>
+    public IDisposable Watch()
+    {
+        Interlocked.Increment(ref _viewers);
+        _demandChanged.Set();
+        return new Lease(this);
+    }
+
+    private sealed class Lease(AlsWatcher owner) : IDisposable
+    {
+        private int _done;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _done, 1) != 0) return;
+            Interlocked.Decrement(ref owner._viewers);
+            owner._demandChanged.Set();
+        }
+    }
 
     /// <summary>Оба параметра опциональны: без конфига нет трассировки, без событий питания —
     /// паузы после сна (тесты собирают watcher голым, COM трогает только Start).</summary>
@@ -123,37 +164,38 @@ public sealed class AlsWatcher : IDisposable
             }
             finally { _ = WindowsDeleteString(hstr); }
 
-            // Датчик СТРИМИТ, только пока у него есть событийный подписчик: одного опроса и
-            // заявленного ReportInterval мало — сервис усыпляет сенсор, и GetCurrentReading
-            // вечно отдаёт последний кэш (поймано вживую: 815 лк с застывшей меткой времени
-            // даже для свежих клиентов). Поэтому: интервал + подписка ReadingChanged; опрос
-            // остаётся страховкой на случай, если события в elevated-процессе не доедут.
             _ = sensor.GetMinimumReportInterval(out uint minMs);
-            _ = sensor.PutReportInterval(Math.Max(minMs, 1000));
             var sink = new ReadingSink(() => Poll(sensor, fromEvent: true));
-            long token = 0;
-            int hrSub = sensor.AddReadingChanged(sink, out token);
-            if (hrSub < 0) Log.Write($"AlsWatcher: подписка ReadingChanged не удалась (0x{hrSub:X8}) — остаёмся на опросе");
-
-            lock (_pollLock)
-            {
-                _gate.Restart(Environment.TickCount64); // наш старт — тоже перезапуск сенсора
-                if (Tracing) AlsTrace.Write($"== старт: интервал {Math.Max(minMs, 1000)} мс (мин. {minMs}), подписка {(hrSub < 0 ? $"НЕ удалась 0x{hrSub:X8}" : "есть")}");
-            }
-
             _started = true;
             ready?.Invoke(true);
 
-            int polls = 0;
-            do
+            // Поток-хозяин: умрёт он — умрут квартира, RCW и подписка. Спит на «стоп / спрос
+            // сменился»; пока стримим — просыпается ещё и на опрос раз в PollMs.
+            WaitHandle[] wake = [_stop.WaitHandle, _demandChanged];
+            long token = 0;
+            int hrSub = -1, polls = 0;
+            try
             {
-                Poll(sensor, fromEvent: false);
-                if (++polls % HeartbeatPolls == 0) Heartbeat();
+                while (true)
+                {
+                    if (Demand != _streaming)
+                    {
+                        if (_streaming) StopStream(sensor, hrSub, token);
+                        else { hrSub = StartStream(sensor, sink, minMs, out token); polls = 0; }
+                    }
+                    if (_streaming)
+                    {
+                        Poll(sensor, fromEvent: false);
+                        if (++polls % HeartbeatPolls == 0) Heartbeat();
+                    }
+                    if (WaitHandle.WaitAny(wake, _streaming ? PollMs : Timeout.Infinite) == 0) break;
+                }
             }
-            while (!_stop.Wait(PollMs)); // поток-хозяин: умрёт он — умрут квартира, RCW и подписка
-
-            if (hrSub >= 0) _ = sensor.RemoveReadingChanged(token);
-            GC.KeepAlive(sink); // CCW должен жить, пока жива подписка
+            finally
+            {
+                if (_streaming) StopStream(sensor, hrSub, token);
+                GC.KeepAlive(sink); // CCW должен жить, пока жива подписка
+            }
         }
         catch (Exception ex)
         {
@@ -162,8 +204,41 @@ public sealed class AlsWatcher : IDisposable
         }
     }
 
+    // Датчик СТРИМИТ, только пока у него есть событийный подписчик: одного опроса и
+    // заявленного ReportInterval мало — сервис усыпляет сенсор, и GetCurrentReading
+    // вечно отдаёт последний кэш (поймано вживую: 815 лк с застывшей меткой времени
+    // даже для свежих клиентов). Поэтому: интервал + подписка ReadingChanged; опрос
+    // остаётся страховкой на случай, если события в elevated-процессе не доедут.
+    private int StartStream(ILightSensor sensor, ReadingSink sink, uint minMs, out long token)
+    {
+        uint interval = Math.Max(minMs, 1000);
+        _ = sensor.PutReportInterval(interval);
+        int hr = sensor.AddReadingChanged(sink, out token);
+        if (hr < 0) Log.Write($"AlsWatcher: подписка ReadingChanged не удалась (0x{hr:X8}) — остаёмся на опросе");
+        lock (_pollLock)
+        {
+            _gate.Restart(Environment.TickCount64); // наш старт — тоже перезапуск сенсора
+            _lastPollUtc = default;                 // пауза без спроса — не сон
+            if (Tracing) AlsTrace.Write($"== старт: интервал {interval} мс (мин. {minMs}), подписка {(hr < 0 ? $"НЕ удалась 0x{hr:X8}" : "есть")}");
+        }
+        _streaming = true;
+        return hr;
+    }
+
+    // Спрос пропал: отписка и интервал по умолчанию (0) — сенсор может уснуть. Уровень
+    // забываем: к следующему включению он устареет, а подписчик (авто-яркость) по LuxLost
+    // сбросит своё окно медианы.
+    private void StopStream(ILightSensor sensor, int hrSub, long token)
+    {
+        _streaming = false;
+        if (hrSub >= 0) _ = sensor.RemoveReadingChanged(token);
+        _ = sensor.PutReportInterval(0);
+        lock (_pollLock) WokeLocked("== стоп: спроса нет, подписка снята");
+    }
+
     private void Poll(ILightSensor sensor, bool fromEvent)
     {
+        if (!_streaming) return; // запоздалое событие после StopStream
         try
         {
             if (sensor.GetCurrentReading(out ILightSensorReading? reading) < 0 || reading is null) return;

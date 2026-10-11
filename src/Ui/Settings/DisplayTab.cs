@@ -14,6 +14,7 @@ public sealed class DisplayTab : SettingsPane
 {
     private readonly UiTimer _live = new() { Interval = 1000 };
     private readonly AppConfig _cfg; // графику нужны живые лимиты (XIC-29) при перерисовке
+    private IDisposable? _luxLease;  // датчик держим, пока индикатор люксов виден (XIC-84)
 
     /// <summary>Кривую какого источника сейчас правим. Статика по той же причине, что и в
     /// PerfTab: окно пересобирает вкладки на каждое изменение, и выбор «от батареи» иначе
@@ -112,6 +113,16 @@ public sealed class DisplayTab : SettingsPane
                 graph?.Invalidate(); // выученные точки и маркер света подтянутся сами
             };
             _live.Start();
+
+            // при выключенной авто-яркости датчик без спроса не стримит (XIC-84) — держим его,
+            // пока индикатор на экране; спрятали вкладку или закрыли окно — отпускаем. Строят
+            // вкладку при заходе на неё (уже видимой — VisibleChanged не придёт), так что сразу берём
+            _luxLease = act.WatchLux();
+            VisibleChanged += (_, _) =>
+            {
+                if (Visible) _luxLease ??= act.WatchLux();
+                else ReleaseLux();
+            };
         }
 
         // честная плашка: с адаптивной яркостью Windows ни лимит, ни авто-яркость не работают
@@ -164,8 +175,18 @@ public sealed class DisplayTab : SettingsPane
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _live.Dispose(); // вкладки пересоздаются на каждый показ окна — не течём
+        if (disposing)
+        {
+            _live.Dispose(); // вкладки пересоздаются на каждый показ окна — не течём
+            ReleaseLux();
+        }
         base.Dispose(disposing);
+    }
+
+    private void ReleaseLux()
+    {
+        _luxLease?.Dispose();
+        _luxLease = null;
     }
 
     private static string LuxText(float lux) =>

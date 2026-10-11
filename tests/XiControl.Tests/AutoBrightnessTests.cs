@@ -652,6 +652,27 @@ public sealed class AutoBrightnessTests
     public void AlsWatcher_SleepGap_DetectedByPollPause(int gapMs, bool slept) =>
         AlsWatcher.IsSleepGap(TimeSpan.FromMilliseconds(gapMs)).Should().Be(slept);
 
+    [Fact]
+    public void AlsWatcher_Demand_AutoBrightnessOrAnyViewer()
+    {
+        // XIC-84: датчик стримит, пока нужен авто-яркости ИЛИ хоть одному живому индикатору
+        using var als = new AlsWatcher();
+        als.Demand.Should().BeFalse("по умолчанию сенсорный стек не будим");
+
+        var a = als.Watch();
+        var b = als.Watch();
+        a.Dispose();
+        a.Dispose(); // повторный Dispose не отнимает чужую аренду
+        als.Demand.Should().BeTrue("второй индикатор ещё открыт");
+
+        als.SetDemand(true);
+        b.Dispose();
+        als.Demand.Should().BeTrue("авто-яркость включена");
+
+        als.SetDemand(false);
+        als.Demand.Should().BeFalse();
+    }
+
     // ---- Медианный фильтр («инерция») ----
 
     [Fact]
