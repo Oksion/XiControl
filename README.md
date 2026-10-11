@@ -791,16 +791,19 @@ None of this runs or spends resources while the API is off (the server simply is
 
 ## How it works
 
-The MIFS protocol is reverse-engineered and documented in [docs/](docs/):
+The MIFS protocol is reverse-engineered and documented in [docs/](docs/) (in Russian; the full
+index is [docs/README.md](docs/README.md)):
 
-- [01-wmi-protocol.md](docs/01-wmi-protocol.md) — transport, buffer format, command codes, key events (**the main document**);
-- [02-feature-catalog.md](docs/02-feature-catalog.md) — the feature catalog;
-- [03-architecture.md](docs/03-architecture.md) — the app architecture;
+- [01-wmi-protocol.md](docs/01-wmi-protocol.md) — transport, buffer format, command codes, key events, driver-free channels beyond WMI (**the main document**);
+- [05-open-questions.md](docs/05-open-questions.md) — what is and isn't possible driver-free, and how each answer was checked on the hardware;
 - [07-keymap.md](docs/07-keymap.md) — the key-code map;
+- [09-power-monitoring.md](docs/09-power-monitoring.md) — where the Monitor gets watts, temperatures, GPU and NPU load;
+- [12-charge-levels.md](docs/12-charge-levels.md) — the charge limit levels the firmware accepts;
 - [13-auto-brightness.md](docs/13-auto-brightness.md) — the math behind the learned auto-brightness curve 🤓;
 - [15-http-api.md](docs/15-http-api.md) — the whole HTTP API: routes, response codes, the webhook and a Home Assistant setup;
 - [16-oem-driver-check.md](docs/16-oem-driver-check.md) — how the OEM checks for driver and BIOS updates: the reverse-engineered request, its signature and the response catalog;
-- [17-oem-services.md](docs/17-oem-services.md) — Xiaomi's MiService and MiDeviceService services: what they do, how they get in XiControl's way and how to disable them.
+- [17-oem-services.md](docs/17-oem-services.md) — Xiaomi's MiService and MiDeviceService services: what they do, how they get in XiControl's way and how to disable them;
+- planning-stage records: [02-feature-catalog.md](docs/02-feature-catalog.md) (the feature catalog and what came of it), [03-architecture.md](docs/03-architecture.md) (why there is no service).
 
 In short: the `MiInterface` method takes a 32-byte buffer
 (`[1]` — GET `0xFA` / SET `0xFB`, `[3]` — command, `[4]/[6]` — arguments) and returns a

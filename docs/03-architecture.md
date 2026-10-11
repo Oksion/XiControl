@@ -4,7 +4,8 @@
 
 > 📌 **Документ этапа планирования / запись решения.** Главный вопрос — «нужна ли фоновая служба» —
 > закрыт: **не нужна** (см. ниже). Актуальная карта модулей и правил — в [CLAUDE.md](../CLAUDE.md)
-> «Архитектура», статус фич — в [ROADMAP.md](../ROADMAP.md). Ниже — как решали и как в итоге вышло.
+> «Архитектура», статус фич — в [ROADMAP.md](../ROADMAP.md). Ниже — как решали и как в итоге вышло;
+> раскладка проекта в конце сверена с кодом 2026-10-11.
 
 ## ✅ Стек зафиксирован
 
@@ -131,12 +132,13 @@ xi_control/
  │   │                         NavStrip, SettingsPane (база вкладок; не подкручивает список
  │   │                         под контрол, получивший фокус мышью), вкладки-контролы
  │   │                         General/Features/Battery/Display/Touchpad/Perf/Keys/Osd/Api/
- │   │                         Drivers/AboutTab (DriversTab — проверка драйверов и BIOS у OEM, XIC-95),
+ │   │                         Drivers/AboutTab (DriversTab — проверка драйверов и BIOS у OEM,
+ │   │                         XIC-95, и службы Xiaomi, XIC-87),
  │   │                         CurveEditor (правка кривой авто-яркости мышью, XIC-33/66)
  │   ├─ SystemIntegration/  — ChargeGuard, RefreshRate(+Guard), PowerProfileGuard,
  │   │                         BrightnessCapGuard (лимит яркости, XIC-29),
  │   │                         AutoBrightnessGuard + BrightnessCurve/MedianWindow +
- │   │                         AlsSensor (авто-яркость по датчику, XIC-30 — см. docs/13),
+ │   │                         AlsSensor/AlsWatcher (авто-яркость по датчику, XIC-30 — см. docs/13),
  │   │                         TravelChargeMonitor, IPowerEvents+IDisplayEvents/SystemEventsSource,
  │   │                         IAppTimer/UiTimer/WorkerTimer, Brightness (+Ramp/Own/
  │   │                         AdaptiveBrightness), TouchpadControl/TouchscreenControl
@@ -148,7 +150,9 @@ xi_control/
  │   │                         Sound, BatteryInfo, PowerDraw, GpuTelemetry, NpuLoad (загрузка NPU,
  │   │                         XIC-86), TrayMetrics (источники индикатора трея), LatestValue<T>
  │   │                         (медленный WMI-источник на пуле, XIC-81), OemDrivers (проверка
- │   │                         драйверов и BIOS у OEM, XIC-95 — см. docs/16),
+ │   │                         драйверов и BIOS у OEM, XIC-95 — см. docs/16), OemService
+ │   │                         (службы Xiaomi через SCM, XIC-87 — см. docs/17), SystemInfo
+ │   │                         (модель/BIOS/серийник для «О программе»),
  │   │                         HttpApi/ApiRouter/ApiSettings/ApiFirewall (opt-in HTTP API, XIC-13),
  │   │                         ChargeLimitWatcher + Webhook (исходящее событие о пороге заряда:
  │   │                         вебхук XIC-75 и предупреждение человеку XIC-74 — см. docs/15),
