@@ -4,7 +4,7 @@ using XiControl.Config;
 namespace XiControl.SystemIntegration;
 
 /// <summary>
-/// Режим «Не спать»: пока включён — система не засыпает (SetThreadExecutionState),
+/// Режим «Не спать»: пока включён — система не засыпает (запрос питания PowerCreateRequest),
 /// а закрытие крышки НА ПИТАНИИ ОТ СЕТИ не уводит в сон (действие крышки AC →
 /// «ничего не делать» через Power Management API). На батарее крышка не трогается —
 /// там штатный сон. Экран дополнительно удерживается негаснущим — кроме случая, когда в
@@ -16,22 +16,23 @@ namespace XiControl.SystemIntegration;
 /// в ставшую активной — значит и исходную оставить с «ничего не делать», и новой подменить
 /// чужое. Запись восстановления сохраняется ДО правки плана: упадём посреди — на следующем
 /// старте есть что и куда вернуть. Не удалось вернуть — запись не стираем, попробуем снова.
+///
+/// Запрет сна — запрос питания (XIC-93), а не SetThreadExecutionState: тот привязан к потоку
+/// (вызов не с того потока молча терял требование), а в `powercfg /requests` виден без
+/// причины. Запрос живёт на хэндле и подписан: «XiControl: Режим совы (не спать)».
 /// </summary>
 public static class AwakeMode
 {
-    private const uint ES_CONTINUOUS = 0x80000000, ES_SYSTEM_REQUIRED = 0x1, ES_DISPLAY_REQUIRED = 0x2;
     internal const uint LidDoNothing = 0;
 
-    [DllImport("kernel32.dll")] private static extern uint SetThreadExecutionState(uint esFlags);
-
-    /// <summary>Включить. Вызывать с UI-потока (ES_CONTINUOUS привязан к потоку). Запись
-    /// восстановления крышки сохраняет сам; остальной конфиг — вызывающий.</summary>
-    public static bool Enable(AppConfig cfg) => Enable(cfg, PowerPlan.Instance, SetThreadExecutionState);
+    /// <summary>Включить. Запись восстановления крышки сохраняет сам; остальной конфиг —
+    /// вызывающий.</summary>
+    public static bool Enable(AppConfig cfg) => Enable(cfg, PowerPlan.Instance, PowerRequest.Instance);
 
     /// <summary>Выключить: вернуть действие крышки и снять запрет сна/гашения экрана.</summary>
-    public static void Disable(AppConfig cfg) => Disable(cfg, PowerPlan.Instance, SetThreadExecutionState);
+    public static void Disable(AppConfig cfg) => Disable(cfg, PowerPlan.Instance, PowerRequest.Instance);
 
-    internal static bool Enable(AppConfig cfg, IPowerPlan plan, Func<uint, uint> setExecState)
+    internal static bool Enable(AppConfig cfg, IPowerPlan plan, IKeepAwake awake)
     {
         try
         {
@@ -63,15 +64,11 @@ public static class AwakeMode
                 return false;
             }
 
-            // ES_SYSTEM_REQUIRED — всегда, это и есть суть режима; экран отпускаем только по опции
-            uint flags = ES_CONTINUOUS | ES_SYSTEM_REQUIRED;
-            if (!cfg.OwlIgnoreDisplay) flags |= ES_DISPLAY_REQUIRED;
-
-            // возвращает прежние флаги; 0 — вызов не принят (сон/экран не удержим) — тогда и
-            // крышку не держим: «сова» либо целиком, либо никак
-            if (setExecState(flags) == 0)
+            // система — всегда, это и есть суть режима; экран отпускаем только по опции.
+            // Не удержали — и крышку не держим: «сова» либо целиком, либо никак
+            if (!awake.Hold(display: !cfg.OwlIgnoreDisplay))
             {
-                Log.Write("AwakeMode: SetThreadExecutionState не принял флаги — откатываю крышку");
+                Log.Write("AwakeMode: запрос питания не принят — откатываю крышку");
                 RestoreLid(cfg, plan);
                 return false;
             }
@@ -80,12 +77,11 @@ public static class AwakeMode
         catch (Exception ex) { Log.Ex("AwakeMode.Enable", ex); RestoreLid(cfg, plan); return false; }
     }
 
-    internal static void Disable(AppConfig cfg, IPowerPlan plan, Func<uint, uint> setExecState)
+    internal static void Disable(AppConfig cfg, IPowerPlan plan, IKeepAwake awake)
     {
         try
         {
-            if (setExecState(ES_CONTINUOUS) == 0)
-                Log.Write("AwakeMode: SetThreadExecutionState(сброс) не принят");
+            awake.Release();
             RestoreLid(cfg, plan);
         }
         catch (Exception ex) { Log.Ex("AwakeMode.Disable", ex); }
@@ -125,6 +121,95 @@ public static class AwakeMode
         bool TryReadLidAc(Guid scheme, out uint value);
         bool WriteLidAc(Guid scheme, uint value);
         bool SetActive(Guid scheme);
+    }
+
+    /// <summary>Шов над запретом сна: держать систему (и экран — по <paramref name="display"/>)
+    /// и отпустить. Ради тестов — живой запрос питания юнитами не трогаем.</summary>
+    internal interface IKeepAwake
+    {
+        /// <summary>Держать. Повторный вызов заменяет прежний запрос. false — Windows не приняла.</summary>
+        bool Hold(bool display);
+
+        /// <summary>Отпустить; без удержания — ничего не делает.</summary>
+        void Release();
+    }
+
+    /// <summary>
+    /// Запрос питания с подписанной причиной. В отличие от SetThreadExecutionState не привязан к
+    /// потоку — живёт, пока открыт хэндл; закрытие хэндла снимает его в любом случае (Windows может
+    /// и сама истечь запрос на Modern Standby от батареи — тогда Clear вернёт ошибку, это не беда).
+    /// ExecutionRequired сознательно не ставим: на Modern Standby он меняет поведение процесса, а
+    /// сова должна вести себя ровно как раньше — только System (+ Display).
+    /// </summary>
+    private sealed class PowerRequest : IKeepAwake
+    {
+        public static readonly PowerRequest Instance = new();
+
+        private const int PowerRequestDisplayRequired = 0, PowerRequestSystemRequired = 1;
+        private const uint POWER_REQUEST_CONTEXT_SIMPLE_STRING = 0x1;
+
+        private readonly object _lock = new();
+        private IntPtr _handle;
+        private bool _display;
+
+        public bool Hold(bool display)
+        {
+            lock (_lock)
+            {
+                ReleaseLocked();
+                var reason = new ReasonContext
+                {
+                    Version = 0, // POWER_REQUEST_CONTEXT_VERSION
+                    Flags = POWER_REQUEST_CONTEXT_SIMPLE_STRING,
+                    SimpleReasonString = $"XiControl: {Localization.Loc.T("menu.owl")}",
+                };
+                IntPtr h = PowerCreateRequest(ref reason);
+                if (h == IntPtr.Zero || h == new IntPtr(-1))
+                {
+                    Log.Write($"AwakeMode: PowerCreateRequest не удался ({Marshal.GetLastWin32Error()})");
+                    return false;
+                }
+                if (!PowerSetRequest(h, PowerRequestSystemRequired)
+                    || (display && !PowerSetRequest(h, PowerRequestDisplayRequired)))
+                {
+                    Log.Write($"AwakeMode: PowerSetRequest не принят ({Marshal.GetLastWin32Error()})");
+                    _ = CloseHandle(h); // закрытие снимает и уже выставленную часть
+                    return false;
+                }
+                _handle = h;
+                _display = display;
+                return true;
+            }
+        }
+
+        public void Release()
+        {
+            lock (_lock) ReleaseLocked();
+        }
+
+        private void ReleaseLocked()
+        {
+            if (_handle == IntPtr.Zero) return;
+            _ = PowerClearRequest(_handle, PowerRequestSystemRequired);
+            if (_display) _ = PowerClearRequest(_handle, PowerRequestDisplayRequired);
+            _ = CloseHandle(_handle);
+            _handle = IntPtr.Zero;
+        }
+
+        // REASON_CONTEXT: Version, Flags и union, в котором для простой строки читается только
+        // первое поле-указатель; Size — полный размер структуры на x64 (4 + 4 + 24)
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Size = 32)]
+        private struct ReasonContext
+        {
+            public uint Version;
+            public uint Flags;
+            [MarshalAs(UnmanagedType.LPWStr)] public string SimpleReasonString;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr PowerCreateRequest(ref ReasonContext context);
+        [DllImport("kernel32.dll", SetLastError = true)] private static extern bool PowerSetRequest(IntPtr handle, int type);
+        [DllImport("kernel32.dll", SetLastError = true)] private static extern bool PowerClearRequest(IntPtr handle, int type);
+        [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr handle);
     }
 
     private sealed class PowerPlan : IPowerPlan

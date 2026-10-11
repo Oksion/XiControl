@@ -34,8 +34,25 @@ public sealed class AwakeModeTests
         public bool SetActive(Guid scheme) => !FailSet;
     }
 
-    private static uint Ok(uint _) => 1;     // SetThreadExecutionState принял
-    private static uint Refused(uint _) => 0;
+    private sealed class FakeAwake : AwakeMode.IKeepAwake
+    {
+        public bool Refuse;
+        public bool Held;
+        public bool? Display;   // с каким флагом экрана держали последний раз
+
+        public bool Hold(bool display)
+        {
+            if (Refuse) return false;
+            Held = true;
+            Display = display;
+            return true;
+        }
+
+        public void Release() => Held = false;
+    }
+
+    private static FakeAwake Ok => new();
+    private static FakeAwake Refused => new() { Refuse = true };
 
     [Fact]
     public void Включение_и_выключение_в_одной_схеме()
@@ -164,6 +181,32 @@ public sealed class AwakeModeTests
 
         plan.LidAc[HighPerf].Should().Be(2u);
         cfg.AwakeSavedLidAc.Should().BeNull();
+    }
+
+    [Fact]
+    public void Удержание_берётся_при_включении_и_отпускается_при_выключении()
+    {
+        // XIC-93: запрос питания вместо SetThreadExecutionState — экран держим по умолчанию
+        var cfg = new AppConfig();
+        var plan = new FakePlan();
+        var awake = new FakeAwake();
+
+        AwakeMode.Enable(cfg, plan, awake).Should().BeTrue();
+        awake.Held.Should().BeTrue();
+        awake.Display.Should().BeTrue("экран держим, пока не задан OwlIgnoreDisplay");
+
+        AwakeMode.Disable(cfg, plan, awake);
+        awake.Held.Should().BeFalse();
+    }
+
+    [Fact]
+    public void OwlIgnoreDisplay_держит_только_систему()
+    {
+        var awake = new FakeAwake();
+
+        AwakeMode.Enable(new AppConfig { OwlIgnoreDisplay = true }, new FakePlan(), awake).Should().BeTrue();
+
+        awake.Display.Should().BeFalse("для удалённого доступа экран может гаснуть");
     }
 
     [Fact]
