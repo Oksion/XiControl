@@ -115,8 +115,8 @@ where there are no watts to show, you can watch load or degrees instead.*
   all**, and a one-off check is available on a button.
 - 🧩 **Driver and BIOS check with Xiaomi** — the Drivers tab asks Xiaomi's server what it offers for
   this model and compares it with what is installed, device by device: what matches, where you are
-  already newer (that is normal) and where an update exists — with a link to the package. BIOS is a
-  notice only. No Xiaomi PC Manager or its services; the network is used **only on the button**, the
+  already newer (that is normal) and where an update exists — with a link to the package (the BIOS
+  link comes with a separate at-your-own-risk warning). No Xiaomi PC Manager or its services; the network is used **only on the button**, the
   serial number is not sent, and XiControl itself downloads and installs nothing.
 - ⚙️ **Settings window** in Windows 11 style — all options across tabs (General / Features /
   Battery / Display / Touchpad / Performance / Keys / Notifications / HTTP API / Drivers / About),

@@ -8,7 +8,8 @@ namespace XiControl.Ui.Settings;
 /// <summary>
 /// Вкладка «Драйверы» (XIC-95): что Xiaomi предлагает для этой модели и как это соотносится с
 /// установленным. В сеть — только по кнопке; ничего не скачиваем и не ставим. Обновления — со
-/// ссылкой на пакет (открывается в браузере после второго нажатия), BIOS — только оповещение.
+/// ссылкой на пакет (открывается в браузере после второго нажатия); у BIOS — тоже, но под жёстким
+/// предупреждением «на свой страх и риск».
 /// Результат живёт в контроллере: окно пересобирается на каждый показ, запроса отсюда нет.
 /// </summary>
 public sealed class DriversTab : SettingsPane
@@ -32,14 +33,21 @@ public sealed class DriversTab : SettingsPane
 
     private void AddResult(SettingsToolkit ui, DriverCheckResult r)
     {
-        // ---- BIOS: только оповещение — провал прошивки = мёртвая машина ----
+        // ---- BIOS: провал прошивки = мёртвая машина, поэтому предупреждение отдельное и жёсткое ----
         ui.AddGroup(this, "settings.drivers.bios.group");
         ui.AddKv(this, "settings.drivers.bios.installed", r.BiosCurrent ?? "—");
         string offer = !r.BiosChecked ? Loc.T("settings.drivers.bios.unknown")
             : r.BiosOffer is { } b ? Loc.T("settings.drivers.bios.available", b.FileName)
             : Loc.T("settings.drivers.bios.none");
         ui.AddKv(this, "settings.drivers.bios.offer", offer);
-        if (r.BiosOffer is not null) ui.AddNote(this, "settings.drivers.bios.warn");
+        if (r.BiosOffer is { } bios)
+        {
+            // Ссылку даём (решение владельца): иначе родная утилита оставалась бы нужна ради одного
+            // BIOS. Но предупреждение — жёстче, чем у драйверов, и кнопка та же, в два нажатия
+            ui.AddNote(this, "settings.drivers.bios.warn");
+            Controls.Add(ui.Row(Loc.T("settings.drivers.bios.package"), PackageText(bios),
+                DownloadButton(ui, bios, new HashSet<string>(StringComparer.OrdinalIgnoreCase))));
+        }
 
         if (r.Rows.Count == 0) return;
 
