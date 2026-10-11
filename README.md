@@ -42,10 +42,10 @@ auto refresh rate and "owl mode" (stay awake).*
 </p>
 
 *In full view — live graphs: power draw (W), CPU, **GPU** (clock and watts under the percentage),
-RAM, **hotspot temperature** (hot zone in cherry red) and the connected adapter's wattage. Collapses
-into a compact line (Power / CPU / GPU / RAM) or a single large readout — via the "view" button or a
+**NPU** (if the laptop has one), RAM, **hotspot temperature** (hot zone in cherry red) and the
+connected adapter's wattage. Collapses into a compact line (Power / CPU / GPU / NPU / RAM) or a single large readout — via the "view" button or a
 double-click; current direction is shown by color (charging green / discharging orange). In the
-smallest view you pick the metric with a right-click: power, CPU, GPU, RAM or temperature — on AC,
+smallest view you pick the metric with a right-click: power, CPU, GPU, NPU, RAM or temperature — on AC,
 where there are no watts to show, you can watch load or degrees instead.*
 
 *The tray icon changes with the active mode:*
@@ -145,7 +145,7 @@ where there are no watts to show, you can watch load or degrees instead.*
   and that's what it will be in that light from now on. Two curves (AC and battery); the
   settings tab shows live lux and the learning graph. See "Auto-brightness by sensor" below.
 - 📟 **Tray indicator** *(optional, off by default)* — a second icon next to the app's tray icon
-  showing a number: power draw (W), CPU or GPU load, used memory or temperature. The exact value
+  showing a number: power draw (W), CPU, GPU or NPU load, used memory or temperature. The exact value
   with units lives in the tooltip, a click opens the Monitor, the update interval is configurable
   (Settings → General). When off, no icon, no timer and no data sources are created: zero extra load.
 - 🌐 UI language: Russian / English / Chinese (中文).
@@ -555,7 +555,7 @@ the system's display-mode-changed event only.
 ### Tray indicator
 
 An optional second icon next to the app's tray icon showing a number: power draw (W, from the
-battery sensor), CPU or GPU load, used memory or temperature (Intel DPTF). Enable it in
+battery sensor), CPU, GPU or NPU load, used memory or temperature (Intel DPTF). Enable it in
 **Settings → General**, where you also pick the metric and the update interval (1/2/5/10 s;
 editing `TrayMetricPeriodSec` in the config allows anything from 1 to 60). The exact value with
 units lives in the tooltip; clicking the icon opens the Monitor.
@@ -566,7 +566,8 @@ Notes:
   the spot is remembered.
 - Power draw is honest only on battery or while charging: on AC with no charging there is no
   sensor data and a dash is shown (same as in the Monitor). GPU load needs Intel graphics,
-  temperature needs DPTF; a metric unavailable on your hardware shows a dash too.
+  temperature needs DPTF, NPU load is offered only if the laptop has a neural processor; a metric
+  unavailable on your hardware shows a dash too.
 - When off, the indicator costs nothing: no icon, no timer and no data sources are created —
   zero extra load.
 
@@ -767,6 +768,10 @@ None of this runs or spends resources while the API is off (the server simply is
   System32, installed with the Intel driver; no administrator rights needed). On machines without
   Intel graphics the GPU row simply does not appear. This channel exposes no temperature or fan RPM
   for integrated GPUs — only usage, power and clock.
+- **NPU usage** is read the same way Task Manager does it — from the Windows performance counters
+  `GPU Engine` (engines of type `Neural`), no driver or administrator rights. The row appears only
+  if Windows lists a neural processor (device class *Compute accelerators*, e.g. Intel AI Boost on
+  Core Ultra).
 
 ## How it works
 

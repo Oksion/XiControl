@@ -15,6 +15,7 @@ public class TrayMetricTests
     [InlineData("gpu", TrayMetric.Gpu)]
     [InlineData("ram", TrayMetric.Ram)]
     [InlineData("temp", TrayMetric.Temp)]
+    [InlineData("npu", TrayMetric.Npu)]
     [InlineData("TEMP", TrayMetric.Temp)] // регистр не важен (руками правленный config.json)
     public void ParseKind_понимает_все_метрики(string s, TrayMetric expected) =>
         TrayMetricFormat.ParseKind(s).Should().Be(expected);
@@ -32,6 +33,7 @@ public class TrayMetricTests
     [InlineData(TrayMetric.Gpu, "gpu")]
     [InlineData(TrayMetric.Ram, "ram")]
     [InlineData(TrayMetric.Temp, "temp")]
+    [InlineData(TrayMetric.Npu, "npu")]
     public void Key_обратен_ParseKind(TrayMetric m, string key)
     {
         TrayMetricFormat.Key(m).Should().Be(key);
@@ -41,25 +43,27 @@ public class TrayMetricTests
     // ---- Available: метрика, которую этой машине есть чем показать (XIC-70) ----
 
     [Theory]
-    [InlineData(TrayMetric.Gpu, false, true)]   // не Intel — IGCL не поднялся
-    [InlineData(TrayMetric.Temp, true, false)]  // ни DPTF, ни ACPI-зоны
-    public void Available_нечем_показать_откатывается_к_потреблению(TrayMetric want, bool gpu, bool temp) =>
-        TrayMetricFormat.Available(want, gpu, temp).Should().Be(TrayMetric.Power,
+    [InlineData(TrayMetric.Gpu, false, true, true)]   // не Intel — IGCL не поднялся
+    [InlineData(TrayMetric.Temp, true, false, true)]  // ни DPTF, ни ACPI-зоны
+    [InlineData(TrayMetric.Npu, true, true, false)]   // нейропроцессора нет (XIC-86)
+    public void Available_нечем_показать_откатывается_к_потреблению(TrayMetric want, bool gpu, bool temp, bool npu) =>
+        TrayMetricFormat.Available(want, gpu, temp, npu).Should().Be(TrayMetric.Power,
             "вечный прочерк вместо числа выглядит поломкой, а не отсутствием датчика");
 
     [Theory]
     [InlineData(TrayMetric.Gpu)]
     [InlineData(TrayMetric.Temp)]
+    [InlineData(TrayMetric.Npu)]
     [InlineData(TrayMetric.Cpu)]
     [InlineData(TrayMetric.Ram)]
     [InlineData(TrayMetric.Power)]
     public void Available_есть_чем_показать_выбор_не_трогаем(TrayMetric want) =>
-        TrayMetricFormat.Available(want, hasGpu: true, hasTemp: true).Should().Be(want);
+        TrayMetricFormat.Available(want, hasGpu: true, hasTemp: true, hasNpu: true).Should().Be(want);
 
     [Fact]
     public void Available_проценты_и_ватты_есть_всегда() =>
-        TrayMetricFormat.Available(TrayMetric.Cpu, hasGpu: false, hasTemp: false)
-            .Should().Be(TrayMetric.Cpu, "CPU и RAM не зависят ни от IGCL, ни от DPTF");
+        TrayMetricFormat.Available(TrayMetric.Cpu, hasGpu: false, hasTemp: false, hasNpu: false)
+            .Should().Be(TrayMetric.Cpu, "CPU и RAM не зависят ни от IGCL, ни от DPTF, ни от NPU");
 
     // ---- IconText: компактный текст на значке ----
 

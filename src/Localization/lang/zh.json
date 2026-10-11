@@ -270,6 +270,7 @@
   "traymetric.power.cpu": "CPU 封装功耗",
   "traymetric.cpu": "CPU 负载",
   "traymetric.gpu": "GPU 负载",
+  "traymetric.npu": "NPU 负载",
   "traymetric.ram": "内存 (RAM)",
   "traymetric.temp": "温度",
   "traymetric.temp.zone": "主板温度",

@@ -160,7 +160,7 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   `TravelChargeMonitor` (SystemIntegration).
 - `src/Ui/` остальное: `QuickPanelForm` (панель по удержанию Mi / клику по трею — чистый view
   над контроллером, навигация с клавиатуры; ширина фиксированная — при скрытых режимах
-  растягиваются ячейки), `OsdForm` (всплывашки), `MonitorForm` (виджет Вт/CPU/GPU/RAM/°C),
+  растягиваются ячейки), `OsdForm` (всплывашки), `MonitorForm` (виджет Вт/CPU/GPU/NPU/RAM/°C),
   `FlyoutForm` + `FlyoutPalette` (общая база флайаутов: borderless tool-window, Region, Esc;
   палитра — единственный источник тёмных цветов флайаутов), `FormChrome` (DWM-тёмный
   заголовок + WM_SETREDRAW), `ModeUi` (режим → ключ локализации / вид OSD / акцент),
@@ -256,7 +256,11 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   ленивый фасад по выбранной метрике), `LatestValue<T>` (XIC-81: медленный WMI-источник читается
   на пуле, не больше одного чтения сразу, UI берёт последнее готовое; `Fresh` прячет устаревшее,
   `WaitFirst` — ограниченное ожидание первого значения ради раскладки. Так «Монитор» читает
-  DPTF, ватты адаптера MIFS и запасной `BatteryStatus` — UI-поток WMI не ждёт);
+  DPTF, ватты адаптера MIFS и запасной `BatteryStatus` — UI-поток WMI не ждёт), `NpuLoad` (XIC-86:
+  загрузка NPU как в диспетчере задач — PDH `\GPU Engine(*)`, движки `engtype_Neural`, сумма по
+  процессам внутри движка и максимум по движкам — чистый `Aggregate` под тестами; наличие — класс
+  устройств ComputeAccelerator. Открытие запроса ~215 мс, поэтому «Монитор» читает его на пуле через
+  `LatestValue` и держит запрос открытым между показами);
   **HTTP API (XIC-13, opt-in)** — `HttpApi` (хост на `HttpListener`/http.sys, без ASP.NET Core;
   создаётся только при включённой фиче → выключено = 0 CPU), `ApiRouter` (авторизация Bearer+SHA-256
   constant-time и белый список маршрутов — тестируется на фейках), `ApiSettings`/`ApiSettingsStore`

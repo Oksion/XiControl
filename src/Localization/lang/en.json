@@ -270,6 +270,7 @@
   "traymetric.power.cpu": "CPU package power",
   "traymetric.cpu": "CPU load",
   "traymetric.gpu": "GPU load",
+  "traymetric.npu": "NPU load",
   "traymetric.ram": "Memory (RAM)",
   "traymetric.temp": "Temperature",
   "traymetric.temp.zone": "Board temperature",
