@@ -5,8 +5,8 @@
 #
 # sonar.coverage.exclusions — из ИЗМЕРЕНИЯ покрытия исключены края, которые мы намеренно
 # не покрываем юнитами (политика из CLAUDE.md: чистую логику тестируем, UI и железо — глазами):
-# UI/WinForms, системная интеграция, точка входа, tools и два файла живого WMI —
-# MifsClient/MifsEventWatcher (они дёргают ManagementObject, без ноутбука не выполняются;
+# UI/WinForms, системная интеграция, точка входа, tools и файлы живого WMI —
+# MifsClient/MifsEventWatcher/WmiEventSubscription (они дёргают ManagementObject, без ноутбука не выполняются;
 # логика над ними тестируется через шов IMifsClient на фейках). Mifs.cs НЕ исключён:
 # это чистые таблицы и маппинги, они покрыты тестами и должны такими оставаться.
 # На статический анализ (баги, smells, уязвимости) исключение не влияет — только на coverage.
@@ -53,7 +53,7 @@ jobs:
           /d:sonar.token="$env:SONAR_TOKEN"
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
           /d:sonar.scanner.scanAll=false
-          /d:sonar.coverage.exclusions="src/Ui/**,src/SystemIntegration/**,src/Wmi/MifsClient.cs,src/Wmi/MifsEventWatcher.cs,src/Program.cs,tools/**"
+          /d:sonar.coverage.exclusions="src/Ui/**,src/SystemIntegration/**,src/Wmi/MifsClient.cs,src/Wmi/MifsEventWatcher.cs,src/Wmi/WmiEventSubscription.cs,src/Program.cs,tools/**"
 
       - name: Build
         run: dotnet build XiControl.sln -c Release
