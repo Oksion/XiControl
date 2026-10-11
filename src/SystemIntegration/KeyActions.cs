@@ -17,6 +17,49 @@ public static class KeyActions
     [DllImport("user32.dll")]
     private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
+    [DllImport("user32.dll")]
+    private static extern bool AllowSetForegroundWindow(uint processId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint count, [In] INPUT[] inputs, int size);
+
+    private const uint ASFW_ANY = uint.MaxValue;
+
+    // INPUT с мышиной частью — самый большой член union, его размер и задаёт sizeof(INPUT)
+    [StructLayout(LayoutKind.Sequential)]
+    private struct INPUT
+    {
+        public uint Type;     // 0 = INPUT_MOUSE
+        public MOUSEINPUT Mi;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MOUSEINPUT
+    {
+        public int Dx, Dy;
+        public uint MouseData, Flags, Time;
+        public IntPtr ExtraInfo;
+    }
+
+    /// <summary>
+    /// Разрешить окну, которое мы сейчас запустим, выйти на передний план (XIC-90). Клавиша
+    /// приходит к нам WMI-событием, а не вводом, поэтому для Windows наш трей-процесс — фоновый,
+    /// и защита от кражи фокуса оставляла «Параметры»/программу позади активного окна (проверено
+    /// на TM2424). Пустое событие мыши (без движения и кнопок — на экране ничего не происходит)
+    /// делает нас «последним получившим ввод», а с этим правом AllowSetForegroundWindow
+    /// передаёт его запускаемому процессу. Приём PowerToys Run; синтетический Alt, как у форка,
+    /// не нужен — он раскрывал бы меню в активном окне.
+    /// </summary>
+    private static void GrantForeground()
+    {
+        try
+        {
+            _ = SendInput(1, [new INPUT { Type = 0 }], Marshal.SizeOf<INPUT>());
+            _ = AllowSetForegroundWindow(ASFW_ANY);
+        }
+        catch (Exception ex) { Log.Ex("KeyActions.GrantForeground", ex); }
+    }
+
     /// <summary>
     /// Проекция экрана — окно выбора режима (как Win+P). Синтетический Win+P из
     /// elevated-процесса Explorer иногда не подхватывает; нативный DisplaySwitch.exe
@@ -28,7 +71,7 @@ public static class KeyActions
         {
             string ds = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.System), "DisplaySwitch.exe");
-            if (File.Exists(ds)) { Process.Start(new ProcessStartInfo(ds) { UseShellExecute = false }); return; }
+            if (File.Exists(ds)) { GrantForeground(); Process.Start(new ProcessStartInfo(ds) { UseShellExecute = false }); return; }
         }
         catch (Exception ex) { Log.Ex("KeyActions.Projection", ex); /* откатываемся на Win+P */ }
         WinCombo(VK_P);
@@ -46,6 +89,7 @@ public static class KeyActions
     /// <summary>Открыть Параметры Windows (опция "SettingsKey": "settings").</summary>
     public static void OpenSettings()
     {
+        GrantForeground();
         try { Process.Start(new ProcessStartInfo("ms-settings:") { UseShellExecute = true }); }
         catch (Exception ex) { Log.Ex("KeyActions.OpenSettings", ex); /* URI-обработчик может отсутствовать */ }
     }
@@ -99,6 +143,7 @@ public static class KeyActions
                 psi.Arguments = Environment.ExpandEnvironmentVariables(args);
             if (File.Exists(path))
                 psi.WorkingDirectory = Path.GetDirectoryName(path);
+            GrantForeground();
             Process.Start(psi);
         }
         catch (Exception ex) { Log.Ex("KeyActions.Launch", ex); }
