@@ -1,4 +1,5 @@
 using System.Management;
+using XiControl.Wmi;
 
 namespace XiControl.SystemIntegration;
 
@@ -237,67 +238,23 @@ public static class AdaptiveBrightness
 
 /// <summary>
 /// Подписка на изменение яркости экрана (WmiMonitorBrightnessEvent). Событие приходит на
-/// потоке пула — подписчик сам решает, что с ним делать. Переживает рестарт WMI: при обрыве
-/// переподключается с задержкой. На панели без поддержки — тихо не стартует (как MifsEventWatcher).
+/// потоке пула — подписчик сам решает, что с ним делать. Сбои старта и обрывы — как у
+/// MifsEventWatcher (WmiRetry): на панели без поддержки через ~минуту попыток замолкает.
 /// </summary>
 public sealed class BrightnessWatcher : IDisposable
 {
-    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
-
-    private readonly ManagementEventWatcher _watcher;
-    private readonly System.Threading.Timer _retry;
-    private volatile bool _disposed;
-    private volatile bool _everStarted;
+    private readonly WmiEventSubscription _sub;
 
     /// <summary>Новая яркость 0–100.</summary>
     public event Action<int>? Changed;
 
-    public BrightnessWatcher()
-    {
-        var scope = new ManagementScope(@"\\.\root\wmi");
-        _watcher = new ManagementEventWatcher(scope, new WqlEventQuery("SELECT * FROM WmiMonitorBrightnessEvent"));
-        _watcher.EventArrived += OnArrived;
-        _watcher.Stopped += OnStopped;
-        _retry = new System.Threading.Timer(_ => Start());
-    }
-
-    public void Start()
-    {
-        if (_disposed) return;
-        try
+    public BrightnessWatcher() =>
+        _sub = new WmiEventSubscription(nameof(BrightnessWatcher), @"\\.\root\wmi", "WmiMonitorBrightnessEvent", e =>
         {
-            _watcher.Start();
-            _everStarted = true;
-        }
-        catch (Exception ex)
-        {
-            Log.Ex("BrightnessWatcher.Start", ex);
-            // хоть раз стартовали → это обрыв (WMI перезапускается), пробуем снова; если нет —
-            // класса событий на этой машине скорее всего нет, не спамим ретраями
-            if (_everStarted) _retry.Change(RetryDelay, Timeout.InfiniteTimeSpan);
-        }
-    }
+            if (e["Brightness"] is { } v) Changed?.Invoke(Convert.ToInt32(v, System.Globalization.CultureInfo.InvariantCulture));
+        });
 
-    private void OnStopped(object sender, StoppedEventArgs e)
-    {
-        if (_disposed) return;
-        _retry.Change(RetryDelay, Timeout.InfiniteTimeSpan);
-    }
+    public void Start() => _sub.Start();
 
-    private void OnArrived(object sender, EventArrivedEventArgs e)
-    {
-        try
-        {
-            if (e.NewEvent["Brightness"] is { } v) Changed?.Invoke(Convert.ToInt32(v, System.Globalization.CultureInfo.InvariantCulture));
-        }
-        catch { /* игнор битых событий */ }
-    }
-
-    public void Dispose()
-    {
-        _disposed = true;
-        _retry.Dispose();
-        try { _watcher.Stop(); } catch { /* WMI мог уже умереть при выходе — не критично */ }
-        _watcher.Dispose();
-    }
+    public void Dispose() => _sub.Dispose();
 }

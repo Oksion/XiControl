@@ -142,7 +142,9 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   статус в `OUT[1]` (`0x80` = ок, `0xE0` = не поддерживается). Команды: `0x08` режимы,
   `0x0A` микрофон, `0x10` заряд. `IMifsClient`/`MifsClient` — семантические Get/Set (опкоды
   наружу не торчат), `IKeyEventSource`/`MifsEventWatcher` — подписка на WMI-событие
-  `HID_EVENT20` (коды клавиш — тоже в `Mifs.cs` и `docs/07`).
+  `HID_EVENT20` (коды клавиш — тоже в `Mifs.cs` и `docs/07`). Живучесть WMI-подписок (её и
+  `BrightnessWatcher`) — общая `WmiEventSubscription` по политике `WmiRetry`: первый старт
+  ретраится ограниченно (~минута, WMI бывает не готов после входа), обрыв — бессрочно (XIC-83).
 - `src/Input/` — жесты и маршрутизация клавиш: `MiButtonGesture` (клик / двойной / удержание
   ~400 мс), `KeyRouter` (код клавиши → действие из конфига per-slot; исполнители — колбэки),
   `KeyMap` (код → смысл: дефолты TM2424 + переопределение `AppConfig.KeyCodes` для моделей
@@ -330,9 +332,10 @@ WMI-событий). `Program.cs`: single-instance mutex → DI-контейне
   встроенный Quality Gate «Sonar way» — свой не завести (Team/Enterprise), а он требует **≥80%
   покрытия нового кода**. Поэтому из ИЗМЕРЕНИЯ покрытия (`sonar.coverage.exclusions`) исключены
   края, которые мы намеренно не покрываем юнитами: `src/Ui/**`, `src/SystemIntegration/**`,
-  `Program.cs`, `tools/**` и живой WMI — `MifsClient.cs`/`MifsEventWatcher.cs`. Чистая логика
-  (`Mifs.cs`, конфиг, guard-ы, роутер) измеряется и должна оставаться покрытой. Добавляешь новый
-  файл с живым железом — впиши его в исключения, иначе гейт покраснеет на ровном месте.
+  `Program.cs`, `tools/**` и живой WMI — `MifsClient.cs`/`MifsEventWatcher.cs`/
+  `WmiEventSubscription.cs`. Чистая логика (`Mifs.cs`, `WmiRetry.cs`, конфиг, guard-ы, роутер)
+  измеряется и должна оставаться покрытой. Добавляешь новый файл с живым железом — впиши его в
+  исключения, иначе гейт покраснеет на ровном месте.
 - Локальная сборка помечается версией `0.0.0-dev` (дев-дефолт в `XiControl.csproj`, суффикс виден
   в AboutTab); реальную версию подставляет CI из тега: `publish -p:Version=X.Y.Z`.
 - winget-PR Komac пересобирает из exe и теряет рукописные поля (`MinimumOSVersion` — в 0.7.0 и 0.8.0);
