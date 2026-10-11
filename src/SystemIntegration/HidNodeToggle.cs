@@ -25,6 +25,8 @@ namespace XiControl.SystemIntegration;
 /// путь Диспетчера устройств: SetupAPI DIF_PROPERTYCHANGE/DICS_DISABLE (персистентный, вето
 /// не подвержен) + флаг <see cref="PersistOff"/> в конфиге, по которому приложение на старте
 /// само включает устройство обратно — обещание «не залипает выключенным» сохраняется.
+/// Мягкий путь тоже оставляет отметку — <see cref="SoftOff"/>: по ней на старте снова гасим
+/// вернувшееся после перезагрузки устройство, если просили «помнить выключенным» (XIC-79).
 /// Каждый шаг логируется под именем <see cref="LogName"/> — по log.txt с чужой машины видно,
 /// где именно не срослось.
 /// </summary>
@@ -43,12 +45,19 @@ public abstract class HidNodeToggle
     /// <see cref="KeepOff"/>. По нему же знаем, что за собой надо убрать.</summary>
     protected abstract bool PersistOff { get; set; }
 
+    /// <summary>Бухгалтерия: «МЫ погасили мягким путём» — до перезагрузки. Отдельно от
+    /// <see cref="PersistOff"/>: мягко погашенное устройство переживает перезапуск приложения
+    /// выключенным, и включать его на старте нельзя — человек выключил его минуту назад. А вот
+    /// после перезагрузки оно возвращается само, и без этой отметки «помнить выключенным»
+    /// было бы не о чем вспомнить (XIC-79).</summary>
+    protected abstract bool SoftOff { get; set; }
+
     /// <summary>Намерение пользователя: «пусть остаётся выключенным между перезагрузками».
     /// Разведено с <see cref="PersistOff"/> намеренно — один флаг не может отвечать и за
     /// «кто выключил», и за «надо ли включать обратно» (XIC-53).</summary>
     protected abstract bool KeepOff { get; }
 
-    /// <summary>Сохранить конфиг после правки <see cref="DeviceId"/>/<see cref="PersistOff"/>.</summary>
+    /// <summary>Сохранить конфиг после правки <see cref="DeviceId"/>/<see cref="PersistOff"/>/<see cref="SoftOff"/>.</summary>
     protected abstract void SaveConfig();
 
     private const uint ProbDisabled = 22;    // CM_PROB_DISABLED
@@ -98,6 +107,8 @@ public abstract class HidNodeToggle
     /// <summary>
     /// Страховка на старте приложения: если в прошлый раз пришлось отключать персистентно,
     /// после перезагрузки включаем устройство сами (мягкое отключение возвращается без нас).
+    /// И обратная сторона (XIC-79): мягко погашенное устройство после перезагрузки вернулось —
+    /// если просили «помнить выключенным», гасим снова; если нет — просто снимаем отметку.
     ///
     /// Три причины НЕ включать, и каждая важна (XIC-53):
     /// <list type="bullet">
@@ -112,37 +123,56 @@ public abstract class HidNodeToggle
     /// </summary>
     public void RestoreAfterBoot()
     {
-        switch (DecideAfterBoot(PersistOff, KeepOff, PersistOff ? IsEnabled() : null))
+        bool ours = PersistOff || SoftOff;
+        switch (DecideAfterBoot(PersistOff, SoftOff, KeepOff, ours ? IsEnabled() : null))
         {
             case BootAction.Nothing:
-                if (PersistOff && KeepOff) Log.Write($"{LogName}: оставляю выключенным — так просили в настройках");
+                if (ours && KeepOff) Log.Write($"{LogName}: оставляю выключенным — так просили в настройках");
                 break;
 
             case BootAction.ClearFlag:
                 PersistOff = false;
+                SoftOff = false;
                 SaveConfig();
-                Log.Write($"{LogName}: уже включено — снимаю отметку о персистентном отключении");
+                Log.Write($"{LogName}: уже включено — снимаю отметку об отключении");
                 break;
 
             case BootAction.Enable:
                 Log.Write($"{LogName}: включаю после перезагрузки (осталось персистентное отключение)");
                 Enable();
                 break;
+
+            case BootAction.Disable:
+                Log.Write($"{LogName}: вернулось после перезагрузки — гашу снова, так просили в настройках");
+                if (!Disable()) Log.Write($"{LogName}: снова погасить не удалось — оставляю включённым");
+                break;
         }
     }
 
     /// <summary>Что делать с устройством на старте. Вынесено ради тестов: живой PnP юнитами
-    /// не покрыть, а само решение — три условия, и ошибка в любом из них дорогая.</summary>
-    internal enum BootAction { Nothing, ClearFlag, Enable }
+    /// не покрыть, а само решение — несколько условий, и ошибка в любом из них дорогая.</summary>
+    internal enum BootAction { Nothing, ClearFlag, Enable, Disable }
 
     /// <param name="enabled">Текущее состояние узла; null — не спрашивали или не нашли.</param>
-    internal static BootAction DecideAfterBoot(bool persistOff, bool keepOff, bool? enabled)
+    internal static BootAction DecideAfterBoot(bool persistOff, bool softOff, bool keepOff, bool? enabled)
     {
-        if (!persistOff) return BootAction.Nothing;  // гасили не мы — чужое решение не трогаем
-        if (keepOff) return BootAction.Nothing;      // человек попросил оставить выключенным
-        // Уже включено: включать нечего, но отметку снять обязательно — иначе она залипает и
-        // каждая загрузка снова зовёт Enable, чем бы человек устройство ни гасил (issue #39).
-        return enabled == true ? BootAction.ClearFlag : BootAction.Enable;
+        if (persistOff)
+        {
+            if (keepOff) return BootAction.Nothing;  // человек попросил оставить выключенным
+            // Уже включено: включать нечего, но отметку снять обязательно — иначе она залипает и
+            // каждая загрузка снова зовёт Enable, чем бы человек устройство ни гасил (issue #39).
+            return enabled == true ? BootAction.ClearFlag : BootAction.Enable;
+        }
+        if (softOff)
+        {
+            // Всё ещё выключено (или не нашлось) — перезагрузки не было, перезапустилось только
+            // приложение: человек погасил устройство сам и недавно, не перебиваем.
+            if (enabled != true) return BootAction.Nothing;
+            // Вернулось — значит, была перезагрузка (или включили в обход нас). «Помнить
+            // выключенным» — гасим снова; иначе это и есть обещанное «до перезагрузки».
+            return keepOff ? BootAction.Disable : BootAction.ClearFlag;
+        }
+        return BootAction.Nothing;                   // гасили не мы — чужое решение не трогаем
     }
 
     // ---- Отключение: мягкое (не-persist), затем путь Диспетчера устройств ----
@@ -162,7 +192,13 @@ public abstract class HidNodeToggle
 
         int cr = CM_Disable_DevNode(inst, DisableUiNotOk);
         if (cr != 0) Log.Write($"{LogName}: CM_Disable_DevNode → CR 0x{cr:X}");
-        if (WaitState(enabled: false)) return true;
+        if (WaitState(enabled: false))
+        {
+            // отметку ставим всегда, а не только под «помнить выключенным»: галочку могут
+            // включить и после того, как устройство уже погашено (XIC-79)
+            MarkOff(soft: true);
+            return true;
+        }
 
         // мягкое отключение заветировано/не сработало — отключаем как Диспетчер устройств
         // (персистентно; на старте приложения RestoreAfterBoot вернёт устройство). Тот же
@@ -172,9 +208,18 @@ public abstract class HidNodeToggle
         Log.Write($"{LogName}: мягкое отключение не сработало — пробую персистентное (SetupAPI)");
         if (!SetupDiChangeState(id, DICS_DISABLE)) return false;
         if (!WaitState(enabled: false)) return false;
-        PersistOff = true;
-        SaveConfig();
+        MarkOff(soft: false);
         return true;
+    }
+
+    // Ровно одна отметка «кто и как погасил»: мягкая и персистентная взаимоисключающие.
+    // Конфиг пишем, только если что-то поменялось — повторное выключение SSD не трогает.
+    private void MarkOff(bool soft)
+    {
+        if (SoftOff == soft && PersistOff == !soft) return;
+        SoftOff = soft;
+        PersistOff = !soft;
+        SaveConfig();
     }
 
     // ---- Включение: CM_Enable → SetupAPI → полный rescan PnP, по нарастающей ----
@@ -209,7 +254,7 @@ public abstract class HidNodeToggle
             // после чего PersistOff не снимался уже никогда (XIC-53).
             ok = WaitState(enabled: true, attempts: SlowAttempts);
         }
-        if (ok && PersistOff) { PersistOff = false; SaveConfig(); }
+        if (ok && (PersistOff || SoftOff)) { PersistOff = false; SoftOff = false; SaveConfig(); }
         else if (!ok) Log.Write($"{LogName}: включить не удалось — отметка останется, проверим на следующем старте");
         return ok;
     }

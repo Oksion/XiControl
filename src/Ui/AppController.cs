@@ -175,6 +175,8 @@ public sealed class AppController
         // Страховка «не залипает»: если тачпад/экран пришлось отключить персистентно,
         // после перезагрузки включаем их сами (в фоне — PnP-вызовы небыстрые). Решение
         // «включать или оставить» принимает сам RestoreAfterBoot по флагу намерения.
+        // Мягко погашенное после перезагрузки возвращается само — его, наоборот, гасим снова,
+        // если просили «помнить выключенным» (XIC-79); решает тот же RestoreAfterBoot.
         //
         // Тумблер фичи здесь намеренно НЕ спрашивается, хотя напрашивается. Выключенная фича
         // убирает устройство из меню и панели — то есть ровно тот путь, которым его можно
@@ -182,9 +184,9 @@ public sealed class AppController
         // единственным выходом через Диспетчер устройств. «Оставить выключенным» — это
         // отдельное намерение (TouchpadKeepOff / TouchscreenKeepOff), а не побочный эффект
         // спрятанной кнопки (XIC-53).
-        if (_cfg.TouchpadPersistOff)
+        if (_cfg.TouchpadPersistOff || _cfg.TouchpadSoftOff)
             Task.Run(() => Safe(() => { _touchpad.RestoreAfterBoot(); return true; }, false));
-        if (_cfg.TouchscreenPersistOff)
+        if (_cfg.TouchscreenPersistOff || _cfg.TouchscreenSoftOff)
             Task.Run(() => Safe(() => { _touchscreen.RestoreAfterBoot(); return true; }, false));
     }
 

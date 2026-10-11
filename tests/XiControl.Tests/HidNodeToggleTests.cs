@@ -34,19 +34,19 @@ public sealed class HidNodeToggleTests
     [InlineData(false, false)]  // выключено, но не нами — это Диспетчер устройств, не лезем
     [InlineData(false, true)]
     public void Гасили_не_мы_значит_не_трогаем(bool persistOff, bool? enabled) =>
-        HidNodeToggle.DecideAfterBoot(persistOff, keepOff: false, enabled)
+        HidNodeToggle.DecideAfterBoot(persistOff, softOff: false, keepOff: false, enabled)
             .Should().Be(HidNodeToggle.BootAction.Nothing);
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void Просили_оставить_выключенным_значит_оставляем(bool? enabled) =>
-        HidNodeToggle.DecideAfterBoot(persistOff: true, keepOff: true, enabled)
+        HidNodeToggle.DecideAfterBoot(persistOff: true, softOff: false, keepOff: true, enabled)
             .Should().Be(HidNodeToggle.BootAction.Nothing);
 
     [Fact]
     public void Гасили_мы_и_оно_выключено_включаем_обратно() =>
-        HidNodeToggle.DecideAfterBoot(persistOff: true, keepOff: false, enabled: false)
+        HidNodeToggle.DecideAfterBoot(persistOff: true, softOff: false, keepOff: false, enabled: false)
             .Should().Be(HidNodeToggle.BootAction.Enable);
 
     [Fact]
@@ -54,7 +54,7 @@ public sealed class HidNodeToggleTests
     {
         // null — узел не найден (например, убран query-remove'ом): включение умеет его вернуть
         // пересканированием шины, поэтому пробуем, а не сдаёмся
-        HidNodeToggle.DecideAfterBoot(persistOff: true, keepOff: false, enabled: null)
+        HidNodeToggle.DecideAfterBoot(persistOff: true, softOff: false, keepOff: false, enabled: null)
             .Should().Be(HidNodeToggle.BootAction.Enable);
     }
 
@@ -64,7 +64,46 @@ public sealed class HidNodeToggleTests
         // Корень вечного цикла из issue #39: медленное, но успешное включение записывалось как
         // неудача, отметка не снималась НИКОГДА, и каждая загрузка снова включала экран —
         // чем бы человек его ни гасил в промежутке.
-        HidNodeToggle.DecideAfterBoot(persistOff: true, keepOff: false, enabled: true)
+        HidNodeToggle.DecideAfterBoot(persistOff: true, softOff: false, keepOff: false, enabled: true)
             .Should().Be(HidNodeToggle.BootAction.ClearFlag);
     }
+
+    // ---- XIC-79: мягкое отключение и «помнить выключенным» ----
+
+    [Fact]
+    public void Мягко_погасили_просили_помнить_и_оно_вернулось_гасим_снова()
+    {
+        // Сама ошибка: мягкое отключение после перезагрузки возвращается, а отметки не было —
+        // и галочка «помнить выключенным» ни на что не влияла.
+        HidNodeToggle.DecideAfterBoot(persistOff: false, softOff: true, keepOff: true, enabled: true)
+            .Should().Be(HidNodeToggle.BootAction.Disable);
+    }
+
+    [Fact]
+    public void Мягко_погасили_без_галочки_и_оно_вернулось_снимаем_отметку() =>
+        // обещанное «выключение до перезагрузки» — перезагрузка была, отметка больше не нужна
+        HidNodeToggle.DecideAfterBoot(persistOff: false, softOff: true, keepOff: false, enabled: true)
+            .Should().Be(HidNodeToggle.BootAction.ClearFlag);
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(null, false)]
+    [InlineData(null, true)]
+    public void Мягко_погасили_и_оно_всё_ещё_выключено_не_трогаем(bool? enabled, bool keepOff)
+    {
+        // Перезапустилось только приложение (обновление, падение): человек погасил устройство
+        // сам и недавно — включать его на старте было бы регрессией против прежнего поведения.
+        HidNodeToggle.DecideAfterBoot(persistOff: false, softOff: true, keepOff, enabled)
+            .Should().Be(HidNodeToggle.BootAction.Nothing);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Не_гасили_вовсе_галочка_ничего_не_делает(bool? enabled) =>
+        // «помнить выключенным» без нашего отключения — не повод гасить устройство самим
+        HidNodeToggle.DecideAfterBoot(persistOff: false, softOff: false, keepOff: true, enabled)
+            .Should().Be(HidNodeToggle.BootAction.Nothing);
 }
