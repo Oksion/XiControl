@@ -385,6 +385,34 @@ public sealed class SettingsToolkit
         return b;
     }
 
+    /// <summary>
+    /// Кнопка в два нажатия: первое меняет надпись на <paramref name="confirmKey"/> (акцентом),
+    /// второе выполняет действие — для того, что случайным кликом делать не стоит (пакет в браузер,
+    /// отключение службы). Размер задан сразу, под более длинную надпись: LinkButton.AutoSize
+    /// срабатывает позже, чем карточка раскладывает описание, и выросшая кнопка уходила под текст.
+    /// </summary>
+    public Button ConfirmButton(string key, string confirmKey, Action click)
+    {
+        bool armed = false;
+        Button? b = null;
+        b = LinkButton(key, () =>
+        {
+            if (!armed)
+            {
+                armed = true;
+                b!.Text = Loc.T(confirmKey);
+                b.ForeColor = T.Accent;
+                return;
+            }
+            click();
+        });
+        b.AutoSize = false;
+        b.Width = Math.Max(TextRenderer.MeasureText(b.Text, CtlFont).Width,
+                           TextRenderer.MeasureText(Loc.T(confirmKey), CtlFont).Width) + Sc(28);
+        b.Height = Sc(30);
+        return b;
+    }
+
     // карточка обрезана по Region (скруглённая), фон = BackColor(Card); здесь только рамка
     public void PaintCardBorder(Graphics g, int w, int h)
     {

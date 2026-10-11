@@ -10,6 +10,7 @@ namespace XiControl.Ui.Settings;
 /// ссылкой на пакет (открывается в браузере после второго нажатия); у BIOS — тоже, но под жёстким
 /// предупреждением «на свой страх и риск».
 /// Результат живёт в контроллере: окно пересобирается на каждый показ, запроса отсюда нет.
+/// Здесь же — служба Xiaomi MiDeviceService с кнопкой «Отключить / Включить» (XIC-87).
 /// </summary>
 public sealed class DriversTab : SettingsPane
 {
@@ -24,6 +25,9 @@ public sealed class DriversTab : SettingsPane
             () => act.CheckDriversNow(rebuild));
         check.Enabled = !running;
         Controls.Add(ui.Row(Loc.T("settings.drivers.check"), StatusText(r), check));
+
+        // служба — до результатов: список драйверов бывает длинным, блок не должен уезжать вниз
+        AddOemService(ui, act, rebuild);
 
         if (r.Status is DriverCheckStatus.Ok or DriverCheckStatus.NoMatch or DriverCheckStatus.NoCatalog
             || (r.Status == DriverCheckStatus.Running && r.CheckedAt != default))
@@ -88,6 +92,80 @@ public sealed class DriversTab : SettingsPane
         if (r.Rows.Any(x => x.State == DriverState.Newer)) ui.AddNote(this, "settings.drivers.summary.note");
     }
 
+    /// <summary>
+    /// Службы Xiaomi MiDeviceService и MiService (XIC-87, docs/17): состояние и «Отключить / Включить»
+    /// в два нажатия. Здесь, а не в «О программе»: MiDeviceService — та самая служба, что проверяет
+    /// драйверы у родного софта, и вкладка про стек Xiaomi. Блок есть всегда — и когда службы нет: пусть человек видит,
+    /// что всё в порядке, а не гадает. Состояние читается на каждый показ (SCM, мгновенно) — служба
+    /// может появиться или исчезнуть, пока XiControl работает. Сама служба трогается только по кнопке.
+    /// </summary>
+    private void AddOemService(SettingsToolkit ui, SettingsActions act, Action rebuild)
+    {
+        ui.AddGroup(this, "settings.drivers.oem.group");
+        // MiDeviceService мешает — она первой и с объяснением чем; MiService не мешает, но отключить
+        // её просят ради приватности, а кто-то уже отключил и ищет, чем вернуть
+        AddOemServiceRow(ui, act, rebuild, OemService.DeviceService, "settings.drivers.oem.");
+        AddOemServiceRow(ui, act, rebuild, OemService.BaseService, "settings.drivers.oem.base.");
+
+        var more = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, ui.Sc(4), 0, 0), BackColor = ui.T.WinBg };
+        more.Controls.Add(Button(ui, "settings.drivers.oem.more",
+            () => ShellOpen.OpenUrl("https://github.com/Oksion/XiControl/blob/main/docs/17-oem-services.md")));
+        Controls.Add(more);
+    }
+
+    // Строка одной службы; тексты «что делает / отключена / не найдена» — свои у каждой (prefix),
+    // состояние, кнопки и ошибки — общие
+    private void AddOemServiceRow(SettingsToolkit ui, SettingsActions act, Action rebuild, string name, string prefix)
+    {
+        var v = act.GetOemService(name);
+        string desc;
+        Control ctl;
+        switch (v.Info.State)
+        {
+            case OemServiceState.NotInstalled:
+                desc = Loc.T(prefix + "missing");
+                ctl = ui.ValueLabel(Loc.T("settings.drivers.oem.v.missing"));
+                break;
+            case OemServiceState.NoAccess:
+                desc = Loc.T("settings.drivers.oem.noaccess");
+                ctl = ui.ValueLabel(Loc.T("settings.drivers.oem.v.noaccess"));
+                break;
+            case OemServiceState.Disabled:
+                desc = Loc.T(prefix + "off");
+                ctl = ui.ConfirmButton("settings.drivers.oem.enable", "settings.drivers.oem.enable.confirm", () => act.SetOemService(name, true, rebuild));
+                break;
+            default: // запущена или остановлена, но не отключена — после перезагрузки поднимется
+                desc = Loc.T(prefix + "desc") + "\n"
+                     + Loc.T("settings.drivers.oem.status", OemStateText(v.Info.State), OemStartText(v.Info.StartType));
+                ctl = ui.ConfirmButton("settings.drivers.oem.disable", "settings.drivers.oem.disable.confirm", () => act.SetOemService(name, false, rebuild));
+                break;
+        }
+        // операция идёт (служба останавливается до ~15 с) — вместо кнопки неактивная надпись
+        if (v.Pending is { } on && v.Info.State is not (OemServiceState.NotInstalled or OemServiceState.NoAccess))
+        {
+            var b = Button(ui, on ? "settings.drivers.oem.busy.on" : "settings.drivers.oem.busy.off", () => { });
+            b.Enabled = false;
+            ctl = b;
+        }
+        ctl.AccessibleName = "Xiaomi " + name;
+        Controls.Add(ui.Row("Xiaomi " + name, desc, ctl));
+
+        if (v.Error == OemServiceResult.AccessDenied) ui.AddNote(this, "settings.drivers.oem.err.denied");
+        else if (v.Error == OemServiceResult.Failed) ui.AddNote(this, "settings.drivers.oem.err.failed");
+    }
+
+    private static string OemStateText(OemServiceState s) => Loc.T(s == OemServiceState.Running
+        ? "settings.drivers.oem.state.running" : "settings.drivers.oem.state.stopped");
+
+    private static string OemStartText(OemStartType t) => Loc.T(t switch
+    {
+        OemStartType.Auto => "settings.drivers.oem.start.auto",
+        OemStartType.DelayedAuto => "settings.drivers.oem.start.delayed",
+        OemStartType.Manual => "settings.drivers.oem.start.manual",
+        OemStartType.Disabled => "settings.drivers.oem.start.disabled", // запущена, хотя отключена: остановка не удалась
+        _ => "settings.drivers.oem.start.unknown",
+    });
+
     private static string StatusText(DriverCheckResult r)
     {
         string at = r.CheckedAt == default ? "" : r.CheckedAt.ToString("t", CultureInfo.CurrentCulture);
@@ -124,23 +202,8 @@ public sealed class DriversTab : SettingsPane
     {
         if (p?.Url is not { } url) return ui.ValueLabel(Loc.T("settings.drivers.nolink"));
         if (!offered.Add(url)) return ui.ValueLabel(Loc.T("settings.drivers.samepackage"));
-        bool armed = false;
-        Button? b = null;
-        b = Button(ui, "settings.drivers.download", () =>
-        {
-            if (!armed)
-            {
-                armed = true;
-                b!.Text = Loc.T("settings.drivers.download.confirm");
-                b.ForeColor = ui.T.Accent;
-                return;
-            }
-            ShellOpen.OpenUrl(url); // браузер без админского токена: пакет качается от имени пользователя
-        });
-        // Ширина — сразу под длинную надпись второго шага: карточка раскладывает описание под
-        // ширину кнопки в момент постройки, и выросшая потом кнопка уходила под текст
-        b.Width = Math.Max(b.Width, TextRenderer.MeasureText(Loc.T("settings.drivers.download.confirm"), ui.CtlFont).Width + ui.Sc(28));
-        return b;
+        // браузер без админского токена: пакет качается от имени пользователя
+        return ui.ConfirmButton("settings.drivers.download", "settings.drivers.download.confirm", () => ShellOpen.OpenUrl(url));
     }
 
     // LinkButton.AutoSize срабатывает позже, чем карточка считает раскладку — ширину меряем сами

@@ -902,6 +902,58 @@ public sealed class AppController
         finally { Volatile.Write(ref _driverCheckRunning, 0); }
     }
 
+    // ---- Службы Xiaomi: MiDeviceService и MiService (XIC-87) ----
+
+    // Одна операция за раз на обе службы: остановка ждёт до ~15 с, параллельно им незачем
+    private readonly object _oemServiceLock = new();
+    private (string Name, bool On)? _oemServiceOp;
+    private (string Name, OemServiceResult Error)? _oemServiceError;
+
+    /// <summary>Состояние службы <paramref name="name"/> для вкладки: SCM сейчас, идёт ли по ней
+    /// операция (null — нет, false — отключаем, true — включаем) и ошибка её последнего нажатия.</summary>
+    public OemServiceView GetOemServiceView(string name)
+    {
+        lock (_oemServiceLock)
+            return new(OemService.Read(name),
+                _oemServiceOp is { } op && op.Name == name ? op.On : null,
+                _oemServiceError is { } e && e.Name == name ? e.Error : null);
+    }
+
+    /// <summary>
+    /// Отключить (<paramref name="on"/> = false) или включить службу — только по кнопке. Тип
+    /// запуска до отключения запоминается здесь, в UI-потоке (конфиг пишем не из пула); сама
+    /// остановка/запуск ждёт службу до ~15 с — на пуле. Нажатие во время другой операции
+    /// ничего не делает.
+    /// </summary>
+    public Task SetOemServiceAsync(string name, bool on)
+    {
+        lock (_oemServiceLock)
+        {
+            if (_oemServiceOp is not null) return Task.CompletedTask;
+            _oemServiceOp = (name, on);
+        }
+        _cfg.OemServiceStartTypes ??= new(StringComparer.OrdinalIgnoreCase);
+        if (!on && OemService.Read(name).StartType is var current && OemService.ShouldRemember(current))
+        {
+            _cfg.OemServiceStartTypes[name] = current.ToString();
+            _cfg.Save();
+        }
+        var restore = OemService.RestoreTarget(_cfg.OemServiceStartTypes.GetValueOrDefault(name));
+        return Task.Run(() =>
+        {
+            var r = OemServiceResult.Failed;
+            try { r = on ? OemService.Enable(name, restore) : OemService.Disable(name); }
+            finally
+            {
+                lock (_oemServiceLock)
+                {
+                    _oemServiceOp = null;
+                    _oemServiceError = r == OemServiceResult.Ok ? null : (name, r);
+                }
+            }
+        });
+    }
+
     /// <summary>
     /// Мёртвая зона у нижнего края тачпада вкл/выкл. Реестр правим только отсюда — то есть
     /// только по явному переключению пользователем; перезапуск узла тачпада (сотни мс, панель
