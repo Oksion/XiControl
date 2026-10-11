@@ -26,6 +26,8 @@ public sealed class HttpApi : IDisposable
 
     /// <summary>Ctor запускает слушатель сразу; занятый порт и т.п. — исключение наружу,
     /// владелец логирует и живёт без API (мягкая деградация).</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "S5332",
+        Justification = "Локальный API на HttpListener: без TLS по замыслу — localhost или домашняя сеть, доступ по токену (docs/15)")]
     public HttpApi(ApiSettings s, ApiRouter router)
     {
         _router = router;
