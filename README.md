@@ -786,8 +786,8 @@ None of this runs or spends resources while the API is off (the server simply is
 - **Xiaomi's MiDeviceService service interferes with brightness.** It comes preinstalled and stays
   after PC Manager is uninstalled. When you leave Eco mode, the service restores the brightness
   you had when entering it: a manual change made in the meantime is lost, and with auto-brightness
-  the screen visibly jumps. XiControl does not need this service and it can be disabled — see
-  [docs/17-oem-services.md](docs/17-oem-services.md) for what it does and how to turn it off.
+  the screen visibly jumps. XiControl does not need this service: disable it on the Drivers tab
+  with the Disable button. What it does — see [docs/17-oem-services.md](docs/17-oem-services.md).
 
 ## How it works
 

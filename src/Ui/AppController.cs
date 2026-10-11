@@ -902,6 +902,43 @@ public sealed class AppController
         finally { Volatile.Write(ref _driverCheckRunning, 0); }
     }
 
+    // ---- Служба Xiaomi MiDeviceService (XIC-87) ----
+
+    private int _oemServiceOp; // 0 — ничего, 1 — отключаем, 2 — включаем
+
+    /// <summary>Что сейчас делается: null — ничего, false — отключаем, true — включаем.
+    /// Вкладка показывает «Отключаю…»/«Включаю…» вместо кнопки.</summary>
+    public bool? OemServicePending => Volatile.Read(ref _oemServiceOp) switch { 1 => false, 2 => true, _ => null };
+
+    /// <summary>Чем кончилось последнее нажатие; null — не нажимали или всё получилось.</summary>
+    public OemServiceResult? OemServiceError { get; private set; }
+
+    /// <summary>
+    /// Отключить (<paramref name="on"/> = false) или включить службу — только по кнопке. Тип
+    /// запуска до отключения запоминается здесь, в UI-потоке (конфиг пишем не из пула); сама
+    /// остановка/запуск ждёт службу до ~15 с — на пуле. Повторное нажатие во время операции
+    /// ничего не делает.
+    /// </summary>
+    public Task SetOemServiceAsync(bool on)
+    {
+        if (Interlocked.CompareExchange(ref _oemServiceOp, on ? 2 : 1, 0) != 0) return Task.CompletedTask;
+        if (!on && OemService.Read().StartType is var current && OemService.ShouldRemember(current))
+        {
+            _cfg.OemServiceStartType = current.ToString();
+            _cfg.Save();
+        }
+        var restore = OemService.RestoreTarget(_cfg.OemServiceStartType);
+        return Task.Run(() =>
+        {
+            try
+            {
+                var r = on ? OemService.Enable(restore) : OemService.Disable();
+                OemServiceError = r == OemServiceResult.Ok ? null : r;
+            }
+            finally { Volatile.Write(ref _oemServiceOp, 0); }
+        });
+    }
+
     /// <summary>
     /// Мёртвая зона у нижнего края тачпада вкл/выкл. Реестр правим только отсюда — то есть
     /// только по явному переключению пользователем; перезапуск узла тачпада (сотни мс, панель

@@ -808,6 +808,14 @@ public sealed class TrayApp : IDisposable
                     await run.ConfigureAwait(false);
                     _osd.BeginInvoke(done); // и с результатом
                 }),
+                GetOemService = () => new OemServiceView(OemService.Read(), _controller.OemServicePending, _controller.OemServiceError),
+                SetOemService = (on, done) =>
+                {
+                    // запоминание типа запуска — в UI-потоке (мы в нём: клик по кнопке), ожидание службы — на пуле
+                    var run = _controller.SetOemServiceAsync(on);
+                    _osd.BeginInvoke(done); // сразу — показать «Отключаю…»
+                    _ = run.ContinueWith(_ => _osd.BeginInvoke(done), TaskScheduler.Default); // и с результатом
+                },
                 SetTouchpadDeadZone = _controller.SetTouchpadDeadZone,
                 SetTouchpadDeadZoneMm = _controller.SetTouchpadDeadZoneMm,
                 SetTouchpadEdgeSliders = _controller.SetTouchpadEdgeSliders,

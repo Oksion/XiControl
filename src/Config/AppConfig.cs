@@ -422,6 +422,11 @@ public sealed class AppConfig
     /// null — запись от версии до XIC-82: возвращаем в активную, как раньше.</summary>
     public Guid? AwakeSavedLidScheme { get; set; }
 
+    /// <summary>Тип запуска службы Xiaomi MiDeviceService до нажатия «Отключить» на вкладке «Драйверы»
+    /// (XIC-87): Auto / DelayedAuto / Manual — его возвращает «Включить». null — не отключали
+    /// нашей кнопкой; тогда «Включить» ставит Auto, как у предустановки.</summary>
+    public string? OemServiceStartType { get; set; }
+
     /// <summary>Позиция окна «Монитор» (виджет перетаскивается мышью); null — по центру.</summary>
     public int? MonitorX { get; set; }
     public int? MonitorY { get; set; }
