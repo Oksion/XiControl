@@ -76,8 +76,12 @@ public sealed class PerfTab : SettingsPane
         if (act.PowerModeSyncBlocked())
         {
             sync.Enabled = false;
-            ui.AddRow(this, "settings.perf.winpower.sync", "settings.perf.winpower.blocked",
-                ui.Pair(ui.LinkButton("settings.perf.winpower.open", act.OpenDriversTab), sync));
+            ui.AddRow(this, "settings.perf.winpower.sync", "settings.perf.winpower.blocked", sync);
+            // кнопка — отдельной строкой под карточкой, как в «О программе»: ширину LinkButton
+            // AutoSize даёт позже раскладки карточки, и в одной строке с тумблером она уезжала за край
+            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, 0, 0, ui.Sc(8)), BackColor = ui.T.WinBg };
+            row.Controls.Add(ui.LinkButton("settings.perf.winpower.open", act.OpenDriversTab));
+            Controls.Add(row);
         }
         else ui.AddRow(this, "settings.perf.winpower.sync", "settings.perf.winpower.sync.desc", sync);
     }
