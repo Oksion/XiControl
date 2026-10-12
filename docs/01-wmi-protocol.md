@@ -301,3 +301,4 @@ OUT[6] = значение для charge-protect — КОД уровня поро
 | Сильное нажатие на тачпад | Raw Input, Tip Pressure в PTP-вводе | там же |
 | Обновления драйверов и BIOS | HTTPS к серверу Xiaomi + WMI-инвентаризация | [16](16-oem-driver-check.md) |
 | Службы Xiaomi | SCM напрямую | [17](17-oem-services.md) |
+| Режим питания Windows вместе с режимом | `powrprof` `PowerGet/SetActiveOverlayScheme` — пишет только текущий источник питания | [17](17-oem-services.md) §5 |

@@ -142,6 +142,8 @@ where there are no watts to show, you can watch load or degrees instead.*
   refresh-rate section of the Display tab go away (the tab itself stays — brightness lives there).
 - 🔌 **Power profiles** — your own performance mode on AC and on battery
   ("Don't change" — leave alone). Applied at startup and on power-source changes; driver-free (firmware WMI).
+- ⚡ **Windows power mode along with the mode** (option) — Eco/Quiet → best power efficiency,
+  Auto/Balance → balanced, Turbo/Full speed → best performance; replaces Xiaomi's service.
 - 💡 **Brightness memory** — a separate option (no profiles): screen brightness is remembered
   and restored separately for AC and battery (WMI ACPI, the same channel Windows uses).
 - 🌗 **Brightness limit** — a maximum brightness, separately for AC and battery (protects an
@@ -385,6 +387,31 @@ below the radio choice appear "Mode on AC" and "Mode on battery" (or "Don't chan
   sleep), through a debounced guard — like charge protection and auto refresh rate. Driver-free:
   firmware WMI `0x08`.
 - If the firmware rejected the mode (e.g. "Full speed" on battery) — a soft fallback to "Auto".
+
+### Windows power mode along with the mode
+
+**Settings → Performance → "Windows power mode"** (off by default). The laptop mode drives the
+"Power mode" from Windows settings:
+
+| Laptop mode | Windows power mode |
+|---|---|
+| Eco, Quiet | Best power efficiency |
+| Auto, Balance | Balanced |
+| Turbo, Full speed | Best performance |
+
+- Fires on any mode change — from XiControl, the Fn+K key, a power profile, the HTTP API — and on
+  a power-source change: AC and battery each have their own Windows power mode.
+- Xiaomi's MiDeviceService service used to do this. While it is running, the switch is disabled —
+  the service does the same thing itself and there is no point fighting it. You can disable it on
+  the Drivers tab.
+- Works on top of the Balanced power plan (with another plan Windows itself doesn't offer the
+  power mode either).
+- Turn the switch off and the power mode goes back to Balanced, if it still holds the value we
+  set. A choice you made by hand in Windows settings is left alone.
+
+```json
+"PowerModeSync": true
+```
 
 ### Screen brightness memory
 

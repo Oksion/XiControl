@@ -60,6 +60,9 @@ public sealed class SettingsActions
     public required Action<Action> CheckDriversNow;          // проверить по кнопке; колбэк — перерисовать вкладку
     public required Func<string, OemServiceView> GetOemService; // служба Xiaomi по имени: состояние на сейчас (XIC-87)
     public required Action<string, bool, Action> SetOemService; // имя, включить?; колбэк — перерисовать вкладку
+    public required Action<bool> SetPowerModeSync;           // режим питания Windows вместе с режимом (XIC-96)
+    public required Func<bool> PowerModeSyncBlocked;         // служба Xiaomi запущена — тумблер неактивен
+    public required Action OpenDriversTab;                   // перейти на вкладку «Драйверы» (там службы Xiaomi)
     public required Action<bool> SetTouchpadDeadZone;        // мёртвая зона у нижнего края тачпада
     public required Action<int> SetTouchpadDeadZoneMm;       // её высота в мм
     public required Action<bool> SetTouchpadEdgeSliders;      // края тачпада как ползунки (XIC-61)

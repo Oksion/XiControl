@@ -67,6 +67,23 @@ public sealed class PerfTab : SettingsPane
         var batRow = ui.SubRow("settings.profile.battery", ProfileCombo(false));
         _profileRows.AddRange([acRow, batRow]);
         foreach (var r in _profileRows) { Controls.Add(r); r.Visible = strat == StartStrategy.Profiles; }
+
+        // Режим питания Windows вместе с режимом (XIC-96). Пока работает служба Xiaomi, она делает
+        // это сама на каждую смену режима — не соревнуемся: тумблер неактивен (значение в конфиге
+        // сохраняется) и рядом переход туда, где службу можно отключить.
+        ui.AddGroup(this, "settings.perf.winpower");
+        var sync = ui.Toggle(cfg.PowerModeSync, act.SetPowerModeSync);
+        if (act.PowerModeSyncBlocked())
+        {
+            sync.Enabled = false;
+            ui.AddRow(this, "settings.perf.winpower.sync", "settings.perf.winpower.blocked", sync);
+            // кнопка — отдельной строкой под карточкой, как в «О программе»: ширину LinkButton
+            // AutoSize даёт позже раскладки карточки, и в одной строке с тумблером она уезжала за край
+            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Width = ui.RowW, Margin = new Padding(0, 0, 0, ui.Sc(8)), BackColor = ui.T.WinBg };
+            row.Controls.Add(ui.LinkButton("settings.perf.winpower.open", act.OpenDriversTab));
+            Controls.Add(row);
+        }
+        else ui.AddRow(this, "settings.perf.winpower.sync", "settings.perf.winpower.sync.desc", sync);
     }
 
     // Панель, умеющая принимать клавиатурный фокус (стрелки/Space/Enter — радио-поведение).
