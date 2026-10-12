@@ -427,6 +427,11 @@ public sealed class AppConfig
     /// отключали нашей кнопкой; тогда «Включить» ставит Auto, как у предустановки.</summary>
     public Dictionary<string, string>? OemServiceStartTypes { get; set; }
 
+    /// <summary>Менять режим питания Windows вместе с режимом ноутбука (XIC-96): Эко/Тихий →
+    /// эффективность, Авто/Баланс → сбалансированный, Турбо/Полная → производительность. Пока
+    /// работает служба Xiaomi MiDeviceService, не пишем — она делает то же сама.</summary>
+    public bool PowerModeSync { get; set; } = false;
+
     /// <summary>Позиция окна «Монитор» (виджет перетаскивается мышью); null — по центру.</summary>
     public int? MonitorX { get; set; }
     public int? MonitorY { get; set; }

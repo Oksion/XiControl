@@ -25,6 +25,7 @@ public sealed class SettingsForm : Form
     // _panes[i] — кэш построенной (null = ещё не строили). Так тяжёлые вкладки (BatteryTab
     // с синхронным WMI-запросом) не платятся, пока их не открыли.
     private readonly List<Func<Panel>> _factories = [];
+    private string[] _tabKeys = [];  // ключи вкладок по порядку — для перехода по имени (ShowTab)
     private readonly List<Panel?> _panes = [];
     private int _tab;
 
@@ -252,6 +253,7 @@ public sealed class SettingsForm : Form
         AddTab("settings.tab.about", NavGlyph.About, () => new AboutTab(_ui, _act, rebuild));
 
         _nav.Tabs = [.. tabs];
+        _tabKeys = [.. tabs.Select(t => t.key)];
         _tab = UiNav.ClampTab(_tab, _panes.Count); // вкладка исчезла (скрыли «Экран») — на первую
         _nav.Selected = _tab;
 
@@ -307,6 +309,13 @@ public sealed class SettingsForm : Form
             c = c.Controls[i];
         }
         return c == root ? null : c;
+    }
+
+    /// <summary>Открыть вкладку по ключу (ссылка из одной вкладки на другую). Нет такой — ничего.</summary>
+    public void ShowTab(string key)
+    {
+        int i = Array.IndexOf(_tabKeys, key);
+        if (i >= 0) SelectTab(i);
     }
 
     private void SelectTab(int i)

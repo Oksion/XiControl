@@ -105,6 +105,7 @@ public sealed class TrayApp : IDisposable
         // Профили питания: после применения режима обновить значок трея
         powerGuard.ModeApplied = () =>
         {
+            _controller.SyncPowerMode(); // и режим питания Windows (XIC-96) — сверка сама уходит на пул
             if (_osd.IsHandleCreated) _osd.BeginInvoke(new Action(() => _icon.Refresh()));
         };
 
@@ -552,6 +553,8 @@ public sealed class TrayApp : IDisposable
         // показали сами, и молчим, когда железо сообщает ровно это. Отвергнутый прошивкой код
         // сюда же и попадает: режим не изменился, значит и говорить не о чем.
         var mode = actual ?? announced;
+        // режим питания Windows (XIC-96) — до дедупликации: эхо нашей же смены здесь гасится
+        _controller.SyncPowerMode();
         if (mode == _shownMode) return;
         _shownMode = mode;
 
@@ -809,6 +812,9 @@ public sealed class TrayApp : IDisposable
                     _osd.BeginInvoke(done); // и с результатом
                 }),
                 GetOemService = _controller.GetOemServiceView,
+                SetPowerModeSync = _controller.SetPowerModeSync,
+                PowerModeSyncBlocked = () => _controller.PowerModeSyncBlocked,
+                OpenDriversTab = () => _settings?.ShowTab("settings.tab.drivers"),
                 SetOemService = (name, on, done) =>
                 {
                     // запоминание типа запуска — в UI-потоке (мы в нём: клик по кнопке), ожидание службы — на пуле

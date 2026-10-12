@@ -151,7 +151,8 @@ xi_control/
  │   │                         XIC-86), TrayMetrics (источники индикатора трея), LatestValue<T>
  │   │                         (медленный WMI-источник на пуле, XIC-81), OemDrivers (проверка
  │   │                         драйверов и BIOS у OEM, XIC-95 — см. docs/16), OemService
- │   │                         (службы Xiaomi через SCM, XIC-87 — см. docs/17), SystemInfo
+ │   │                         (службы Xiaomi через SCM, XIC-87 — см. docs/17), PowerModeSync
+ │   │                         (режим питания Windows вместе с режимом, XIC-96), SystemInfo
  │   │                         (модель/BIOS/серийник для «О программе»),
  │   │                         HttpApi/ApiRouter/ApiSettings/ApiFirewall (opt-in HTTP API, XIC-13),
  │   │                         ChargeLimitWatcher + Webhook (исходящее событие о пороге заряда:

@@ -30,6 +30,7 @@ public sealed class AppController
     private readonly TouchpadEdgeSliders _edges;
     private readonly TouchpadHaptics? _haptics;
     private readonly TouchpadHeavyPress? _heavy;
+    private readonly PowerModeSync? _modeSync;  // режим питания Windows вместе с режимом (XIC-96)
 
     private PerfMode[] _modes = [];
     private bool _autoStart;   // кэш состояния автозапуска (не дёргаем schtasks на каждое меню)
@@ -64,7 +65,7 @@ public sealed class AppController
         AutoBrightnessGuard autoGuard, AlsWatcher als,
         TravelChargeMonitor travel, TouchpadControl touchpad, TouchscreenControl touchscreen,
         TouchpadDeadZone deadZone, TouchpadEdgeSliders edges,
-        TouchpadHaptics? haptics = null, TouchpadHeavyPress? heavy = null)
+        TouchpadHaptics? haptics = null, TouchpadHeavyPress? heavy = null, PowerModeSync? modeSync = null)
     {
         _mifs = mifs;
         _cfg = cfg;
@@ -85,6 +86,7 @@ public sealed class AppController
         _edges = edges;
         _haptics = haptics; // null в тестах: юниты не должны писать в настоящий тачпад
         _heavy = heavy;     // тоже null в тестах — касаний настоящего тачпада там нет
+        _modeSync = modeSync; // null в тестах: живой overlay питания юнитами не трогаем
         if (_heavy is not null) _heavy.Pressed += () => TouchpadHeavyPressed?.Invoke();
         ApplyModeVisibility();
     }
@@ -162,6 +164,10 @@ public sealed class AppController
         if (_cfg.AutoBrightness) SeedCurves();
         _als.SetDemand(_cfg.AutoBrightness);
         _als.Start();
+
+        // Режим питания Windows (XIC-96): режим на старте уже применён выше — сверить с ним.
+        // Профиль питания применяется на пуле и сверится сам по ModeApplied.
+        _modeSync?.Request();
 
         // Краевые ползунки тачпада (XIC-61): реестр на старте НЕ трогаем (зоны там уже лежат
         // с прошлого включения), поднимаем только чтение касаний.
@@ -323,8 +329,28 @@ public sealed class AppController
     {
         if (!Apply(mode)) { FirmwareFailed?.Invoke(); return; }
         _cfg.RememberMode(mode);
+        _modeSync?.Request();
         ModeSet?.Invoke(mode);
     }
+
+    /// <summary>
+    /// Режим сменился мимо наших команд (Fn+K, профиль питания) или пришло 0x16 — сверить режим
+    /// питания Windows (XIC-96). Своих смен 0x16 тоже касается: TrayApp гасит их эхо для OSD,
+    /// поэтому сверка зовётся до этой дедупликации. Лишний вызов ничего не стоит.
+    /// </summary>
+    public void SyncPowerMode() => _modeSync?.Request();
+
+    /// <summary>Режим питания Windows вместе с режимом ноутбука вкл/выкл (XIC-96). Выключение
+    /// возвращает «сбалансированный» там, где стоит записанное нами.</summary>
+    public void SetPowerModeSync(bool on)
+    {
+        _cfg.PowerModeSync = on;
+        _cfg.Save();
+        if (on) _modeSync?.Request(); else _modeSync?.Undo();
+    }
+
+    /// <summary>Служба Xiaomi сама меняет режим питания — пока она запущена, опция недоступна.</summary>
+    public bool PowerModeSyncBlocked => _modeSync?.BlockedByService ?? false;
 
     /// <summary>
     /// Переключить на следующий режим по кругу (Mi-кнопка / клавиша).
@@ -347,6 +373,7 @@ public sealed class AppController
             if (!Apply(next)) continue;
 
             _cfg.RememberMode(next);
+            _modeSync?.Request();
             ModeCycled?.Invoke(next);
             return;
         }
@@ -554,6 +581,7 @@ public sealed class AppController
         {
             if (!Safe(() => _mifs.SetPerfMode(m), false))
                 Safe(() => _mifs.SetPerfMode(PerfMode.Auto), false);
+            _modeSync?.Request();
             ProfileModeApplied?.Invoke();
         }
     }
