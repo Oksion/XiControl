@@ -184,6 +184,8 @@ public sealed class TrayApp : IDisposable
         };
         _controller.TravelChanged = on =>
         {
+            // «В дорогу» снимает порог — наблюдение за ним встаёт, по выходу взводится снова (XIC-99)
+            _chargeLimit.Rearm();
             // экран заблокирован: OSD под локскрином не виден (secure desktop) — «слепая» обратная
             // связь: различимый джингл вкл/выкл + toast (Windows сама показывает его на локскрине).
             // В обычном режиме — как раньше, без звука и тостов (XIC-11)
@@ -199,7 +201,11 @@ public sealed class TrayApp : IDisposable
             else if (on) _osd.Flash(OsdKind.Travel, Loc.T("osd.travel"), Loc.T("osd.travel.sub"));
             else _osd.Flash(OsdKind.TravelOff, Loc.T("osd.travel.off"));
         };
-        _controller.TravelCancelled = () => { if (_panel.Visible) _panel.RefreshUi(); };
+        _controller.TravelCancelled = () =>
+        {
+            _chargeLimit.Rearm(); // зарядку выдернули — на батарее и так стоит, но правило одно (XIC-99)
+            if (_panel.Visible) _panel.RefreshUi();
+        };
         _controller.ModeSet = m =>
         {
             _shownMode = m;                        // прошивка сейчас пришлёт эхо 0x16 — гасим его
