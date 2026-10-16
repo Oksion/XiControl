@@ -96,9 +96,33 @@ public sealed class HttpApi : IDisposable
         ctx.Response.StatusCode = code;
         ctx.Response.ContentType = "application/json";
         ctx.Response.ContentLength64 = buf.Length;
-        await ctx.Response.OutputStream.WriteAsync(buf, ct).AsTask().WaitAsync(ct).ConfigureAwait(false);
+        await Bounded(ctx.Response.OutputStream.WriteAsync(buf, ct).AsTask(), ct).ConfigureAwait(false);
         ctx.Response.Close();
     }
+
+    /// <summary>
+    /// Ждать операцию ввода-вывода не дольше <paramref name="ct"/>. Поток http.sys отмену не
+    /// слушает, поэтому по дедлайну мы бросаем ожидание, а сама операция остаётся висеть и потом
+    /// падает (сокет закрыл вызывающий). Без наблюдателя её исключение всплыло бы в
+    /// UnobservedTaskException и легло в log.txt «необработанным» — побочный эффект дедлайна,
+    /// а не сбой (XIC-101). Поэтому брошенную операцию наблюдаем и глотаем.
+    /// </summary>
+    internal static async Task<T> Bounded<T>(Task<T> io, CancellationToken ct)
+    {
+        try { return await io.WaitAsync(ct).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!io.IsCompleted) { Observe(io); throw; }
+    }
+
+    /// <inheritdoc cref="Bounded{T}(Task{T}, CancellationToken)"/>
+    internal static async Task Bounded(Task io, CancellationToken ct)
+    {
+        try { await io.WaitAsync(ct).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!io.IsCompleted) { Observe(io); throw; }
+    }
+
+    private static void Observe(Task io) => _ = io.ContinueWith(static t => _ = t.Exception,
+        CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+        TaskScheduler.Default);
 
     internal enum BodyError { None, TooLarge, BadUtf8 }
 
@@ -115,7 +139,7 @@ public sealed class HttpApi : IDisposable
         int count = 0;
         while (count < buf.Length)
         {
-            int read = await input.ReadAsync(buf.AsMemory(count), ct).AsTask().WaitAsync(ct).ConfigureAwait(false);
+            int read = await Bounded(input.ReadAsync(buf.AsMemory(count), ct).AsTask(), ct).ConfigureAwait(false);
             if (read == 0) break;
             count += read;
         }

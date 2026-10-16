@@ -130,6 +130,10 @@ public sealed class DriversTab : SettingsPane
                 desc = Loc.T("settings.drivers.oem.noaccess");
                 ctl = ui.ValueLabel(Loc.T("settings.drivers.oem.v.noaccess"));
                 break;
+            case OemServiceState.Unknown:   // не прочиталось по другой причине — без кнопок, причина в журнале
+                desc = Loc.T("settings.drivers.oem.unknown");
+                ctl = ui.ValueLabel(Loc.T("settings.drivers.oem.v.unknown"));
+                break;
             case OemServiceState.Disabled:
                 desc = Loc.T(prefix + "off");
                 ctl = ui.ConfirmButton("settings.drivers.oem.enable", "settings.drivers.oem.enable.confirm", () => act.SetOemService(name, true, rebuild));
@@ -141,7 +145,7 @@ public sealed class DriversTab : SettingsPane
                 break;
         }
         // операция идёт (служба останавливается до ~15 с) — вместо кнопки неактивная надпись
-        if (v.Pending is { } on && v.Info.State is not (OemServiceState.NotInstalled or OemServiceState.NoAccess))
+        if (v.Pending is { } on && v.Info.State is not (OemServiceState.NotInstalled or OemServiceState.NoAccess or OemServiceState.Unknown))
         {
             var b = Button(ui, on ? "settings.drivers.oem.busy.on" : "settings.drivers.oem.busy.off", () => { });
             b.Enabled = false;

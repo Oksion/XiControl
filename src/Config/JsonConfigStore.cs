@@ -43,14 +43,22 @@ public sealed class JsonConfigStore : IConfigStore
         return cfg;
     }
 
+    // Сохраняют и UI-поток, и пул (PowerModeSync, самолечение порога заряда, RestoreAfterBoot):
+    // две одновременные записи одного файла давали IOException, и одна правка терялась. Под
+    // замком каждая запись сериализует весь текущий конфиг — последняя несёт обе правки.
+    private readonly object _saveLock = new();
+
     public void Save(AppConfig cfg)
     {
-        try
+        lock (_saveLock)
         {
-            Directory.CreateDirectory(_dir);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(cfg, JsonOpts));
+            try
+            {
+                Directory.CreateDirectory(_dir);
+                File.WriteAllText(FilePath, JsonSerializer.Serialize(cfg, JsonOpts));
+            }
+            catch (Exception ex) { Log.Ex("JsonConfigStore.Save", ex); /* не критично */ }
         }
-        catch (Exception ex) { Log.Ex("JsonConfigStore.Save", ex); /* не критично */ }
     }
 
     /// <summary>Конфиг для первого старта (файла нет / повреждён): язык — по языку ОС.</summary>

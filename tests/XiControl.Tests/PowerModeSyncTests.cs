@@ -76,6 +76,7 @@ public sealed class PowerModeSyncTests
     [InlineData(OemServiceState.Stopped)]
     [InlineData(OemServiceState.Disabled)]
     [InlineData(OemServiceState.NoAccess)]
+    [InlineData(OemServiceState.Unknown)]
     public void Служба_не_запущена_пишем(OemServiceState state) =>
         PowerModeSync.Decide(true, state, null, PerfMode.Turbo, null, out _).Should().Be(Skip.None);
 
@@ -162,6 +163,32 @@ public sealed class PowerModeSyncTests
 
         _overlay.Overlay[true].Should().Be(Guid.Empty);
         _overlay.Overlay[false].Should().Be(Guid.Empty);
+    }
+
+    [Fact]
+    public void Откат_переживает_перезапуск()
+    {
+        _sync.Sync();                     // сеть ← эффективность
+        _cfg.PowerOverlayWritten.Should().ContainKey("ac");
+
+        // «перезапуск»: новый экземпляр с тем же конфигом, памяти прежнего нет
+        var restarted = new PowerModeSync(_cfg, _mifs, _power, _overlay, () => _service);
+        _cfg.PowerModeSync = false;
+        restarted.UndoCurrent();
+
+        _overlay.Overlay[true].Should().Be(Guid.Empty, "откатываем записанное нами и после перезапуска (XIC-101)");
+        _cfg.PowerOverlayWritten.Should().BeNull("откатили — помнить нечего");
+    }
+
+    [Fact]
+    public void Сбалансированный_не_хранится()
+    {
+        _mifs.Mode = PerfMode.Turbo;
+        _sync.Sync();
+        _mifs.Mode = PerfMode.Auto;       // своя запись «сбалансированного» — откатывать нечего
+        _sync.Sync();
+
+        _cfg.PowerOverlayWritten.Should().BeNull();
     }
 
     [Fact]

@@ -432,6 +432,11 @@ public sealed class AppConfig
     /// работает служба Xiaomi MiDeviceService, не пишем — она делает то же сама.</summary>
     public bool PowerModeSync { get; set; } = false;
 
+    /// <summary>Что из режима питания Windows записали мы, по источнику (<c>ac</c>/<c>battery</c> →
+    /// GUID overlay). Выключая <see cref="PowerModeSync"/>, откатываем только это — и после
+    /// перезапуска тоже (XIC-101). «Сбалансированный» не храним; null — ничего нашего не стоит.</summary>
+    public Dictionary<string, Guid>? PowerOverlayWritten { get; set; }
+
     /// <summary>Позиция окна «Монитор» (виджет перетаскивается мышью); null — по центру.</summary>
     public int? MonitorX { get; set; }
     public int? MonitorY { get; set; }

@@ -79,7 +79,9 @@ public sealed class ChargeGuard : IDisposable
             int pct = _limitWanted();
             if (pct >= 100) return;
 
-            int? now = _mifs.GetChargeLimit();
+            // Перед сном не спрашиваем: времени нет, а чтение — лишний вызов WMI ровно в этом окне
+            // (XIC-101). Риска нет: в спешке пишем одной командой без сброса в «выкл».
+            int? now = hurry ? null : _mifs.GetChargeLimit();
             if (now == pct) return;   // EC уже держит нужный порог — молча и не трогая
 
             if (!_mifs.SetChargeLimit(pct, resetFirst: !hurry))

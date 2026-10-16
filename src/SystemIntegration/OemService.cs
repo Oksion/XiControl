@@ -3,8 +3,9 @@ using System.Runtime.InteropServices;
 
 namespace XiControl.SystemIntegration;
 
-/// <summary>Что видно о службе Xiaomi MiDeviceService.</summary>
-public enum OemServiceState { NotInstalled, Running, Stopped, Disabled, NoAccess }
+/// <summary>Что видно о службе Xiaomi MiDeviceService. NoAccess — Windows отказала в доступе;
+/// Unknown — прочие сбои чтения (SCM недоступен, RPC), их с правами не путаем (XIC-101).</summary>
+public enum OemServiceState { NotInstalled, Running, Stopped, Disabled, NoAccess, Unknown }
 
 /// <summary>Тип запуска службы (то, что запоминаем перед отключением и возвращаем потом).</summary>
 public enum OemStartType { Unknown, Auto, DelayedAuto, Manual, Disabled }
@@ -59,7 +60,9 @@ public static class OemService
         catch (Exception ex)
         {
             Log.Ex("OemService.Read " + name, ex);
-            return new(OemServiceState.NoAccess, OemStartType.Unknown);
+            // «нет доступа» — только когда Windows так и сказала: иначе человек зря пойдёт
+            // перезапускать от администратора, хотя причина в недоступном SCM (XIC-101)
+            return new(StateOnFailure(ex), OemStartType.Unknown);
         }
     }
 
@@ -106,6 +109,10 @@ public static class OemService
     /// поверх уже запомненного — повторное «Отключить» не должно стереть исходный.</summary>
     internal static bool ShouldRemember(OemStartType current) =>
         current is OemStartType.Auto or OemStartType.DelayedAuto or OemStartType.Manual;
+
+    /// <summary>Чем показать сбой чтения: «нет доступа» — только если Windows так и сказала.</summary>
+    internal static OemServiceState StateOnFailure(Exception ex) =>
+        ex is Win32Exception { NativeErrorCode: ERROR_ACCESS_DENIED } ? OemServiceState.NoAccess : OemServiceState.Unknown;
 
     /// <summary>Состояние для показа: работающая — «запущена» при любом типе запуска (отключение
     /// могло не остановить её), стоящая с Disabled — «отключена».</summary>

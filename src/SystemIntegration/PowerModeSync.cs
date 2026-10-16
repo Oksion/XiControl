@@ -45,10 +45,10 @@ public sealed class PowerModeSync : IDisposable
     private readonly IPowerOverlay _overlay;
     private readonly Func<OemServiceState> _service;
 
+    // Что записали мы, по источнику, — в конфиге (AppConfig.PowerOverlayWritten), а не в памяти:
+    // выключая опцию, откатываем только своё, и это должно пережить перезапуск (XIC-101).
+    // Выбор человека в параметрах Windows не трогаем. Читается и пишется только под замком.
     private readonly object _lock = new();
-    // что записали мы, по источнику (true — сеть): выключая опцию, откатываем только своё,
-    // выбор человека в параметрах Windows не трогаем
-    private readonly Dictionary<bool, Guid> _written = [];
     private Skip _lastSkip = Skip.None;
 
     public PowerModeSync(AppConfig cfg, IMifsClient mifs, IPowerEvents power)
@@ -121,7 +121,7 @@ public sealed class PowerModeSync : IDisposable
                 {
                     if (_overlay.SetActive(target))
                     {
-                        _written[online] = target;
+                        Remember(online, target);
                         Log.Write($"PowerModeSync: {(online ? "сеть" : "батарея")} → {Name(target)}");
                     }
                     else skip = Skip.Unavailable;
@@ -142,10 +142,10 @@ public sealed class PowerModeSync : IDisposable
             try
             {
                 bool online = _power.IsOnline;
-                if (!_written.TryGetValue(online, out var w)) return;
+                if (_cfg.PowerOverlayWritten?.TryGetValue(Key(online), out var w) != true) return;
                 if (ShouldUndo(w, Actual()) && _overlay.SetActive(Balanced))
                     Log.Write($"PowerModeSync: выключено, {(online ? "сеть" : "батарея")} → сбалансированный");
-                _written.Remove(online);
+                Remember(online, Balanced);   // своё откатили (или его уже сменил человек) — забыть
             }
             catch (Exception ex) { Log.Ex("PowerModeSync.Undo", ex); }
         }
@@ -156,7 +156,34 @@ public sealed class PowerModeSync : IDisposable
         if (mode is not (PowerModes.Resume or PowerModes.StatusChange)) return;
         // включено — сверить новый источник; выключено — доделать откат, если он остался на нём
         if (_cfg.PowerModeSync) Request();
-        else if (_written.Count > 0) Undo();
+        else
+        {
+            bool pending;
+            lock (_lock) pending = _cfg.PowerOverlayWritten is { Count: > 0 };
+            if (pending) Undo();
+        }
+    }
+
+    private static string Key(bool online) => online ? "ac" : "battery";
+
+    /// <summary>Запомнить, что стоит нашей записью на источнике. «Сбалансированный» откатывать
+    /// не нужно — его не храним. Звать под замком. Конфиг пишем только при изменении.</summary>
+    private void Remember(bool online, Guid overlay)
+    {
+        var written = _cfg.PowerOverlayWritten;
+        bool known = written?.ContainsKey(Key(online)) == true;
+        if (overlay == Balanced)
+        {
+            if (!known) return;
+            written!.Remove(Key(online));
+            if (written.Count == 0) _cfg.PowerOverlayWritten = null;
+        }
+        else
+        {
+            if (known && written![Key(online)] == overlay) return;
+            (_cfg.PowerOverlayWritten ??= [])[Key(online)] = overlay;
+        }
+        _cfg.Save();
     }
 
     private PerfMode? Mode()

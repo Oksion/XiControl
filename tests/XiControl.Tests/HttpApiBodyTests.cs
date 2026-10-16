@@ -86,6 +86,44 @@ public sealed class HttpApiBodyTests
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
+    [Fact]
+    public async Task Брошенное_по_дедлайну_чтение_не_всплывает_необработанным()
+    {
+        // Сокет закрыли после дедлайна — висящая операция падает. Её исключение не должно
+        // уйти в UnobservedTaskException (оно пишется в log.txt «необработанным», XIC-101).
+        const string marker = "XIC-101: сокет закрыт после дедлайна";
+        bool leaked = false;
+        void OnUnobserved(object? _, UnobservedTaskExceptionEventArgs e)
+        {
+            if (e.Exception.InnerExceptions.Any(x => x.Message == marker)) leaked = true;
+        }
+        TaskScheduler.UnobservedTaskException += OnUnobserved;
+        try
+        {
+            await AbandonAndFault(marker);
+            for (int i = 0; i < 3; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+            leaked.Should().BeFalse();
+        }
+        finally { TaskScheduler.UnobservedTaskException -= OnUnobserved; }
+    }
+
+    // Отдельный метод: после выхода из него на упавшую задачу не остаётся ни одной ссылки, и
+    // сборщик её финализирует — иначе тест прошёл бы и без исправления.
+    private static async Task AbandonAndFault(string marker)
+    {
+        var pending = new TaskCompletionSource<int>();
+        using (var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50)))
+        {
+            Func<Task> act = () => HttpApi.Bounded(pending.Task, cts.Token);
+            await act.Should().ThrowAsync<OperationCanceledException>();
+        }
+        pending.SetException(new IOException(marker));
+    }
+
     // ---- Потоки-фейки ----
 
     /// <summary>Бесконечный поток нулей; считает, сколько отдал.</summary>
