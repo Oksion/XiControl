@@ -134,6 +134,22 @@ public sealed class ChargeGuardTests
     }
 
     [Fact]
+    public void Перед_сном_порог_не_спрашиваем_а_сразу_пишем()
+    {
+        // XIC-101: времени до засыпания мало — чтение было лишним вызовом WMI в этом окне.
+        // Пишем даже если порог уже стоит: запись без сброса окна «без защиты» не открывает.
+        _mifs.ChargeLimit = 80;
+        using var guard = Create();
+
+        _power.RaisePower(PowerModes.Suspend);
+        _power.RaiseSession();
+
+        _mifs.ChargeLimitReads.Should().Be(0);
+        _mifs.ChargeLimitCalls.Should().Equal(80, 80);
+        _mifs.ChargeLimitResets.Should().Equal(false, false);
+    }
+
+    [Fact]
     public void Обычный_ре_арм_сбрасывает_стейт_машину_как_раньше()
     {
         // Вне спешки поведение прежнее: off→on. Времени достаточно, а сброс лечит EC,

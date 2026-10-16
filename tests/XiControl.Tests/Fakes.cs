@@ -33,7 +33,8 @@ internal sealed class FakeMifsClient : IMifsClient
         return !Rejects.Contains(mode) && SetPerfModeResult;
     }
 
-    public int? GetChargeLimit() => ChargeLimit;
+    public int ChargeLimitReads;          // сколько раз спросили порог (XIC-101: перед сном — ни разу)
+    public int? GetChargeLimit() { ChargeLimitReads++; return ChargeLimit; }
 
     public readonly List<bool> ChargeLimitResets = [];  // с каким resetFirst звали (XIC-64)
 
