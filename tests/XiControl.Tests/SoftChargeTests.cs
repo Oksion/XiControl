@@ -18,7 +18,7 @@ public sealed class SoftChargeTests
     public void Аппаратный_лимит_есть_следим_за_ним()
     {
         var t = ChargeLimitWatcher.Target(care: true, careLimit: 60, softOn: true, softLimit: 90,
-            hardwareMissing: false);
+            hardwareMissing: false, travel: false);
 
         t.Should().Be(new ChargeTarget(60, false),
             "прошивка остановит заряд сама — программный порог тут лишний, даже если включён");
@@ -28,7 +28,7 @@ public sealed class SoftChargeTests
     public void Аппаратного_нет_следим_за_программным()
     {
         var t = ChargeLimitWatcher.Target(care: true, careLimit: 60, softOn: true, softLimit: 90,
-            hardwareMissing: true);
+            hardwareMissing: true, travel: false);
 
         t.Should().Be(new ChargeTarget(90, true));
     }
@@ -36,17 +36,56 @@ public sealed class SoftChargeTests
     [Fact]
     public void Аппаратного_нет_и_программный_выключен_следить_не_за_чем()
         => ChargeLimitWatcher.Target(care: true, careLimit: 60, softOn: false, softLimit: 90,
-            hardwareMissing: true).Should().BeNull("выключено — значит батарею не опрашиваем вовсе");
+            hardwareMissing: true, travel: false).Should().BeNull("выключено — значит батарею не опрашиваем вовсе");
 
     [Fact]
     public void Защита_выключена_следить_не_за_чем()
         => ChargeLimitWatcher.Target(care: false, careLimit: 60, softOn: true, softLimit: 90,
-            hardwareMissing: false).Should().BeNull();
+            hardwareMissing: false, travel: false).Should().BeNull();
 
     [Fact]
     public void Программный_порог_из_конфига_зажимается_в_разумные_рамки()
         => ChargeLimitWatcher.Target(care: false, careLimit: 60, softOn: true, softLimit: 500,
-            hardwareMissing: true)!.Value.Limit.Should().Be(100, "порог выше 100% недостижим");
+            hardwareMissing: true, travel: false)!.Value.Limit.Should().Be(100, "порог выше 100% недостижим");
+
+    // ---- «В дорогу» снимает порог (XIC-99) ----
+
+    [Fact]
+    public void В_дорогу_аппаратный_порог_не_наблюдаем()
+        => ChargeLimitWatcher.Target(care: true, careLimit: 80, softOn: false, softLimit: 80,
+            hardwareMissing: false, travel: true).Should().BeNull(
+            "прошивка заряжает до 100 — вебхук «дошли до 80» оборвал бы разовый заряд розеткой");
+
+    [Fact]
+    public void Без_в_дорогу_аппаратный_порог_как_раньше()
+        => ChargeLimitWatcher.Target(care: true, careLimit: 80, softOn: false, softLimit: 80,
+            hardwareMissing: false, travel: false).Should().Be(new ChargeTarget(80, false));
+
+    [Fact]
+    public void В_дорогу_программный_порог_тоже_не_наблюдаем()
+        => ChargeLimitWatcher.Target(care: true, careLimit: 80, softOn: true, softLimit: 80,
+            hardwareMissing: true, travel: true).Should().BeNull("правило одно на оба порога");
+
+    [Fact]
+    public void В_дорогу_заряд_выше_порога_вебхук_молчит_а_после_выхода_сообщает()
+    {
+        var cfg = new Config.AppConfig { ChargeCare = true, CareLimitPercent = 80, TravelMode = true };
+        var power = new FakePowerEvents { IsOnline = true, BatteryLifePercent = 0.85f };
+        var timer = new FakeTimer();
+        using var w = new ChargeLimitWatcher(cfg, power, timer);
+        int fired = 0;
+        w.Reached = (_, _, _) => fired++;
+
+        w.Rearm();
+        timer.Running.Should().BeFalse("во время «В дорогу» следить не за чем");
+        timer.Fire();
+        fired.Should().Be(0);
+
+        cfg.TravelMode = false;      // вышли из «В дорогу» на 85% — порог 80 снова держит прошивка
+        w.Rearm();
+        timer.Fire();
+        fired.Should().Be(1, "заряд выше порога — автоматика должна узнать сразу (вариант А)");
+    }
 
     // ---- Напоминания ----
 

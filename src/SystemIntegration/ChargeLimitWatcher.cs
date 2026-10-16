@@ -109,14 +109,21 @@ public sealed class ChargeLimitWatcher : IDisposable
     /// За каким порогом следить. Программный порог предлагается ТОЛЬКО там, где аппаратного
     /// нет: иначе мы подсовывали бы костыль рядом с настоящим решением и будили человека
     /// ради того, что прошивка делает сама.
+    ///
+    /// «В дорогу» порог снимает: прошивка заряжает до 100 (ChargeGuard получает 100), и
+    /// сообщить «дошли до порога» значило бы, что розетка из вебхука сама оборвёт разовый
+    /// заряд (XIC-99). О 100% говорит TravelChargeMonitor. Параметр обязательный намеренно:
+    /// забытый «В дорогу» и был ошибкой.
     /// </summary>
-    public static ChargeTarget? Target(bool care, int careLimit, bool softOn, int softLimit, bool hardwareMissing) =>
-        hardwareMissing
+    public static ChargeTarget? Target(bool care, int careLimit, bool softOn, int softLimit,
+        bool hardwareMissing, bool travel) =>
+        travel ? null
+        : hardwareMissing
             ? softOn ? new ChargeTarget(Math.Clamp(softLimit, 20, 100), true) : null
             : care ? new ChargeTarget(careLimit, false) : null;
 
     private ChargeTarget? Target() => Target(_cfg.ChargeCare, _cfg.CarePercent(),
-        _cfg.SoftChargeAlert, _cfg.SoftChargeLimitPercent, _cfg.ChargeLimitUnsupported);
+        _cfg.SoftChargeAlert, _cfg.SoftChargeLimitPercent, _cfg.ChargeLimitUnsupported, _cfg.TravelMode);
 
     /// <summary>
     /// Пора ли напомнить. Напоминаем, пока выполняются все условия сразу: зарядник в розетке,
