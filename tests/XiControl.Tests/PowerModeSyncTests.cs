@@ -165,6 +165,32 @@ public sealed class PowerModeSyncTests
     }
 
     [Fact]
+    public void Откат_переживает_перезапуск()
+    {
+        _sync.Sync();                     // сеть ← эффективность
+        _cfg.PowerOverlayWritten.Should().ContainKey("ac");
+
+        // «перезапуск»: новый экземпляр с тем же конфигом, памяти прежнего нет
+        var restarted = new PowerModeSync(_cfg, _mifs, _power, _overlay, () => _service);
+        _cfg.PowerModeSync = false;
+        restarted.UndoCurrent();
+
+        _overlay.Overlay[true].Should().Be(Guid.Empty, "откатываем записанное нами и после перезапуска (XIC-101)");
+        _cfg.PowerOverlayWritten.Should().BeNull("откатили — помнить нечего");
+    }
+
+    [Fact]
+    public void Сбалансированный_не_хранится()
+    {
+        _mifs.Mode = PerfMode.Turbo;
+        _sync.Sync();
+        _mifs.Mode = PerfMode.Auto;       // своя запись «сбалансированного» — откатывать нечего
+        _sync.Sync();
+
+        _cfg.PowerOverlayWritten.Should().BeNull();
+    }
+
+    [Fact]
     public void Отказ_записи_не_запоминается_как_наше()
     {
         _overlay.FailSet = true;
