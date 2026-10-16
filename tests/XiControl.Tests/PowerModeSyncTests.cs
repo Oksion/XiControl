@@ -76,6 +76,7 @@ public sealed class PowerModeSyncTests
     [InlineData(OemServiceState.Stopped)]
     [InlineData(OemServiceState.Disabled)]
     [InlineData(OemServiceState.NoAccess)]
+    [InlineData(OemServiceState.Unknown)]
     public void Служба_не_запущена_пишем(OemServiceState state) =>
         PowerModeSync.Decide(true, state, null, PerfMode.Turbo, null, out _).Should().Be(Skip.None);
 
