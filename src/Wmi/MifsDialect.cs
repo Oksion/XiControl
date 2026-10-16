@@ -94,5 +94,27 @@ public static class MifsReply
     /// </summary>
     public static bool CarriesChargeData(MifsDialect dialect) => dialect == MifsDialect.Classic;
 
+    /// <summary>
+    /// Есть ли у модели порог заряда (группа <c>0x10/0x02</c>) — по ответу на GET, без записи
+    /// (XIC-100). Отказ записи это различить не может: <c>0x00</c> — прошивка отвергла этот
+    /// уровень, другие работают; <c>0xE0</c> — команды на модели нет вовсе. Учиться «лимита нет»
+    /// можно только на втором.
+    /// </summary>
+    /// <returns>true — есть; false — нет (диалект без группы или <c>0xE0</c>); null — не смогли
+    /// спросить (диалект ещё не определён, пустой или непонятный ответ) — вывода не делаем.</returns>
+    public static bool? ChargeGroupSupported(MifsDialect dialect, byte[] outData) => dialect switch
+    {
+        MifsDialect.Unknown => null,
+        MifsDialect.Classic => outData is { Length: > 1 }
+            ? outData[1] switch
+            {
+                Mifs.StatusOk => true,
+                Mifs.StatusUnsupported => false,
+                _ => null,
+            }
+            : null,
+        _ => false,   // эхо и неопознанный диалект: данных группы нет (см. CarriesChargeData)
+    };
+
     private static byte At(byte[] b, int i) => b is not null && i < b.Length ? b[i] : (byte)0;
 }

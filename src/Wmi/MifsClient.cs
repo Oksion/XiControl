@@ -143,6 +143,15 @@ public sealed class MifsClient : IMifsClient
         return Set(Mifs.CmdCharge, Mifs.ChargeSubEnable, code.Value).Ok;
     }
 
+    /// <summary>Есть ли порог заряда на этой модели — чтением, без записи (XIC-100).
+    /// Разбор статуса — <see cref="MifsReply.ChargeGroupSupported"/>.</summary>
+    public bool? IsChargeLimitSupported()
+    {
+        var d = Dialect();
+        if (!MifsReply.CarriesChargeData(d)) return MifsReply.ChargeGroupSupported(d, []);
+        return MifsReply.ChargeGroupSupported(d, Get(Mifs.CmdCharge, Mifs.ChargeSubEnable).Out);
+    }
+
     // ---- Сенсоры (та же группа команд 0x10, driver-free) ----
 
     /// <summary>Мощность подключённого адаптера в ваттах; 0 — не подключён или не-PD
