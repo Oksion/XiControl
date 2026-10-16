@@ -189,6 +189,95 @@ public sealed class AppControllerTests
         failed.Should().BeTrue();
     }
 
+    // ---- «Аппаратного лимита нет» — только по ответу прошивки (XIC-100) ----
+
+    [Fact]
+    public void Отвергнутый_уровень_не_значит_что_лимита_нет()
+    {
+        _cfg.ChargeCare = true;
+        _mifs.SetChargeLimitResult = false;   // прошивка не держит 40%
+        _mifs.ChargeLimitSupported = true;    // а группа заряда есть
+
+        _c.SetCareLimit(40);
+
+        _cfg.ChargeLimitUnsupported.Should().BeFalse("другие уровни работают — программный порог тут не нужен");
+    }
+
+    [Fact]
+    public void Команды_порога_нет_учимся_что_лимита_нет_а_успех_снимает()
+    {
+        bool failed = false;
+        _c.FirmwareFailed = () => failed = true;
+        _mifs.SetChargeLimitResult = false;
+        _mifs.ChargeLimitSupported = false;   // 0xE0 / диалект без группы — как на TM2113
+
+        _c.ToggleCare(true);
+
+        _cfg.ChargeLimitUnsupported.Should().BeTrue();
+        failed.Should().BeTrue();
+
+        _mifs.SetChargeLimitResult = true;
+        _c.ToggleCare(true);
+
+        _cfg.ChargeLimitUnsupported.Should().BeFalse("прошивка приняла порог — лимит есть");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Исключение_WMI_ничему_не_учит(bool before)
+    {
+        bool failed = false;
+        _c.FirmwareFailed = () => failed = true;
+        _cfg.ChargeLimitUnsupported = before;
+        _mifs.ThrowOnSetChargeLimit = true;
+        _mifs.ChargeLimitSupported = !before;  // даже если чтение сказало бы обратное — его не спрашиваем
+
+        _c.ToggleCare(true);
+
+        _cfg.ChargeLimitUnsupported.Should().Be(before, "разовый сбой провайдера — не свойство модели");
+        failed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Не_смогли_спросить_мнение_не_меняем()
+    {
+        _mifs.SetChargeLimitResult = false;
+        _mifs.ThrowOnChargeLimitSupported = true;
+
+        _c.ToggleCare(true);
+        _cfg.ChargeLimitUnsupported.Should().BeFalse();
+
+        _mifs.ThrowOnChargeLimitSupported = false;
+        _mifs.ChargeLimitSupported = null;    // ответ непонятен
+        _c.ToggleCare(true);
+        _cfg.ChargeLimitUnsupported.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(true, false)]    // прошивка говорит «есть» — ложный флаг снимаем
+    [InlineData(false, true)]    // «нет» — на старте не трогаем (и не ставим, и не снимаем)
+    [InlineData(null, true)]     // не смогли спросить — тоже
+    public void Старт_снимает_ложно_выученный_флаг(bool? supported, bool after)
+    {
+        _cfg.ChargeLimitUnsupported = true;
+        _mifs.ChargeLimitSupported = supported;
+
+        _c.HealChargeSupport();
+
+        _cfg.ChargeLimitUnsupported.Should().Be(after);
+    }
+
+    [Fact]
+    public void Старт_флаг_не_ставит()
+    {
+        _mifs.ChargeLimitSupported = false;
+
+        _c.HealChargeSupport();
+
+        _cfg.ChargeLimitUnsupported.Should().BeFalse("«лимита нет» — только по явному действию человека");
+    }
+
     // ---- Примирение порога с прошивкой (XIC-17) ----
 
     [Fact]

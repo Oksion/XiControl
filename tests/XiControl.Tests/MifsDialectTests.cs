@@ -89,6 +89,18 @@ public sealed class MifsDialectTests
     // Ловушка, в которую нельзя въехать: в эхо-диалекте OUT[2] для группы 0x10 — это эхо
     // АРГУМЕНТА. Прочитав его как данные, мы показали бы выдуманный порог заряда: на запрос
     // 0x10/0x02 машина вернёт 0x02, что по таблице кодов означало бы совсем другой процент.
+    // XIC-100: «лимита нет» — только «команды нет», а не «уровень отвергнут» и не «не ответила»
+    [Theory]
+    [InlineData(MifsDialect.Classic, new byte[] { 0x00, 0x80, 0x00, 0x10, 0x02, 0x00, 0x01 }, true)]
+    [InlineData(MifsDialect.Classic, new byte[] { 0x00, 0xE0 }, false)]
+    [InlineData(MifsDialect.Classic, new byte[] { 0x00, 0x00, 0x00, 0x10 }, null)]   // не статус «нет»
+    [InlineData(MifsDialect.Classic, new byte[] { }, null)]                          // пустой ответ
+    [InlineData(MifsDialect.Echo, new byte[] { 0x00, 0x10, 0x02 }, false)]            // TM2113
+    [InlineData(MifsDialect.Unsupported, new byte[] { 0x00, 0x42 }, false)]
+    [InlineData(MifsDialect.Unknown, new byte[] { 0x00, 0x80 }, null)]
+    public void Есть_ли_порог_заряда_по_ответу_на_чтение(MifsDialect dialect, byte[] outData, bool? expected) =>
+        MifsReply.ChargeGroupSupported(dialect, outData).Should().Be(expected);
+
     [Fact]
     public void В_эхо_диалекте_группа_заряда_данных_не_несёт()
     {

@@ -118,6 +118,9 @@ public sealed class AppController
         // (запрос, который PC Manager шлёт на каждом своём старте); пишем лишь по выбору человека
         if (_haptics is { } haptics) Task.Run(() => TouchpadHaptics = Safe(haptics.Read, null));
 
+        // ложное «аппаратного лимита нет» из прошлых версий — снять, если прошивка говорит «есть» (XIC-100)
+        if (_cfg.ChargeLimitUnsupported) Task.Run(HealChargeSupport);
+
         // Страж заряда и авто-герцовка: применить желаемое состояние на старте
         _charge.Reapply();
         _hz.Reapply();
@@ -293,8 +296,11 @@ public sealed class AppController
     /// <summary>
     /// Написать порог в прошивку и заодно ЗАПОМНИТЬ, умеет ли эта машина такое вообще (XIC-74).
     /// Единственная точка, где приложение ставит лимит по воле человека, поэтому и вывод
-    /// делается здесь: отказ — признак, что группы 0x10/0x02 на модели нет (так на TM2113),
-    /// успех — что есть. Гадать по названию модели не нужно, железо отвечает само.
+    /// делается здесь: успех — группа 0x10/0x02 есть. А вот отказ сам по себе ничего не значит
+    /// (XIC-100): прошивка могла отвергнуть ОДИН уровень (другие работают), а WMI — споткнуться
+    /// разово. Поэтому после отказа спрашиваем прошивку прямо, чтением: «команды нет» (0xE0,
+    /// диалект без группы — так на TM2113) — вот признак модели без лимита. Исключение и «не
+    /// смогли спросить» не учат ничему. Гадать по названию модели не нужно, железо отвечает само.
     ///
     /// Сверка ChargeGuard сюда НЕ ходит намеренно: она переустанавливает лимит по событиям
     /// питания, и разовый сбой на просыпающемся EC пометил бы рабочую машину как «не умеет».
@@ -302,14 +308,37 @@ public sealed class AppController
     /// </summary>
     private bool ApplyChargeLimit(int percent)
     {
-        bool ok = Safe(() => _mifs.SetChargeLimit(percent), false);
-        if (ok == !_cfg.ChargeLimitUnsupported) return ok;  // вывод не изменился — конфиг не трогаем
-        _cfg.ChargeLimitUnsupported = !ok;
-        _cfg.Save();
-        Log.Write(ok
-            ? "Заряд: прошивка приняла порог — аппаратный лимит есть"
-            : "Заряд: прошивка отвергла порог — аппаратного лимита на этой модели нет");
+        bool ok;
+        try { ok = _mifs.SetChargeLimit(percent); }
+        catch (Exception ex) { Log.Ex("AppController.ApplyChargeLimit", ex); return false; } // не спросили — не учимся
+
+        bool? supported = ok ? true : Safe<bool?>(() => _mifs.IsChargeLimitSupported(), null);
+        if (!ok && supported == true)
+            Log.Write($"Заряд: прошивка отвергла уровень {percent}% — модель его не держит, лимит при этом есть");
+        LearnChargeSupport(supported);
         return ok;
+    }
+
+    /// <summary>Запомнить, есть ли на модели аппаратный порог; null — вывода нет, конфиг не трогаем.</summary>
+    private void LearnChargeSupport(bool? supported)
+    {
+        if (supported is not bool s || s == !_cfg.ChargeLimitUnsupported) return; // вывод не изменился
+        _cfg.ChargeLimitUnsupported = !s;
+        _cfg.Save();
+        Log.Write(s
+            ? "Заряд: порог заряда на модели есть — аппаратный лимит работает"
+            : "Заряд: команды порога заряда на этой модели нет — аппаратного лимита нет");
+    }
+
+    /// <summary>
+    /// Старт: ложно выученное «лимита нет» не должно пережить перезапуск (XIC-100). Только
+    /// снимаем — чтение говорит «есть»; ставить на старте не будем: вывод «нет» делается лишь
+    /// по явному действию человека, а просыпающийся EC может ответить чем угодно.
+    /// </summary>
+    internal void HealChargeSupport()
+    {
+        if (!_cfg.ChargeLimitUnsupported) return;
+        if (Safe<bool?>(() => _mifs.IsChargeLimitSupported(), null) == true) LearnChargeSupport(true);
     }
 
     /// <summary>Тихий сброс «В дорогу» (отключили зарядник): ChargeGuard сам вернёт «беречь 80%».</summary>

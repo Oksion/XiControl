@@ -48,6 +48,12 @@ internal sealed class FakeMifsClient : IMifsClient
         return SetChargeLimitResult;
     }
 
+    public bool? ChargeLimitSupported = true;   // что ответит чтение группы заряда (XIC-100)
+    public bool ThrowOnChargeLimitSupported;
+
+    public bool? IsChargeLimitSupported() =>
+        ThrowOnChargeLimitSupported ? throw new InvalidOperationException("прошивка не ответила") : ChargeLimitSupported;
+
     public int GetAdapterWatts() => 0;
     public int? GetBatteryHealth() => null;
     public void Dispose() { }

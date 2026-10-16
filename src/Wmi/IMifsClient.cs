@@ -22,6 +22,11 @@ public interface IMifsClient : IDisposable
     /// записями защиты нет вовсе, и перед сном это окно опасно (XIC-64).</summary>
     bool SetChargeLimit(int percent, bool resetFirst = true);
 
+    /// <summary>Есть ли у модели порог заряда вообще — чтением, без записи (XIC-100). Отказ
+    /// <see cref="SetChargeLimit"/> этого не значит: прошивка могла отвергнуть один уровень.
+    /// true — есть; false — нет; null — не смогли спросить (вывода не делать).</summary>
+    bool? IsChargeLimitSupported();
+
     /// <summary>Мощность адаптера в ваттах; 0 — не подключён или не-PD.</summary>
     int GetAdapterWatts();
 
