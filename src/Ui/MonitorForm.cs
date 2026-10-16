@@ -715,6 +715,10 @@ public sealed class MonitorForm : FlyoutForm
             _tip.Dispose();
             _compactMenu?.Dispose();
             _battery?.Dispose();
+            // Чтения на пуле (температура, ватты) могут ещё идти над источниками ниже: дать им
+            // закончить, не дольше 500 мс — зависший провайдер не держит закрытие (XIC-101).
+            // Тик уже остановлен — новых чтений не будет.
+            Task.WhenAll(_tempWmi.Pending, _batteryWmi.Pending, _adapterWmi.Pending).Wait(500);
             _tempSrc.Dispose();
             _powerDraw.Dispose();
             _gpuTel.Dispose();

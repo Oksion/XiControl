@@ -45,6 +45,12 @@ public sealed class LatestValue<T>
             return _at != long.MinValue && _now() - _at <= maxAgeMs ? _latest : stale;
     }
 
+    /// <summary>Чтение в полёте (или завершённая задача, если его нет). Владелец источника ждёт
+    /// его перед тем, как освободить то, что читает <c>read</c>: иначе чтение на пуле падает на
+    /// уже освобождённом объекте и пишет в журнал ложный ObjectDisposedException (XIC-101).
+    /// Не бросает — ReadOnce исключения глотает.</summary>
+    public Task Pending { get { lock (_gate) return _pending ?? Task.CompletedTask; } }
+
     /// <summary>Хоть одно чтение уже завершилось удачно.</summary>
     public bool HasValue { get { lock (_gate) return _at != long.MinValue; } }
 

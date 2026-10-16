@@ -102,4 +102,23 @@ public sealed class LatestValueTests
         await v.Request(); // после ошибки слот свободен — чтение снова идёт
         v.Fresh(5000, -2).Should().Be(42);
     }
+
+    // XIC-101: владелец ждёт чтение в полёте, прежде чем освободить источник
+    [Fact]
+    public async Task Pending_это_чтение_в_полёте_и_оно_завершается()
+    {
+        using var release = new ManualResetEventSlim();
+        var v = Make(() => { release.Wait(); return 7; });
+
+        v.Pending.IsCompleted.Should().BeTrue("чтения нет — ждать нечего");
+        var read = v.Request();
+        v.Pending.Should().BeSameAs(read);
+        await Task.Delay(50);
+        v.Pending.IsCompleted.Should().BeFalse("чтение ещё идёт");
+
+        release.Set();
+        await v.Pending.WaitAsync(TimeSpan.FromSeconds(5));
+        v.Latest.Should().Be(7);
+        v.Pending.IsCompleted.Should().BeTrue();
+    }
 }
