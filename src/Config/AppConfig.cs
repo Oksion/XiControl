@@ -483,6 +483,10 @@ public sealed class AppConfig
     /// <summary>Сколько OSD висит до затухания. Дефолт 2800 мс («Авто»-режим — на 600 мс дольше).</summary>
     public int OsdDurationMs { get; set; } = 2800;
 
+    /// <summary>Прозрачность OSD, % (XIC-98): 0 — непрозрачная карточка (по умолчанию), до 80.
+    /// Правленное руками зажимается в 0..80 при применении (<see cref="Ui.OsdOpacity"/>).</summary>
+    public int OsdTransparencyPercent { get; set; } = 0;
+
     /// <summary>
     /// Где на экране показывать OSD. <see cref="Ui.OsdPosition.Center"/> — как было всегда:
     /// по центру ширины, чуть ниже середины по высоте. Остальные восемь позиций прижимают

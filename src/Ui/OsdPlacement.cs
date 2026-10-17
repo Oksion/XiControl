@@ -90,3 +90,26 @@ public static class OsdPlacement
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
 }
+
+/// <summary>
+/// Прозрачность OSD (XIC-98, просили в GitHub #90). Чистая математика — под тестами; сама форма
+/// только применяет. По умолчанию 0 — карточка непрозрачна, как всегда.
+/// </summary>
+public static class OsdOpacity
+{
+    /// <summary>Потолок: при 80% карточка видна хотя бы на пятую часть.</summary>
+    public const int MaxPercent = 80;
+
+    /// <summary>Шаг затухания непрозрачной карточки за тик (16 мс) — исторический, ~200 мс до нуля.</summary>
+    public const double FullFadeStep = 0.08;
+
+    /// <summary>Процент из config.json — его правят руками, поэтому зажимаем в 0..80.</summary>
+    public static int Clamp(int percent) => Math.Clamp(percent, 0, MaxPercent);
+
+    /// <summary>С какой непрозрачности карточка показывается: 40% прозрачности → 0.6.</summary>
+    public static double Base(int percent) => 1.0 - Clamp(percent) / 100.0;
+
+    /// <summary>Шаг затухания от базовой непрозрачности: пропорционально меньше, чтобы
+    /// полупрозрачная карточка гасла те же ~200 мс, а не быстрее непрозрачной.</summary>
+    public static double FadeStep(double baseOpacity) => FullFadeStep * baseOpacity;
+}

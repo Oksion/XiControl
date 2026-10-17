@@ -87,6 +87,7 @@ public sealed class SettingsActions
     public required Action TrayMetricApplied; // индикатор в трее (XIC-35): вкл/выкл/метрика/период изменились
     public required Action<OsdPosition> SetOsdPosition; // где показывать OSD (сетка 3×3)
     public required Action<int> SetOsdDuration;         // сколько висит, мс
+    public required Action<int> SetOsdTransparency;     // прозрачность OSD, % (0 — нет; XIC-98)
     public required Action<LockOsd, bool> SetLockOsd;   // показывать ли плашку фиксатора
     public required Action PreviewOsd;                  // «Показать пример» — настоящий OSD настоящим путём
 }

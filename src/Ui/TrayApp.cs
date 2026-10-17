@@ -852,6 +852,8 @@ public sealed class TrayApp : IDisposable
                 TrayMetricApplied = TrayMetricApplied,
                 SetOsdPosition = p => { _cfg.OsdPosition = p; _cfg.Save(); OsdApplied(); },
                 SetOsdDuration = ms => { _cfg.OsdDurationMs = ms; _cfg.Save(); OsdApplied(); },
+                // прозрачность сразу видна на примере — выбирают глазами (XIC-98)
+                SetOsdTransparency = pct => { _cfg.OsdTransparencyPercent = OsdOpacity.Clamp(pct); _cfg.Save(); PreviewOsd(); },
                 SetLockOsd = SetLockOsd,
                 PreviewOsd = PreviewOsd,
             };
@@ -894,6 +896,7 @@ public sealed class TrayApp : IDisposable
     {
         _osd.DurationMs = _cfg.OsdDurationMs;
         _osd.Position = _cfg.OsdPosition;
+        _osd.SetTransparency(_cfg.OsdTransparencyPercent);
     }
 
     // Показывать ли плашку этого фиксатора. Храним СКРЫТЫЕ (как HiddenModes у режимов):
