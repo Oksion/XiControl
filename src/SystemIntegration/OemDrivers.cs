@@ -20,7 +20,7 @@ public sealed record OemHardwareId(string Id, string Version);
 public sealed record InstalledDriver(string HardwareId, string Version, string Device);
 
 /// <summary>Сверка одного устройства с каталогом. <see cref="Firmware"/> — прошивка: её текущую
-/// версию читать нечем, поэтому только «в каталоге есть такая».</summary>
+/// версию читать нечем и устройства под её id в системе нет, поэтому только «в каталоге есть такая».</summary>
 public enum DriverState { Same, Update, Newer, Firmware }
 
 public sealed record DriverRow(string Module, string Device, string? Installed, string Catalog, DriverState State, OemPackage? Package);
@@ -156,7 +156,8 @@ public static class OemProtocol
     private static string Str(string s) => JsonSerializer.Serialize(s);
 }
 
-/// <summary>Сверка каталога с установленным — строго попарно по hardware-id (чистая логика).</summary>
+/// <summary>Сверка каталога с установленным — строго попарно по hardware-id (чистая логика);
+/// прошивки — исключение, см. <see cref="Compare"/>.</summary>
 public static class DriverMatch
 {
     /// <summary>
@@ -187,6 +188,10 @@ public static class DriverMatch
     /// Строки сверки. Версия — из записи ЭТОГО hardware-id, не «пакета»: один zip везёт драйверы
     /// разных вендоров (у аудио 10 разных версий на 125 id). Несколько id каталога могут указывать
     /// на одно устройство — строку даём одну.
+    /// Прошивки (XIC-102) — без сверки по hardware-id: их id в каталоге синтетические
+    /// (<c>USB\VID_6789&amp;PID_1234&amp;REV_1236</c> у экрана), такого устройства в системе нет,
+    /// а текущую версию прошивки читать нечем. Поэтому строка — одна на модуль с пакетом,
+    /// «в каталоге есть прошивка X»; в <c>Device</c> — код модуля, имя ему даёт UI по локализации.
     /// </summary>
     internal static List<DriverRow> Compare(IEnumerable<OemModule> modules, IReadOnlyList<InstalledDriver> installed)
     {
@@ -194,16 +199,16 @@ public static class DriverMatch
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var m in modules)
         {
-            bool firmware = OemProtocol.IsFirmware(m.Name);
+            if (OemProtocol.IsFirmware(m.Name))
+            {
+                if (m.Package is not null && seen.Add(m.Name))
+                    rows.Add(new DriverRow(m.Name, m.Name, null, m.HardwareIds.Count > 0 ? m.HardwareIds[0].Version : "", DriverState.Firmware, m.Package));
+                continue;
+            }
             foreach (var h in m.HardwareIds)
             {
                 if (Find(installed, h.Id) is not { } inst) continue;
                 if (!seen.Add($"{m.Name}|{inst.Device}|{h.Version}")) continue;
-                if (firmware)
-                {
-                    rows.Add(new DriverRow(m.Name, inst.Device, null, h.Version, DriverState.Firmware, m.Package));
-                    continue;
-                }
                 int c = CompareVersions(h.Version, inst.Version);
                 var state = c > 0 ? DriverState.Update : c < 0 ? DriverState.Newer : DriverState.Same;
                 rows.Add(new DriverRow(m.Name, inst.Device, inst.Version, h.Version, state, m.Package));
@@ -274,7 +279,7 @@ public static class OemDriverCheck
             : rows.Count == 0 ? DriverCheckStatus.NoMatch
             : DriverCheckStatus.Ok;
         Log.Write($"OemDriverCheck: {product}, модулей с пакетом {modules.Count}, устройств сверено {rows.Count}, " +
-                  $"обновлений {rows.Count(r => r.State == DriverState.Update)}, без ответа {failed}");
+                  $"обновлений {rows.Count(r => r.State == DriverState.Update)}, прошивок {rows.Count(r => r.State == DriverState.Firmware)}, без ответа {failed}");
         return new DriverCheckResult(status, product, rows, sys.Bios, bios?.FirstOrDefault()?.Package,
             bios is not null, failed, DateTime.Now);
     }

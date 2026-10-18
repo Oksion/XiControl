@@ -160,4 +160,45 @@ public sealed class OemDriversTests
 
         rows.Should().ContainSingle().Which.Should().Match<DriverRow>(r => r.State == DriverState.Firmware && r.Installed == null);
     }
+
+    // ---- прошивки без устройства (XIC-102) ----
+
+    [Fact]
+    public void Прошивка_без_совпавшего_устройства_даёт_одну_строку_на_модуль()
+    {
+        // id прошивок в каталоге синтетические — в системе их нет; устройства подставлены настоящие с TM2424
+        var rows = DriverMatch.Compare(
+            [
+                Module("FWSC", (@"USB\VID_6789&PID_1234&REV_1236", "740B08"), (@"USB\VID_6789&PID_1234&REV_1237", "740B08")),
+                Module("FWTP", (@"USB\VID_6989&PID_1234&REV_1836", "3.5.13.01.44.25.13.0"), (@"USB\VID_6989&PID_1234&REV_1837", "3.5.13.01.44.25.13.0")),
+            ],
+            [Npu, Wifi, Audio]);
+
+        rows.Should().HaveCount(2, "по строке на модуль, а не на каждый hardware-id");
+        rows.Should().AllSatisfy(r =>
+        {
+            r.State.Should().Be(DriverState.Firmware);
+            r.Installed.Should().BeNull("текущую версию прошивки читать нечем");
+            r.Device.Should().Be(r.Module, "имя устройства даёт UI по коду модуля, не PnP");
+            r.Package.Should().NotBeNull();
+        });
+        rows.Single(r => r.Module == "FWSC").Catalog.Should().Be("740B08");
+        rows.Single(r => r.Module == "FWTP").Catalog.Should().Be("3.5.13.01.44.25.13.0");
+    }
+
+    [Fact]
+    public void Прошивка_без_пакета_строки_не_даёт()
+    {
+        var noPackage = new OemModule("FWSC", null, [new OemHardwareId(@"USB\VID_6789&PID_1234&REV_1236", "740B08")]);
+
+        DriverMatch.Compare([noPackage], []).Should().BeEmpty("нечего предлагать — ни ссылки, ни пакета");
+    }
+
+    [Fact]
+    public void Драйвер_без_совпавшего_устройства_строки_не_даёт()
+    {
+        var rows = DriverMatch.Compare([Module("NFC", (@"PCI\VEN_1FC9&DEV_0001", "1.0.0.1"))], [Npu, Wifi, Audio]);
+
+        rows.Should().BeEmpty("для обычных драйверов правило прежнее: нет устройства — нет строки");
+    }
 }
