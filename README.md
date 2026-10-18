@@ -279,7 +279,7 @@ hidden if refresh-rate control is off), Touchpad (bottom dead zone, edge sliders
 strength and click force, force press), Performance (mode visibility,
 separately for AC and battery, with a switch above the list; startup mode, power profiles),
 Keys (remapping), Notifications (where popups appear, how long
-they stay, which lock-key popups to show), HTTP API (port, token, permissions), Drivers (check with Xiaomi on a button) and About
+they stay, transparency, which lock-key popups to show), HTTP API (port, token, permissions), Drivers (check with Xiaomi on a button) and About
 (version, model with the board code, BIOS, serial number — masked by default, click to reveal).
 The quick toggles (charge, "travel", owl, refresh rate, Monitor,
 mode) stay in the tray menu and the panel.

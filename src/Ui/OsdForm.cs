@@ -29,6 +29,10 @@ public sealed class OsdForm : Form
     /// <summary>Где показывать карточку (сетка 3×3). Настраивается на вкладке «Уведомления»,
     /// TrayApp выставляет её на старте и после каждой правки.</summary>
     public OsdPosition Position { get; set; } = OsdPosition.Center;
+
+    // Прозрачность карточки (XIC-98): с какой непрозрачности показываем и с какой гасим.
+    private double _baseOpacity = 1.0;
+    public void SetTransparency(int percent) => _baseOpacity = OsdOpacity.Base(percent);
     private int DisplayMsAuto => _displayMs + 600;
 
     private readonly System.Windows.Forms.Timer _display = new() { Interval = 2800 };
@@ -69,7 +73,7 @@ public sealed class OsdForm : Form
         _display.Tick += (_, _) => { _display.Stop(); _fade.Start(); };
         _fade.Tick += (_, _) =>
         {
-            Opacity -= 0.08;
+            Opacity -= OsdOpacity.FadeStep(_baseOpacity); // от базовой — те же ~200 мс, без скачка
             if (Opacity <= 0.01) { _fade.Stop(); _gauge.Stop(); Hide(); }
         };
         _gauge.Tick += (_, _) => { _gaugeT += 0.03f; Invalidate(); };
@@ -135,7 +139,7 @@ public sealed class OsdForm : Form
         Location = OsdPlacement.Locate(wa, new Size(w, h), Position, Sc(OsdPlacement.Margin));
 
         _display.Stop(); _fade.Stop();
-        Opacity = 1.0;
+        Opacity = _baseOpacity;
         _gauge.Stop();
         // для «Авто» показываем дольше — стрелка успевает плавно «настроиться»
         _display.Interval = kind == OsdKind.Auto ? DisplayMsAuto : _displayMs;

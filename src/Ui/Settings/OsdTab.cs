@@ -30,6 +30,9 @@ public sealed class OsdTab : SettingsPane
         ui.AddRow(this, "settings.osd.duration", "settings.osd.duration.desc",
             DurationCombo(ui, cfg.OsdDurationMs, act.SetOsdDuration));
 
+        ui.AddRow(this, "settings.osd.transparency", "settings.osd.transparency.desc",
+            TransparencyCombo(ui, cfg.OsdTransparencyPercent, act.SetOsdTransparency));
+
         // ширину меряем сами: AutoSize у кнопки срабатывает позже, чем карточка считает
         // раскладку, и кнопка выходит микроскопической (та же грабля, что в DisplayTab)
         var preview = ui.LinkButton("settings.osd.preview.btn", act.PreviewOsd);
@@ -52,6 +55,17 @@ public sealed class OsdTab : SettingsPane
     private void AddLock(SettingsToolkit ui, SettingsActions act, AppConfig cfg, LockOsd key, string titleKey)
         => ui.AddRow(this, titleKey, titleKey + ".desc",
             ui.Toggle(!cfg.HiddenLockOsd.Contains(key), on => act.SetLockOsd(key, on)));
+
+    /// <summary>Прозрачность списком, как остальные проценты в настройках (XIC-98): «Нет», 10…80%.
+    /// Значение из config.json вне шага (правили руками) не теряем — добавляем его, уже зажатое.</summary>
+    private static ComboBox TransparencyCombo(SettingsToolkit ui, int current, Action<int> apply)
+    {
+        current = OsdOpacity.Clamp(current);
+        int[] steps = [.. Enumerable.Range(0, OsdOpacity.MaxPercent / 10 + 1).Select(i => i * 10)];
+        int[] items = steps.Contains(current) ? steps : [.. steps.Append(current).Order()];
+        string[] names = [.. items.Select(p => p == 0 ? Loc.T("settings.osd.transparency.none") : $"{p}%")];
+        return ui.Combo(names, Array.IndexOf(items, current), i => apply(items[i]), ui.Sc(150));
+    }
 
     /// <summary>Длительность в секундах — человек думает в них, а не в миллисекундах.
     /// Значение из config.json вне списка (правили руками) не теряется: добавляем его как есть.</summary>
