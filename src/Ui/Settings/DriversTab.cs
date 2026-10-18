@@ -7,8 +7,8 @@ namespace XiControl.Ui.Settings;
 /// <summary>
 /// Вкладка «Драйверы» (XIC-95): что Xiaomi предлагает для этой модели и как это соотносится с
 /// установленным. В сеть — только по кнопке; ничего не скачиваем и не ставим. Обновления — со
-/// ссылкой на пакет (открывается в браузере после второго нажатия); у BIOS — тоже, но под жёстким
-/// предупреждением «на свой страх и риск».
+/// ссылкой на пакет (открывается в браузере после второго нажатия); у BIOS и прошивок экрана/тачпада
+/// (XIC-102) — тоже, но под жёстким предупреждением «на свой страх и риск».
 /// Результат живёт в контроллере: окно пересобирается на каждый показ, запроса отсюда нет.
 /// Здесь же — служба Xiaomi MiDeviceService с кнопкой «Отключить / Включить» (XIC-87).
 /// </summary>
@@ -57,22 +57,31 @@ public sealed class DriversTab : SettingsPane
         // ---- Обновления: устройство, было → стало, пакет; один пакет — одна кнопка ----
         ui.AddGroup(this, "settings.drivers.updates.group");
         var updates = r.Rows.Where(x => x.State == DriverState.Update).ToList();
-        var firmware = r.Rows.Where(x => x.State == DriverState.Firmware).ToList();
-        if (updates.Count == 0 && firmware.Count == 0)
+        var offered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (updates.Count == 0)
             ui.AddNote(this, "settings.drivers.updates.none");
         else
         {
             ui.AddNote(this, "settings.drivers.updates.warn");
-            var offered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var u in updates)
             {
                 string desc = Loc.T("settings.drivers.update.desc", u.Installed ?? "—", u.Catalog, PackageText(u.Package));
                 Controls.Add(ui.Row(u.Device, desc, DownloadButton(ui, u.Package, offered)));
             }
+        }
+
+        // ---- Прошивки экрана и тачпада (XIC-102): только «в каталоге есть», без сравнения — текущую
+        // версию читать нечем, а устройства под их hardware-id в системе нет. Имя — по коду модуля, не
+        // из PnP. Предупреждение жёсткое, как у BIOS: сбой прошивки панели или тачпада — тоже ремонт ----
+        var firmware = r.Rows.Where(x => x.State == DriverState.Firmware).ToList();
+        if (firmware.Count > 0)
+        {
+            ui.AddGroup(this, "settings.drivers.firmware.group");
+            ui.AddNote(this, "settings.drivers.firmware.warn");
             foreach (var f in firmware)
             {
                 string desc = Loc.T("settings.drivers.firmware.desc", f.Catalog, PackageText(f.Package));
-                Controls.Add(ui.Row(Loc.T("settings.drivers.firmware.title", f.Device), desc, DownloadButton(ui, f.Package, offered)));
+                Controls.Add(ui.Row(Loc.T("settings.drivers.firmware.title", ModuleName(f.Module)), desc, DownloadButton(ui, f.Package, offered)));
             }
         }
 
