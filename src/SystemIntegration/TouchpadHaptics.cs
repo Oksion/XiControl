@@ -42,6 +42,17 @@ public sealed class TouchpadHaptics
         }
     }
 
+    /// <summary>Версия прошивки тачпада (команда 0x10, только чтение — XIC-104). null — тачпада нет
+    /// или он не ответил. Зовётся по кнопке проверки драйверов, с пула.</summary>
+    public string? ReadFirmwareVersion()
+    {
+        lock (_lock)
+        {
+            using var h = Open();
+            return h is not null && ReadValues(h, CmdFirmware, 2) is { } v ? FirmwareVersion(v) : null;
+        }
+    }
+
     /// <summary>Записать силу вибрации; true — тачпад подтвердил значение чтением.</summary>
     public bool SetVibration(HapticsVibration level) =>
         Write(CmdVibration, VibrationValues(level), v => MatchVibration(v[0], v[1]) == level);

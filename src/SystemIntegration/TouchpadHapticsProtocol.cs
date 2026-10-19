@@ -29,6 +29,7 @@ public static class TouchpadHapticsProtocol
     public const byte CmdPressure = 0x5B;    // 4 short: порог, порог×0.33, 500, 400
     public const byte CmdSlide = 0x58;       // 1 short: сила щелчка PulseFrame (XIC-73)
     public const byte CmdHeavyPress = 0x59;  // 1 short: второй щелчок прошивки на сильном нажатии (XIC-78)
+    public const byte CmdFirmware = 0x10;    // 2 short (4 байта): версия прошивки, только чтение (XIC-104)
 
     /// <summary>Значения 0x59 — ровно как шлёт PC Manager (<c>WriteEnableHeavyPress</c>):
     /// 1 — прошивка щёлкает второй раз, когда нажатие продавлено, 2 — не щёлкает (заводское).
@@ -129,6 +130,12 @@ public static class TouchpadHapticsProtocol
         }
         return any ? values : null;
     }
+
+    /// <summary>Версия прошивки из ответа на <see cref="CmdFirmware"/>: четыре байта данных по
+    /// порядку, каждый — часть версии (<c>2C 19 0B 00</c> → <c>44.25.11.0</c>, XIC-103). Байты
+    /// приходят как два short little-endian — раскладываем обратно.</summary>
+    public static string FirmwareVersion(IReadOnlyList<ushort> v) =>
+        $"{v[0] & 0xFF}.{v[0] >> 8}.{v[1] & 0xFF}.{v[1] >> 8}";
 
     /// <summary>XOR байтов [3..31] плюс 1 — одна формула для кадров и ответов.</summary>
     public static byte Checksum(byte[] f)

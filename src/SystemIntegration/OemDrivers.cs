@@ -19,8 +19,10 @@ public sealed record OemHardwareId(string Id, string Version);
 /// <summary>Установленный драйвер: один из hardware-/compatible-id устройства и версия его драйвера.</summary>
 public sealed record InstalledDriver(string HardwareId, string Version, string Device);
 
-/// <summary>Сверка одного устройства с каталогом. <see cref="Firmware"/> — прошивка: её текущую
-/// версию читать нечем и устройства под её id в системе нет, поэтому только «в каталоге есть такая».</summary>
+/// <summary>Сверка одного устройства с каталогом. <see cref="Firmware"/> — прошивка, которую сравнить
+/// нельзя: текущая версия не прочиталась или (у экрана) номера не сопоставимы — «в каталоге есть такая»,
+/// и, если прочиталась, текущая рядом. Прошивка тачпада с прочитанной версией получает обычные
+/// Same/Update/Newer (XIC-104).</summary>
 public enum DriverState { Same, Update, Newer, Firmware }
 
 public sealed record DriverRow(string Module, string Device, string? Installed, string Catalog, DriverState State, OemPackage? Package);
@@ -61,6 +63,8 @@ public static class OemProtocol
 
     /// <summary>Прошивки: версии в каталоге — прошивочные, сравнивать их с версией драйвера нельзя.</summary>
     internal static bool IsFirmware(string module) => module is "FWTP" or "FWSC";
+
+    internal const string TouchpadFirmware = "FWTP", PanelFirmware = "FWSC";
 
     /// <summary>
     /// Тело запроса. Ключи строго по алфавиту и компактно: служба собирает JSON на std::map, и
@@ -192,15 +196,33 @@ public static class DriverMatch
             : string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// Версия прошивки тачпада из каталожной: последние четыре числа
+    /// (<c>3.5.13.01.44.25.13.0</c> → <c>44.25.13.0</c>; префикс <c>3.5.13.01</c> — номер пакета,
+    /// он же в имени zip). Именно эти четыре числа отдаёт сам тачпад командой 0x10 (XIC-103).
+    /// null — строка другого вида, сравнивать не с чем.
+    /// </summary>
+    internal static string? TouchpadCatalogVersion(string catalog)
+    {
+        var parts = catalog.Split('.');
+        if (parts.Length < 4) return null;
+        var tail = parts[^4..];
+        return tail.All(p => p.Length > 0 && p.All(char.IsAsciiDigit)) ? string.Join('.', tail) : null;
+    }
+
+    /// <summary>
     /// Строки сверки. Версия — из записи ЭТОГО hardware-id, не «пакета»: один zip везёт драйверы
     /// разных вендоров (у аудио 10 разных версий на 125 id). Несколько id каталога могут указывать
     /// на одно устройство — строку даём одну.
     /// Прошивки (XIC-102) — без сверки по hardware-id: их id в каталоге синтетические
-    /// (<c>USB\VID_6789&amp;PID_1234&amp;REV_1236</c> у экрана), такого устройства в системе нет,
-    /// а текущую версию прошивки читать нечем. Поэтому строка — одна на модуль с пакетом,
-    /// «в каталоге есть прошивка X»; в <c>Device</c> — код модуля, имя ему даёт UI по локализации.
+    /// (<c>USB\VID_6789&amp;PID_1234&amp;REV_1236</c> у экрана), такого устройства в системе нет.
+    /// Строка — одна на модуль с пакетом; в <c>Device</c> — код модуля, имя ему даёт UI по локализации.
+    /// Текущая версия прошивки — из <paramref name="firmware"/> (код модуля → прочитанное, XIC-104):
+    /// у тачпада она сравнивается с хвостом каталожной, у экрана только встаёт рядом — ROM Ver панели
+    /// отличается от каталожного старшим байтом, и «старее» это или другой вариант панели, по номеру
+    /// не сказать (docs/16).
     /// </summary>
-    internal static List<DriverRow> Compare(IEnumerable<OemModule> modules, IReadOnlyList<InstalledDriver> installed)
+    internal static List<DriverRow> Compare(IEnumerable<OemModule> modules, IReadOnlyList<InstalledDriver> installed,
+        IReadOnlyDictionary<string, string>? firmware = null)
     {
         var rows = new List<DriverRow>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -209,7 +231,7 @@ public static class DriverMatch
             if (OemProtocol.IsFirmware(m.Name))
             {
                 if (m.Package is not null && seen.Add(m.Name))
-                    rows.Add(new DriverRow(m.Name, m.Name, null, m.HardwareIds.Count > 0 ? m.HardwareIds[0].Version : "", DriverState.Firmware, m.Package));
+                    rows.Add(FirmwareRow(m, firmware?.GetValueOrDefault(m.Name)));
                 continue;
             }
             foreach (var h in m.HardwareIds)
@@ -223,6 +245,22 @@ public static class DriverMatch
         }
         return rows;
     }
+
+    private static DriverRow FirmwareRow(OemModule m, string? current)
+    {
+        string catalog = m.HardwareIds.Count > 0 ? m.HardwareIds[0].Version : "";
+        var state = DriverState.Firmware;
+        if (m.Name == OemProtocol.TouchpadFirmware && TouchpadCatalogVersion(catalog) is { } tail)
+        {
+            catalog = tail;
+            if (current is not null)
+            {
+                int c = CompareVersions(tail, current);
+                state = c > 0 ? DriverState.Update : c < 0 ? DriverState.Newer : DriverState.Same;
+            }
+        }
+        return new DriverRow(m.Name, m.Name, current, catalog, state, m.Package);
+    }
 }
 
 /// <summary>
@@ -235,8 +273,10 @@ public static class OemDriverCheck
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
     private const int Parallel = 4; // вежливо к их серверу: полный скан — 25 запросов
 
-    /// <summary>Звать только из фонового потока.</summary>
-    public static async Task<DriverCheckResult> RunAsync(CancellationToken ct = default)
+    /// <summary>Звать только из фонового потока. <paramref name="currentFirmware"/> — чтение текущей
+    /// версии прошивки по коду модуля (XIC-104); зовётся только для прошивок, на которые в каталоге
+    /// есть пакет: у экрана чтение включает записи в контроллер, без повода их не делаем.</summary>
+    public static async Task<DriverCheckResult> RunAsync(Func<string, string?>? currentFirmware = null, CancellationToken ct = default)
     {
         var sys = SystemInfo.Current;
         string? product = sys.Board;
@@ -280,7 +320,7 @@ public static class OemDriverCheck
 
         int failed = answers.Count(a => a is null);
         var modules = answers.Where(a => a is not null).SelectMany(a => a!).ToList();
-        var rows = DriverMatch.Compare(modules, installed);
+        var rows = DriverMatch.Compare(modules, installed, ReadFirmware(modules, currentFirmware));
         var status = failed == answers.Length ? DriverCheckStatus.Failed
             : modules.Count == 0 ? DriverCheckStatus.NoCatalog
             : rows.Count == 0 ? DriverCheckStatus.NoMatch
@@ -289,6 +329,24 @@ public static class OemDriverCheck
                   $"обновлений {rows.Count(r => r.State == DriverState.Update)}, прошивок {rows.Count(r => r.State == DriverState.Firmware)}, без ответа {failed}");
         return new DriverCheckResult(status, product, rows, sys.Bios, bios?.FirstOrDefault()?.Package,
             bios is not null, failed, DateTime.Now);
+    }
+
+    // По очереди, а не параллельно: тачпад и контроллер панели — разные устройства, но спешить
+    // некуда, а чтение версии у каждого — секунды пауз между кадрами
+    private static Dictionary<string, string>? ReadFirmware(List<OemModule> modules, Func<string, string?>? read)
+    {
+        if (read is null) return null;
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string name in modules.Where(m => OemProtocol.IsFirmware(m.Name) && m.Package is not null)
+                     .Select(m => m.Name).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            string? v = null;
+            try { v = read(name); }
+            catch (Exception ex) { Log.Ex($"OemDriverCheck.ReadFirmware({name})", ex); }
+            Log.Write($"OemDriverCheck: текущая прошивка {name} — {v ?? "не прочиталась"}");
+            if (v is not null) result[name] = v;
+        }
+        return result;
     }
 
     private static string Trim(string s) => s.Length <= 120 ? s : s[..120] + "…";

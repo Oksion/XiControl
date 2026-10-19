@@ -85,6 +85,15 @@ public sealed class TouchpadHapticsProtocolTests
         ParseResponse(Padded("0D 06 3F 00 2C 19 0B 00"), 2).Should().Equal(0x192C, 0x000B);
     }
 
+    // версия прошивки (XIC-104): живой ответ на 0x10 — тот же 44.25.11.0, что в логе PC Manager
+    [Fact]
+    public void Firmware_version_from_live_response()
+    {
+        ReadRequest(CmdFirmware, 2).Should().Equal(Padded("0D 07 15 01 00 01 00 04 10"));
+        FirmwareVersion(ParseResponse(Padded("0D 06 3F 00 2C 19 0B 00"), 2)!).Should().Be("44.25.11.0");
+        FirmwareVersion([0x192C, 0x000D]).Should().Be("44.25.13.0"); // каталожная — для сверки формата
+    }
+
     [Fact]
     public void Empty_response_means_not_ready()
     {

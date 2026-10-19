@@ -207,7 +207,58 @@ public sealed class OemDriversTests
             r.Package.Should().NotBeNull();
         });
         rows.Single(r => r.Module == "FWSC").Catalog.Should().Be("740B08");
-        rows.Single(r => r.Module == "FWTP").Catalog.Should().Be("3.5.13.01.44.25.13.0");
+        rows.Single(r => r.Module == "FWTP").Catalog.Should().Be("44.25.13.0", "у тачпада показываем саму версию прошивки, без номера пакета");
+    }
+
+    // ---- текущие версии прошивок (XIC-104) ----
+
+    [Theory]
+    [InlineData("3.5.13.01.44.25.13.0", "44.25.13.0")]
+    [InlineData("44.25.13.0", "44.25.13.0")]
+    [InlineData("44.25.13", null)]
+    [InlineData("3.5.13.01.44.25.13.x", null)]
+    [InlineData("740B08", null)]
+    [InlineData("", null)]
+    public void Версия_тачпада_из_хвоста_каталожной(string catalog, string? expected) =>
+        DriverMatch.TouchpadCatalogVersion(catalog).Should().Be(expected);
+
+    private static readonly OemModule Touchpad = Module("FWTP", (@"USB\VID_6989&PID_1234&REV_1836", "3.5.13.01.44.25.13.0"));
+    private static readonly OemModule Panel = Module("FWSC", (@"USB\VID_6789&PID_1234&REV_1236", "740B08"));
+
+    [Theory]
+    [InlineData("44.25.11.0", DriverState.Update)] // TM2424 на момент XIC-103
+    [InlineData("44.25.13.0", DriverState.Same)]
+    [InlineData("44.25.14.0", DriverState.Newer)]
+    public void Тачпад_с_прочитанной_версией_сравнивается_как_драйвер(string current, DriverState state)
+    {
+        var row = DriverMatch.Compare([Touchpad], [], new Dictionary<string, string> { ["FWTP"] = current }).Single();
+
+        row.State.Should().Be(state);
+        row.Installed.Should().Be(current);
+        row.Catalog.Should().Be("44.25.13.0");
+        row.Package.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Экран_с_прочитанной_версией_только_рядом_без_вывода()
+    {
+        var row = DriverMatch.Compare([Panel], [], new Dictionary<string, string> { ["FWSC"] = "570B06" }).Single();
+
+        row.State.Should().Be(DriverState.Firmware, "старший байт ROM Ver отличается — может быть другой вариант панели");
+        row.Installed.Should().Be("570B06");
+        row.Catalog.Should().Be("740B08");
+    }
+
+    [Fact]
+    public void Не_прочиталась_версия_остаётся_в_каталоге_есть()
+    {
+        var rows = DriverMatch.Compare([Touchpad, Panel], [], new Dictionary<string, string>());
+
+        rows.Should().HaveCount(2).And.AllSatisfy(r =>
+        {
+            r.State.Should().Be(DriverState.Firmware);
+            r.Installed.Should().BeNull();
+        });
     }
 
     [Fact]
