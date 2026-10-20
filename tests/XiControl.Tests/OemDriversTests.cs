@@ -207,7 +207,7 @@ public sealed class OemDriversTests
             r.Package.Should().NotBeNull();
         });
         rows.Single(r => r.Module == "FWSC").Catalog.Should().Be("740B08");
-        rows.Single(r => r.Module == "FWTP").Catalog.Should().Be("44.25.13.0", "у тачпада показываем саму версию прошивки, без номера пакета");
+        rows.Single(r => r.Module == "FWTP").Catalog.Should().Be("44.25.13.0", "у тачпада показываем версию прошивки Force-MCU — её тачпад и отдаёт");
     }
 
     // ---- текущие версии прошивок (XIC-104) ----
