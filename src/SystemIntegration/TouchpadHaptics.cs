@@ -23,9 +23,14 @@ public sealed class TouchpadHaptics
     private const int SettleMs = 120;
     private const int ReadAttempts = 3;
 
+    // COL05 — наш рабочий канал (MCU силы и вибрации); COL04 — канал контроллера касаний BL7853,
+    // в него шлём ровно один кадр OEM — запрос версии (XIC-104)
+    private const ushort ForcePage = 0xFF01, ControllerPage = 0xFF00;
+    private const int ControllerSettleMs = 30; // пауза OEM-прошивальщика перед ответом COL04
+
     private readonly object _lock = new();
-    private string? _path;
-    private bool _searched;
+    private string? _path, _ctlPath;
+    private bool _searched, _ctlSearched;
 
     /// <summary>Прочитать обе настройки. null — тачпада нет или он не ответил.</summary>
     public TouchpadHapticsState? Read()
@@ -39,6 +44,39 @@ public sealed class TouchpadHaptics
             var slide = ReadValues(h, CmdSlide, 1);
             if (vib is null || press is null || slide is null) return null;
             return new TouchpadHapticsState(MatchVibration(vib[0], vib[1]), press[0], slide[0]);
+        }
+    }
+
+    /// <summary>Версия прошивки MCU силы и вибрации (команда 0x10 в COL05, только чтение — XIC-104).
+    /// null — тачпада нет или он не ответил. Зовётся по кнопке проверки драйверов, с пула.</summary>
+    public string? ReadFirmwareVersion()
+    {
+        lock (_lock)
+        {
+            using var h = Open();
+            return h is not null && ReadValues(h, CmdFirmware, 2) is { } v ? FirmwareVersion(v) : null;
+        }
+    }
+
+    /// <summary>Версия прошивки контроллера касаний BL7853 через COL04 (XIC-104): кадр OEM как есть,
+    /// 30 мс, ответ. Пустой или чужой ответ — повтор того же кадра, как у чтения COL05. null — нет
+    /// канала или ответа. Только по кнопке проверки драйверов.</summary>
+    public string? ReadControllerVersion()
+    {
+        lock (_lock)
+        {
+            using var h = Open(controller: true);
+            if (h is null) return null;
+            for (int i = 0; i < ReadAttempts; i++)
+            {
+                if (!Send(h, ControllerVersionRequest())) return null;
+                Thread.Sleep(ControllerSettleMs);
+                var r = new byte[FrameLength];
+                r[0] = ControllerReportId;
+                if (HidD_GetInputReport(h, r, FrameLength) && ParseControllerVersion(r) is { } v) return v;
+            }
+            Log.Write("TouchpadHaptics: COL04 не ответил на запрос версии");
+            return null;
         }
     }
 
@@ -118,20 +156,22 @@ public sealed class TouchpadHaptics
 
     // Хэндл на операцию, как у PC Manager: держать открытым незачем, а после сна/переподключения
     // старый хэндл протухает молча
-    private SafeFileHandle? Open()
+    private SafeFileHandle? Open(bool controller = false)
     {
-        if (!_searched) { _path = FindCollection(); _searched = true; }
-        if (_path is null) return null;
-        var h = CreateFileW(_path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        ref string? path = ref controller ? ref _ctlPath : ref _path;
+        ref bool searched = ref controller ? ref _ctlSearched : ref _searched;
+        if (!searched) { path = FindCollection(controller ? ControllerPage : ForcePage); searched = true; }
+        if (path is null) return null;
+        var h = CreateFileW(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
             IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero);
         if (!h.IsInvalid) return h;
-        Log.Write($"TouchpadHaptics: открыть коллекцию не удалось ({Marshal.GetLastWin32Error()})");
+        Log.Write($"TouchpadHaptics: открыть коллекцию 0x{(controller ? ControllerPage : ForcePage):X4} не удалось ({Marshal.GetLastWin32Error()})");
         h.Dispose();
-        _searched = false; // устройство могло переподключиться под другим путём — поищем снова
+        searched = false; // устройство могло переподключиться под другим путём — поищем снова
         return null;
     }
 
-    private static string? FindCollection()
+    private static string? FindCollection(ushort usagePage)
     {
         HidD_GetHidGuid(out Guid guid);
         IntPtr set = SetupDiGetClassDevsW(ref guid, IntPtr.Zero, IntPtr.Zero, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
@@ -143,7 +183,7 @@ public sealed class TouchpadHaptics
             {
                 string? path = InterfacePath(set, ref di);
                 if (path is null || !path.Contains("bltp7853", StringComparison.OrdinalIgnoreCase)) continue;
-                if (IsVendorChannel(path)) return path;
+                if (IsVendorChannel(path, usagePage)) return path;
             }
             return null;
         }
@@ -164,16 +204,16 @@ public sealed class TouchpadHaptics
         finally { Marshal.FreeHGlobal(buf); }
     }
 
-    /// <summary>Вендорская коллекция с нашим протоколом: UsagePage 0xFF01, отчёты по 33 байта.
-    /// Открываем без прав доступа — только спросить дескриптор.</summary>
-    private static bool IsVendorChannel(string path)
+    /// <summary>Вендорская коллекция с нашим протоколом: нужная UsagePage (0xFF01 — COL05, 0xFF00 —
+    /// COL04), отчёты по 33 байта. Открываем без прав доступа — только спросить дескриптор.</summary>
+    private static bool IsVendorChannel(string path, ushort usagePage)
     {
         using var h = CreateFileW(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero);
         if (h.IsInvalid || !HidD_GetPreparsedData(h, out IntPtr pp)) return false;
         try
         {
             return HidP_GetCaps(pp, out HIDP_CAPS c) == HIDP_STATUS_SUCCESS &&
-                c.UsagePage == 0xFF01 && c.OutputReportByteLength == FrameLength && c.InputReportByteLength == FrameLength;
+                c.UsagePage == usagePage && c.OutputReportByteLength == FrameLength && c.InputReportByteLength == FrameLength;
         }
         finally { HidD_FreePreparsedData(pp); }
     }

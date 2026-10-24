@@ -54,9 +54,12 @@ public sealed class DriversTab : SettingsPane
 
         if (r.Rows.Count == 0) return;
 
+        // прошивки — своей группой ниже, в обновления и сводку драйверов не попадают
+        var drivers = r.Rows.Where(x => !OemProtocol.IsFirmware(x.Module)).ToList();
+
         // ---- Обновления: устройство, было → стало, пакет; один пакет — одна кнопка ----
         ui.AddGroup(this, "settings.drivers.updates.group");
-        var updates = r.Rows.Where(x => x.State == DriverState.Update).ToList();
+        var updates = drivers.Where(x => x.State == DriverState.Update).ToList();
         var offered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (updates.Count == 0)
             ui.AddNote(this, "settings.drivers.updates.none");
@@ -70,24 +73,23 @@ public sealed class DriversTab : SettingsPane
             }
         }
 
-        // ---- Прошивки экрана и тачпада (XIC-102): только «в каталоге есть», без сравнения — текущую
-        // версию читать нечем, а устройства под их hardware-id в системе нет. Имя — по коду модуля, не
-        // из PnP. Предупреждение жёсткое, как у BIOS: сбой прошивки панели или тачпада — тоже ремонт ----
-        var firmware = r.Rows.Where(x => x.State == DriverState.Firmware).ToList();
+        // ---- Прошивки экрана и тачпада (XIC-102/104): по строке на модуль, имя — по коду модуля, не
+        // из PnP. Тачпад сравнивается как драйвер, у экрана обе версии рядом без вывода (номера
+        // вариантов панели несопоставимы), не прочиталась — «в каталоге есть X». Предупреждение
+        // жёсткое, как у BIOS: сбой прошивки панели или тачпада — тоже ремонт ----
+        var firmware = r.Rows.Where(x => OemProtocol.IsFirmware(x.Module)).ToList();
         if (firmware.Count > 0)
         {
             ui.AddGroup(this, "settings.drivers.firmware.group");
             ui.AddNote(this, "settings.drivers.firmware.warn");
             foreach (var f in firmware)
-            {
-                string desc = Loc.T("settings.drivers.firmware.desc", f.Catalog, PackageText(f.Package));
-                Controls.Add(ui.Row(Loc.T("settings.drivers.firmware.title", ModuleName(f.Module)), desc, DownloadButton(ui, f.Package, offered)));
-            }
+                Controls.Add(ui.Row(Loc.T("settings.drivers.firmware.title", ModuleName(f.Module)),
+                    FirmwareText(f), FirmwareControl(ui, f, offered)));
         }
 
         // ---- Сводка по модулям: под сотню строк «совпадает» читать незачем ----
         ui.AddGroup(this, "settings.drivers.summary.group");
-        foreach (var g in r.Rows.Where(x => x.State != DriverState.Firmware).GroupBy(x => x.Module).OrderBy(g => ModuleName(g.Key), StringComparer.CurrentCulture))
+        foreach (var g in drivers.GroupBy(x => x.Module).OrderBy(g => ModuleName(g.Key), StringComparer.CurrentCulture))
         {
             var parts = new List<string>();
             int up = g.Count(x => x.State == DriverState.Update), same = g.Count(x => x.State == DriverState.Same), newer = g.Count(x => x.State == DriverState.Newer);
@@ -98,8 +100,38 @@ public sealed class DriversTab : SettingsPane
             if (up > 0) value.ForeColor = ui.T.Accent;
             Controls.Add(ui.Row(ModuleName(g.Key), g.First().Device, value));
         }
-        if (r.Rows.Any(x => x.State == DriverState.Newer)) ui.AddNote(this, "settings.drivers.summary.note");
+        if (drivers.Any(x => x.State == DriverState.Newer)) ui.AddNote(this, "settings.drivers.summary.note");
     }
+
+    // у тачпада две прошивки в одной строке — объясняем, где какая
+    private static string FirmwareText(DriverRow f) =>
+        f.Module == OemProtocol.TouchpadFirmware && f.Catalog.Contains(DriverMatch.PartSeparator, StringComparison.Ordinal)
+            ? FirmwareVerdict(f) + "\n" + Loc.T("settings.drivers.firmware.tp.parts")
+            : FirmwareVerdict(f);
+
+    private static string FirmwareVerdict(DriverRow f)
+    {
+        string pkg = PackageText(f.Package);
+        return f.State switch
+        {
+            DriverState.Update => Loc.T("settings.drivers.update.desc", f.Installed ?? "—", f.Catalog, pkg),
+            DriverState.Same => Loc.T("settings.drivers.firmware.same", f.Catalog, pkg),
+            DriverState.Newer => Loc.T("settings.drivers.firmware.newer", f.Installed ?? "—", f.Catalog, pkg),
+            // экран: версия прочиталась, но сравнивать её с каталожной нельзя
+            _ when f.Installed is { } current => Loc.T("settings.drivers.firmware.side", current, f.Catalog, pkg),
+            _ when f.Module == OemProtocol.PanelFirmware => Loc.T("settings.drivers.firmware.unknown.panel", f.Catalog, pkg),
+            _ => Loc.T("settings.drivers.firmware.desc", f.Catalog, pkg),
+        };
+    }
+
+    // Ссылка — где пакет может пригодиться; где стоит та же или новее — только вердикт
+    private static Control FirmwareControl(SettingsToolkit ui, DriverRow f, HashSet<string> offered) =>
+        f.State switch
+        {
+            DriverState.Same => ui.ValueLabel(Loc.T("settings.drivers.firmware.v.same")),
+            DriverState.Newer => ui.ValueLabel(Loc.T("settings.drivers.firmware.v.newer")),
+            _ => DownloadButton(ui, f.Package, offered),
+        };
 
     /// <summary>
     /// Службы Xiaomi MiDeviceService и MiService (XIC-87, docs/17): состояние и «Отключить / Включить»

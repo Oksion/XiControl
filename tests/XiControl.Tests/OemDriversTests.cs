@@ -202,12 +202,92 @@ public sealed class OemDriversTests
         rows.Should().AllSatisfy(r =>
         {
             r.State.Should().Be(DriverState.Firmware);
-            r.Installed.Should().BeNull("текущую версию прошивки читать нечем");
+            r.Installed.Should().BeNull("текущие версии не передавали");
             r.Device.Should().Be(r.Module, "имя устройства даёт UI по коду модуля, не PnP");
             r.Package.Should().NotBeNull();
         });
         rows.Single(r => r.Module == "FWSC").Catalog.Should().Be("740B08");
-        rows.Single(r => r.Module == "FWTP").Catalog.Should().Be("3.5.13.01.44.25.13.0");
+        rows.Single(r => r.Module == "FWTP").Catalog.Should().Be("44.25.13.0", "у тачпада показываем версию прошивки Force-MCU — её тачпад и отдаёт");
+    }
+
+    // ---- текущие версии прошивок (XIC-104) ----
+
+    [Theory]
+    [InlineData("3.5.13.01.44.25.13.0", "3.5.13.1", "44.25.13.0")] // контроллер — без ведущего нуля, как отдаёт сам
+    [InlineData("44.25.13.0", null, "44.25.13.0")]
+    public void Каталожная_версия_тачпада_по_частям(string catalog, string? controller, string force) =>
+        DriverMatch.TouchpadCatalogParts(catalog).Should().Be((controller, force));
+
+    [Theory]
+    [InlineData("44.25.13")]
+    [InlineData("3.5.13.01.44.25.13.x")]
+    [InlineData("1.3.5.13.01.44.25.13.0")]
+    [InlineData("740B08")]
+    [InlineData("")]
+    public void Чужая_каталожная_версия_тачпада_не_разбирается(string catalog) =>
+        DriverMatch.TouchpadCatalogParts(catalog).Should().BeNull();
+
+    [Theory]
+    [InlineData("3.5.13.1", "44.25.11.0", "3.5.13.1 / 44.25.11.0")]
+    [InlineData(null, "44.25.11.0", "44.25.11.0")]
+    [InlineData("3.5.13.1", null, null)]
+    [InlineData(null, null, null)]
+    public void Текущая_версия_тачпада_одной_строкой(string? controller, string? force, string? expected) =>
+        DriverMatch.TouchpadCurrent(controller, force).Should().Be(expected);
+
+    [Theory]
+    [InlineData("3.5.13.1", "44.25.11.0", DriverState.Update)] // TM2424 на момент XIC-104: сила старее
+    [InlineData("3.5.12.1", "44.25.13.0", DriverState.Update)] // старее только контроллер
+    [InlineData("3.5.13.1", "44.25.13.0", DriverState.Same)]   // машина автора issue #99
+    [InlineData("3.5.14.1", "44.25.13.0", DriverState.Newer)]
+    [InlineData("3.5.14.1", "44.25.12.0", DriverState.Update)] // хоть одна старее — обновление
+    public void Тачпад_сверяется_по_обеим_прошивкам(string controller, string force, DriverState state)
+    {
+        var row = DriverMatch.Compare([Touchpad], [],
+            new Dictionary<string, string> { ["FWTP"] = DriverMatch.TouchpadCurrent(controller, force)! }).Single();
+
+        row.State.Should().Be(state);
+        row.Installed.Should().Be($"{controller} / {force}");
+        row.Catalog.Should().Be("3.5.13.1 / 44.25.13.0");
+    }
+
+    private static readonly OemModule Touchpad = Module("FWTP", (@"USB\VID_6989&PID_1234&REV_1836", "3.5.13.01.44.25.13.0"));
+    private static readonly OemModule Panel = Module("FWSC", (@"USB\VID_6789&PID_1234&REV_1236", "740B08"));
+
+    [Theory]
+    [InlineData("44.25.11.0", DriverState.Update)] // TM2424 на момент XIC-103
+    [InlineData("44.25.13.0", DriverState.Same)]
+    [InlineData("44.25.14.0", DriverState.Newer)]
+    public void Тачпад_с_прочитанной_версией_сравнивается_как_драйвер(string current, DriverState state)
+    {
+        var row = DriverMatch.Compare([Touchpad], [], new Dictionary<string, string> { ["FWTP"] = current }).Single();
+
+        row.State.Should().Be(state);
+        row.Installed.Should().Be(current);
+        row.Catalog.Should().Be("44.25.13.0");
+        row.Package.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Экран_с_прочитанной_версией_только_рядом_без_вывода()
+    {
+        var row = DriverMatch.Compare([Panel], [], new Dictionary<string, string> { ["FWSC"] = "570B06" }).Single();
+
+        row.State.Should().Be(DriverState.Firmware, "старший байт ROM Ver отличается — может быть другой вариант панели");
+        row.Installed.Should().Be("570B06");
+        row.Catalog.Should().Be("740B08");
+    }
+
+    [Fact]
+    public void Не_прочиталась_версия_остаётся_в_каталоге_есть()
+    {
+        var rows = DriverMatch.Compare([Touchpad, Panel], [], new Dictionary<string, string>());
+
+        rows.Should().HaveCount(2).And.AllSatisfy(r =>
+        {
+            r.State.Should().Be(DriverState.Firmware);
+            r.Installed.Should().BeNull();
+        });
     }
 
     [Fact]
