@@ -104,8 +104,12 @@ public static class OemProtocol
     }
 
     /// <summary>Разобрать ответ. null — не JSON или <c>code</c> ≠ 0 (неверная подпись и т.п.);
-    /// пустой список — «для этого модуля на эту модель пакета нет», это не ошибка.</summary>
-    internal static List<OemModule>? ParseResponse(string json)
+    /// пустой список — «для этого модуля на эту модель пакета нет», это не ошибка.
+    /// <paramref name="product"/> — модель, о которой спрашивали: модуль, у которого сервер явно
+    /// назвал другую <c>product</c>, отбрасывается. Для драйверов это страховка поверх сверки по
+    /// hardware-id, для прошивок FWSC/FWTP — единственная проверка, что пакет про эту модель:
+    /// их id синтетические и с устройствами не сверяются (XIC-102, XIC-103).</summary>
+    internal static List<OemModule>? ParseResponse(string json, string? product = null)
     {
         try
         {
@@ -118,6 +122,9 @@ public static class OemProtocol
             foreach (var m in modules.EnumerateArray())
             {
                 string name = Text(m, "moduleName") ?? "?";
+                if (product is not null && Text(m, "product") is { } answered
+                    && !answered.Equals(product, StringComparison.OrdinalIgnoreCase))
+                    continue; // каталог чужой модели — не про этот ноутбук
                 if (!m.TryGetProperty("latestVer", out var latest) || latest.ValueKind != JsonValueKind.Object) continue;
 
                 // пакет у модуля один — FULL_PACKAGE
@@ -253,7 +260,7 @@ public static class OemDriverCheck
                 using var content = new StringContent(OemProtocol.BuildPost(body), Encoding.ASCII, "application/x-www-form-urlencoded");
                 using var resp = await http.PostAsync(OemProtocol.Url, content, ct).ConfigureAwait(false);
                 string json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                var parsed = OemProtocol.ParseResponse(json);
+                var parsed = OemProtocol.ParseResponse(json, product);
                 if (parsed is null) Log.Write($"OemDriverCheck: {category}/{modulesJson} — сервер ответил ошибкой ({Trim(json)})");
                 return parsed;
             }

@@ -76,6 +76,30 @@ public sealed class OemDriversTests
         m.HardwareIds.Should().HaveCount(2).And.AllSatisfy(h => h.Version.Should().Be("32.0.100.4841"));
     }
 
+    private const string TwoProducts = """
+        {"code":0,"message":"ok","modules":[
+          {"product":"TM2424","moduleName":"FWSC","latestVer":{"packages":[{"fileName":"our.zip","fileSize":1,"md5":"a",
+            "mirrors":["https://cdn/our.zip"]}],"strategy":{"hardwareIds":[{"id":"USB\\VID_6789&PID_1234&REV_1236","version":"740B08"}]}}},
+          {"product":"TM2309","moduleName":"FWSC","latestVer":{"packages":[{"fileName":"alien.zip","fileSize":1,"md5":"b",
+            "mirrors":["https://cdn/alien.zip"]}],"strategy":{"hardwareIds":[{"id":"USB\\VID_6789&PID_1234&REV_1111","version":"999999"}]}}},
+          {"moduleName":"FWTP","latestVer":{"packages":[{"fileName":"noproduct.zip","fileSize":1,"md5":"c",
+            "mirrors":["https://cdn/noproduct.zip"]}],"strategy":{"hardwareIds":[]}}}]}
+        """;
+
+    [Fact]
+    public void Модуль_чужой_модели_отбрасывается() =>
+        OemProtocol.ParseResponse(TwoProducts, "TM2424")!.Select(m => m.Package!.FileName)
+            .Should().Equal("our.zip", "noproduct.zip"); // без поля product не отбрасываем: доказать «чужую модель» нечем
+
+    [Fact]
+    public void Модель_сравнивается_без_учёта_регистра() =>
+        OemProtocol.ParseResponse(TwoProducts, "tm2424")!.Select(m => m.Package!.FileName)
+            .Should().Contain("our.zip").And.NotContain("alien.zip");
+
+    [Fact]
+    public void Без_модели_фильтра_нет() =>
+        OemProtocol.ParseResponse(TwoProducts).Should().HaveCount(3);
+
     [Fact]
     public void Пустые_modules_это_нет_пакета_а_не_ошибка() =>
         OemProtocol.ParseResponse("{\"code\":0,\"message\":\"ok\",\"modules\":[]}").Should().BeEmpty();
