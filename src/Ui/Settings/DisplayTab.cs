@@ -142,10 +142,12 @@ public sealed class DisplayTab : SettingsPane
         hold.Enabled = cfg.AutoRefreshRate;
         ui.AddRow(this, "settings.hz.hold", "settings.hz.hold.desc", hold);
         ui.AddGroup(this, "settings.hz.rates");
+        // режимы панели — один раз на постройку: ими же живут и комбо, и список для цикла ниже
+        int[] supported = SystemIntegration.RefreshRate.Supported();
         ui.AddRow(this, "settings.hz.ac", "settings.hz.ac.desc",
-            HzCombo(cfg.AcRefreshRate, hz => act.SetRefreshRates(hz, cfg.BatteryRefreshRate)));
+            HzCombo(cfg.AcRefreshRate, supported, hz => act.SetRefreshRates(hz, cfg.BatteryRefreshRate)));
         ui.AddRow(this, "settings.hz.battery", "settings.hz.battery.desc",
-            HzCombo(cfg.BatteryRefreshRate, hz => act.SetRefreshRates(cfg.AcRefreshRate, hz)));
+            HzCombo(cfg.BatteryRefreshRate, supported, hz => act.SetRefreshRates(cfg.AcRefreshRate, hz)));
         ui.AddNote(this, "settings.hz.note");
 
         // Какие частоты перебирать клавишей (XIC-69). Показываем ровно то, что отдала панель:
@@ -155,7 +157,6 @@ public sealed class DisplayTab : SettingsPane
         // выключение одного тумблера оставляет одну частоту, а это вырожденный случай, и
         // перебор возвращается ко всем. Тумблер выглядел бы выключенным, не меняя ничего —
         // настройка, которая делает вид, что работает, хуже отсутствующей.
-        int[] supported = SystemIntegration.RefreshRate.Supported();
         if (supported.Length >= 3)
         {
             ui.AddGroup(this, "settings.hz.cycle");
@@ -192,12 +193,11 @@ public sealed class DisplayTab : SettingsPane
     private static string LuxText(float lux) =>
         float.IsNaN(lux) ? "—" : Loc.T("settings.bright.lux.val", Math.Round(lux));
 
-    // Комбо частоты: пресеты + текущее значение из config.json, если оно нестандартное
-    // (вручную вписанные 165 Гц не должны отображаться как «144»)
-    private ComboBox HzCombo(int current, Action<int> apply)
+    // Комбо частоты: режимы самой панели + значение из config.json, если у панели его нет
+    // (зашитые пресеты упирались в 144 на панели с 165 Гц — XIC-107; правила — RefreshRate.Choices)
+    private ComboBox HzCombo(int current, int[] supported, Action<int> apply)
     {
-        int[] presets = [144, 120, 90, 60, 48];
-        int[] rates = presets.Contains(current) ? presets : [current, .. presets];
+        int[] rates = SystemIntegration.RefreshRate.Choices(supported, current);
         return Ui.Combo([.. rates.Select(r => $"{r} " + Loc.T("settings.hz.unit"))],
             Array.IndexOf(rates, current), i => apply(rates[i]), Ui.Sc(110));
     }

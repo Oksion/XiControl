@@ -549,6 +549,11 @@ rate is set with `ChangeDisplaySettingsEx` — no driver needed):
 - **The nearest supported rate** at the current resolution is taken: you asked for 120, the panel
   can only do 90/60 → it picks 90 (ties go to the higher). So entering "144" on a 60 Hz matrix is
   safe — it just stays 60. A value ≤ 0 in config is ignored.
+- **The AC / battery lists show the panel's own rates** — 165 on a 165 Hz panel, only 120 and 60 on
+  a 60/120 one. A value from config that the panel lacks stays in the list rather than being swapped
+  silently. If the panel reports no modes (remote desktop, panel inactive), a fixed preset list is
+  shown. The panel's modes are written to `log.txt` at startup — handy when reporting a model we
+  don't have.
 - **Triggers** at app startup, on AC↔battery changes and on wake from sleep (the latter two are
   debounced ~1.5 s, events arrive in bursts), and immediately when you enable the option.
 - If the desired rate **is already set — the screen doesn't blink** (no redundant call is made).

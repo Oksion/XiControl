@@ -119,6 +119,34 @@ public sealed class RefreshRateTests
         RefreshRate.CycleRates(Panel, Pick60120).Should().Equal(60, 120);
     }
 
+    // ---- Варианты комбо «от сети / от батареи» (XIC-107) ----
+
+    private static readonly int[] Panel165 = [60, 165, 120, 48, 165, 0];
+
+    [Fact]
+    public void Choices_ЧастотыПанелиПоУбыванию()
+    {
+        // TM2409: Windows предлагает 165, а зашитые пресеты упирались в 144; 0 — не частота
+        RefreshRate.Choices(Panel165, 120).Should().Equal(165, 120, 60, 48);
+        // TM2424: только то, что умеет панель — без чужих 144/90/48
+        RefreshRate.Choices(Panel60120, 120).Should().Equal(120, 60);
+    }
+
+    [Fact]
+    public void Choices_ЗначениеКонфигаВнеПанели_ОстаётсяПервым()
+    {
+        // вписано руками или приехало с другой машины — молча не подменяем
+        RefreshRate.Choices(Panel60120, 144).Should().Equal(144, 120, 60);
+    }
+
+    [Fact]
+    public void Choices_ПанельНеОтдалаРежимы_ПрежниеПресеты()
+    {
+        // RDP / панель неактивна: настройка не должна пропасть
+        RefreshRate.Choices([], 120).Should().Equal(RefreshRate.FallbackRates);
+        RefreshRate.Choices([0, 1], 165).Should().Equal([165, .. RefreshRate.FallbackRates]);
+    }
+
     [Fact]
     public void CycleRates_ВыбранноеЧегоПанельНеУмеет_Игнорируется()
     {
