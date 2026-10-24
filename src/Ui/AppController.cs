@@ -964,7 +964,7 @@ public sealed class AppController
         DriverCheck = previous with { Status = DriverCheckStatus.Running };
         // Task.Run: синхронная часть проверки (WMI-перечень драйверов) длится секунды — вызывающий
         // должен сразу получить задачу и успеть показать «Проверяю…»
-        try { DriverCheck = await Task.Run(() => OemDriverCheck.RunAsync()).ConfigureAwait(false); }
+        try { DriverCheck = await Task.Run(() => OemDriverCheck.RunAsync(CurrentFirmware)).ConfigureAwait(false); }
         catch (Exception ex)
         {
             Log.Ex("CheckDrivers", ex);
@@ -972,6 +972,15 @@ public sealed class AppController
         }
         finally { Volatile.Write(ref _driverCheckRunning, 0); }
     }
+
+    // Текущие версии прошивок (XIC-104): тачпад — контроллер касаний через COL04 и MCU силы через
+    // COL05 (в тестах _haptics нет), экран — ROM Ver контроллера панели через IGCL
+    private string? CurrentFirmware(string module) => module switch
+    {
+        OemProtocol.TouchpadFirmware when _haptics is { } h => DriverMatch.TouchpadCurrent(h.ReadControllerVersion(), h.ReadFirmwareVersion()),
+        OemProtocol.PanelFirmware => PanelFirmware.ReadRomVersion(),
+        _ => null,
+    };
 
     // ---- Службы Xiaomi: MiDeviceService и MiService (XIC-87) ----
 
