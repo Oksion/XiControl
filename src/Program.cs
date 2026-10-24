@@ -10,11 +10,18 @@ namespace XiControl;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
-        // единственный экземпляр
+        // единственный экземпляр; вторая копия не стартует, а будит первую (XIC-106)
         using var mutex = new Mutex(true, @"Global\XiControlMutex", out bool created);
-        if (!created) return;
+        if (!created)
+        {
+            // автозапуск будить не должен: задача срабатывает и на возврат в сеанс, когда мы
+            // уже работаем, — окно настроек выскакивало бы на каждом переключении пользователей
+            if (!HasArg(args, "--autostart")) WakeRunning();
+            return;
+        }
+        using var wake = new InstanceWake(); // сразу за мьютексом: ранний вызов не теряется
 
         ApplicationConfiguration.Initialize();
         WatchForCrashes();
@@ -86,8 +93,27 @@ internal static class Program
             return;
         }
 
-        provider.GetRequiredService<TrayApp>().Start();
+        var tray = provider.GetRequiredService<TrayApp>();
+        tray.Start();
+        // запуск ярлыком из «Пуска» — человек ждёт окно, а не значок в трее
+        tray.AttachWake(wake, showNow: HasArg(args, StartMenuShortcut.ShowArg));
         Application.Run();
+    }
+
+    private static bool HasArg(string[] args, string arg) => args.Contains(arg, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Мьютекс занят. Свою копию в этом сеансе будим — она откроет окно настроек. Не нашли —
+    /// работает копия у другого пользователя или старая версия без будильника: говорим прямо,
+    /// иначе клик по ярлыку снова не дал бы ничего, кроме UAC.
+    /// </summary>
+    private static void WakeRunning()
+    {
+        if (InstanceWake.Signal()) return;
+        ApplicationConfiguration.Initialize();
+        Loc.Current = new JsonConfigStore().Load().Language ?? ""; // только чтение, конфиг не пишем
+        MessageBox.Show(Loc.T("err.running.elsewhere"), Loc.T("app.name"),
+            MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     /// <summary>

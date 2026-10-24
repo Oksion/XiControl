@@ -34,6 +34,8 @@
   "settings.language.desc": "Language of the menu, panel and pop-ups.",
   "settings.autostart": "Start with Windows",
   "settings.autostart.desc": "Via Task Scheduler, without a UAC prompt.",
+  "settings.startmenu": "Start menu shortcut",
+  "settings.startmenu.desc": "Launching from Start opens the settings window — or brings up the running XiControl instead of a second copy.",
   "settings.general.comfort": "Comfort",
   "settings.brightness.desc": "Separately for AC and battery; no Power profiles.",
   "settings.battery.sub": "Charge threshold, travel mode and the charge-ready sound.",
@@ -531,6 +533,10 @@
   "theme.system": "Follow Windows",
   "toast.firstrun.title": "XiControl is running in the tray",
   "toast.firstrun.text": "Click the tray icon for the quick panel, right-click for the menu. Holding the Mi button also opens the panel.",
+  "toast.firstrun.startmenu": "Click this notification to add XiControl to the Start menu.",
+  "toast.startmenu.added": "XiControl has been added to the Start menu. You can remove the shortcut in Settings → General.",
+  "toast.startmenu.failed": "Couldn't add the Start menu shortcut — see the log for details.",
   "err.title": "Error",
+  "err.running.elsewhere": "XiControl is already running — for another user on this PC, or as an older version that can't be brought up from here. To start this copy, close that one: tray menu → Exit.",
   "err.noiface": "MIFS interface not found. Requires administrator rights and a compatible Xiaomi/Redmi laptop."
 }

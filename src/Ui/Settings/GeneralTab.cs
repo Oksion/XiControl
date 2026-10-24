@@ -20,6 +20,9 @@ public sealed class GeneralTab : SettingsPane
             }, ui.Sc(150)));
         ui.AddRow(this, "settings.autostart", "settings.autostart.desc",
             ui.Toggle(act.GetAutoStart(), act.SetAutoStart));
+        // winget-пакет portable и сам ярлыков не создаёт — кладём свой, только по тумблеру (XIC-106)
+        ui.AddRow(this, "settings.startmenu", "settings.startmenu.desc",
+            ui.Toggle(act.GetStartMenu(), act.SetStartMenu));
 
         // тема панелей/OSD/«Монитора»: значения соответствуют AppConfig.FlyoutTheme
         string?[] themeValues = [null, "light", "system"];

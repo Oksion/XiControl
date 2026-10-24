@@ -160,6 +160,8 @@ where there are no watts to show, you can watch load or degrees instead.*
   (Settings → General). When off, no icon, no timer and no data sources are created: zero extra load.
 - 🌐 UI language: Russian / English / Chinese (中文).
 - 🚀 Autostart via Task Scheduler (no UAC prompt at logon, works on battery).
+- 📌 Start menu shortcut on request — launching from Start opens Settings, and if Xi Control is
+  already running, it brings that copy up instead of starting a second one.
 - 🛰️ **HTTP API for the local network** (optional, **off by default**) — control it from a
   phone or from Home Assistant automations: read status and charge (`GET /status`),
   switch mode, charge protection, "travel" and owl. A command allowlist, token authorization
@@ -217,6 +219,8 @@ moved to another drive or a flash stick, and survives a Windows reinstall with n
   protected by "administrators only" permissions, and that's precisely why the API cannot be
   enabled — or its token swapped — by editing the user config.
 - Autostart is a Windows Task Scheduler entry; by its nature it lives in the system, not in the folder.
+  The same goes for the Start menu shortcut, if you turn it on: it sits in your profile's Start menu
+  folder and points at this exe.
 
 ### Antivirus false positives
 
@@ -271,7 +275,7 @@ Launch `XiControl.exe` (confirm the UAC prompt) — a tray icon appears.
 | Keyboard backlight key | OSD with the level (off / 50% / 100% / auto) |
 
 All options live in the **Settings…** window (tray menu item): tabs General (language,
-autostart, panel theme, update check, logging, tray indicator), Features (owl, touchpad,
+autostart, Start menu shortcut, panel theme, update check, logging, tray indicator), Features (owl, touchpad,
 touchscreen, refresh-rate control), Battery (charge threshold with a hint, "travel" sound and file,
 lock-screen sound and toast, charger-wattage OSD, "weak PSU" threshold, battery health), Display
 (brightness limit and memory, auto-brightness by sensor with the curve graph; auto refresh rate, "Keep refresh rate" and the rates — the section is
@@ -300,6 +304,15 @@ a task from older versions (plain `XiControl`) is recognised and migrated to the
 next toggle. Self-repair on launch covers not only a missing exe but also a task pointing at an
 **outdated build** — the typical case when the portable version is unpacked into a new folder.
 Besides logon, the task also fires when you return to the session via fast user switching.
+
+The winget package is portable and creates no Start menu shortcut, so Xi Control adds its own — only
+when you ask: the "Start menu shortcut" toggle (Settings → General) or a click on the first-run
+notification. The shortcut opens Settings right away. If Xi Control is already running, launching it
+again (by the shortcut or the exe) brings up the running copy's Settings window instead of a second
+copy. The UAC prompt on that click stays: the app needs administrator rights. If the running copy
+belongs to another user on this PC, or is an older version, you get a message saying so. A
+shortcut pointing at a removed or older build is fixed on launch, like the autostart task.
+`winget uninstall` can't remove it — turn the toggle off before uninstalling.
 
 ### Travel mode (a one-off charge to 100%)
 

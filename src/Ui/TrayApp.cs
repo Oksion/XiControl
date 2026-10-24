@@ -21,7 +21,9 @@ public sealed class TrayApp : IDisposable
     private readonly QuickPanelForm _panel;
     private bool _lastOnline;  // прошлое состояние питания (для OSD только на реальном переходе)
     private bool _locked;      // сессия заблокирована (Win+L): OSD не виден — обратная связь звуком/тостом (XIC-11)
-    private string? _pendingUpdateUrl; // куда вести по клику на тост об обновлении
+    // Действие по клику на тост. Ставится при КАЖДОМ показе (у большинства — null): иначе клик по
+    // следующему, постороннему тосту исполнил бы чужое — с XIC-106 это создание ярлыка без спроса
+    private Action? _balloonClick;
 
     // Кэш отчёта о батарее (BatteryTab + /status API): износ/циклы/ёмкость меняются раз в
     // сутки-недели, а окно настроек пересобирается на каждый Popup/смену языка — держим короткий
@@ -138,7 +140,7 @@ public sealed class TrayApp : IDisposable
                 // зарегистрированным AppUserModelID — а он требует ярлыка в «Пуске», то есть
                 // следа в системе, которого у портативного exe быть не должно.
                 // Напоминания тостами не дублируем: три штуки подряд — уже спам.
-                if (!reminder) Safe(() => { _tray.ShowBalloonTip(10_000, Loc.T("app.name"),
+                if (!reminder) Safe(() => { Balloon(10_000, Loc.T("app.name"),
                     $"{Loc.T("osd.softcharge", pct)} — {Loc.T("osd.softcharge.sub")}",
                     ToolTipIcon.Warning); return true; }, false);
             }
@@ -192,7 +194,7 @@ public sealed class TrayApp : IDisposable
             if (_locked)
             {
                 if (_cfg.TravelLockSound) Sound.PlayToggle(on);
-                if (_cfg.TravelLockToast) Safe(() => { _tray.ShowBalloonTip(4000, Loc.T("app.name"),
+                if (_cfg.TravelLockToast) Safe(() => { Balloon(4000, Loc.T("app.name"),
                     on ? $"{Loc.T("osd.travel")} — {Loc.T("osd.travel.sub")}" : Loc.T("osd.travel.off"),
                     ToolTipIcon.Info); return true; }, false);
                 return;
@@ -249,9 +251,9 @@ public sealed class TrayApp : IDisposable
         _controller.UpdateFound = OnUpdateFound;
         _tray.BalloonTipClicked += (_, _) =>
         {
-            if (_pendingUpdateUrl is not string url) return; // тост мог быть и не про обновление
-            _pendingUpdateUrl = null;
-            ShellOpen.OpenUrl(url);
+            var click = _balloonClick;
+            _balloonClick = null;
+            click?.Invoke();
         };
         // тачпад/экран: колбэк приходит с фонового потока — маршалим в UI
         _controller.TouchpadToggled = b => _osd.BeginInvoke(new Action(() =>
@@ -366,12 +368,17 @@ public sealed class TrayApp : IDisposable
         _osd.BeginInvoke(new Action(_menu.Prime));
 
         // Одноразовая подсказка первого запуска: как открыть панель и меню — иначе
-        // самая богатая поверхность (QuickPanel) остаётся спрятанной за Mi-кнопкой
+        // самая богатая поверхность (QuickPanel) остаётся спрятанной за Mi-кнопкой.
+        // Заодно предлагаем ярлык в «Пуск» (XIC-106): сами без спроса не создаём, клик по тосту —
+        // и есть спрос; дальше тот же тумблер в «Общих»
         if (!_cfg.FirstRunShown)
         {
             _cfg.FirstRunShown = true;
             _cfg.Save();
-            _tray.ShowBalloonTip(10000, Loc.T("toast.firstrun.title"), Loc.T("toast.firstrun.text"), ToolTipIcon.None);
+            bool offer = !AppController.StartMenuEnabled;
+            Balloon(10000, Loc.T("toast.firstrun.title"),
+                offer ? $"{Loc.T("toast.firstrun.text")}\n{Loc.T("toast.firstrun.startmenu")}" : Loc.T("toast.firstrun.text"),
+                onClick: offer ? AddStartMenuFromToast : null);
         }
 
         // Проверка обновления — с задержкой и в фоне: старт не замедляем, сеть в UI-поток не тащим
@@ -392,12 +399,46 @@ public sealed class TrayApp : IDisposable
             _osd.BeginInvoke(new Action(() =>
             {
                 UpdateCheck.MarkNotified(_cfg, release);
-                _pendingUpdateUrl = release.Url;
-                _tray.ShowBalloonTip(10000, Loc.T("toast.update.title"),
-                    Loc.T("toast.update.text", release.Tag), ToolTipIcon.None);
+                Balloon(10000, Loc.T("toast.update.title"), Loc.T("toast.update.text", release.Tag),
+                    onClick: () => ShellOpen.OpenUrl(release.Url));
             }));
             return true;
         }, false);
+    }
+
+    // Все тосты — через это: действие по клику ставится заново на каждом показе (см. _balloonClick)
+    private void Balloon(int ms, string title, string text, ToolTipIcon icon = ToolTipIcon.None, Action? onClick = null)
+    {
+        _balloonClick = onClick;
+        _tray.ShowBalloonTip(ms, title, text, icon);
+    }
+
+    // Клик по приветствию первого запуска — согласие на ярлык в «Пуске» (XIC-106). Итог говорим
+    // тем же тостом: человек кликнул по уведомлению и ждёт ответа там же
+    private void AddStartMenuFromToast()
+    {
+        bool ok = AppController.ToggleStartMenu(true);
+        Balloon(6000, Loc.T("app.name"), Loc.T(ok ? "toast.startmenu.added" : "toast.startmenu.failed"),
+            ok ? ToolTipIcon.None : ToolTipIcon.Warning);
+    }
+
+    /// <summary>
+    /// Будильник второй копии (XIC-106): запуск ярлыком при работающем приложении открывает окно
+    /// настроек здесь. showNow — нас самих только что запустили ярлыком.
+    /// </summary>
+    public void AttachWake(InstanceWake wake, bool showNow)
+    {
+        // колбэк — с пула; NotifyIcon не Control, маршалим через форму OSD, как остальные
+        wake.Listen(() => _osd.BeginInvoke(new Action(ShowSettingsWindow)));
+        if (showNow) _osd.BeginInvoke(new Action(ShowSettingsWindow));
+    }
+
+    // Окно уже открыто — только вывести вперёд: Popup пересобирает вкладки, и человек потерял бы,
+    // где был. Закрыто — открыть как обычно.
+    private void ShowSettingsWindow()
+    {
+        if (_settings is { IsDisposed: false, Visible: true } s) s.Reveal();
+        else OpenSettings();
     }
 
     // Тултип трея: имя • режим • заряд (NotifyIcon.Text ограничен 127 символами).
@@ -768,6 +809,8 @@ public sealed class TrayApp : IDisposable
             {
                 GetAutoStart = () => _controller.AutoStartEnabled,
                 SetAutoStart = _controller.ToggleAutoStart,
+                GetStartMenu = () => AppController.StartMenuEnabled,
+                SetStartMenu = on => AppController.ToggleStartMenu(on),
                 Languages = () => _controller.Languages,
                 CurrentLanguage = () => _controller.CurrentLanguage,
                 SetLanguage = _controller.SetLanguage,
