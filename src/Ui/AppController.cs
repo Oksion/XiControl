@@ -114,6 +114,11 @@ public sealed class AppController
             if (_autoStart) Safe(() => { AutoStart.RepairIfBroken(); return true; }, true);
             // то же для ярлыка в «Пуске» (XIC-106): нет ярлыка — ничего не создаём
             Safe(() => { StartMenuShortcut.RepairIfBroken(); return true; }, true);
+            // режимы панели — в журнал: по log.txt тестера с чужой моделью сразу видно, что отдал
+            // драйвер (например, 164 вместо 165 при дробных 164,9 Гц) — XIC-107
+            int[] rates = RefreshRate.Supported();
+            Log.Write(rates.Length > 0 ? $"RefreshRate: режимы панели {string.Join('/', rates)} Гц"
+                                       : "RefreshRate: панель не отдала режимы");
         });
 
         // Тактильные настройки тачпада живут в нём самом — только прочитать для вкладки
