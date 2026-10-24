@@ -119,6 +119,12 @@ public sealed class AppController
             int[] rates = RefreshRate.Supported();
             Log.Write(rates.Length > 0 ? $"RefreshRate: режимы панели {string.Join('/', rates)} Гц"
                                        : "RefreshRate: панель не отдала режимы");
+            // домены DPTF — туда же и по той же причине: имён у них нет, и какой из них ядро на
+            // чужой модели, видно только по цифрам (XIC-105). Заодно наполняет список в настройках
+            using var dptf = new DptfTemperature();
+            if (dptf.ReadDomains() is { } domains)
+                Log.Write($"DPTF: домены {DptfDomains.Describe(domains)}" +
+                          (_cfg.TemperatureDomain is int sel ? $"; выбран _{sel}" : "; выбран самый горячий"));
         });
 
         // Тактильные настройки тачпада живут в нём самом — только прочитать для вкладки

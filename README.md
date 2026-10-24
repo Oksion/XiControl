@@ -621,6 +621,10 @@ Notes:
   sensor data and a dash is shown (same as in the Monitor). GPU load needs Intel graphics,
   temperature needs DPTF, NPU load is offered only if the laptop has a neural processor; a metric
   unavailable on your hardware shows a dash too.
+- Temperature is the hottest DPTF point by default. On some models that isn't the CPU, so
+  **Settings → General → Temperature sensor** lets you pick a specific one, for the Monitor too.
+  Intel sensors have no names, only numbers with their current reading: load the CPU and pick the
+  one that rises with it.
 - When off, the indicator costs nothing: no icon, no timer and no data sources are created —
   zero extra load.
 

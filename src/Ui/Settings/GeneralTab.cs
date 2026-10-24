@@ -77,6 +77,55 @@ public sealed class GeneralTab : SettingsPane
                 cfg.Save();
                 act.TrayMetricApplied();
             }, ui.Sc(150)));
+
+        AddTemperatureSensor(ui, cfg);
+    }
+
+    // Какой датчик DPTF считать температурой (XIC-105). Имён у доменов нет — подписываем номером и
+    // текущей температурой: человек выбирает тот, что растёт под нагрузкой. Список — из последнего
+    // снимка (WMI в UI-потоке не ждём, XIC-81), цифры освежаются фоном после показа вкладки.
+    // Нет DPTF (AMD, ACPI-зона) — выбирать не из чего, раздела нет.
+    private void AddTemperatureSensor(SettingsToolkit ui, AppConfig cfg)
+    {
+        var snapshot = SystemIntegration.DptfTemperature.LastDomains;
+        int[] indexes = [.. snapshot.Where(d => SystemIntegration.DptfDomains.Plausible(d.Celsius)).Select(d => d.Index)];
+        if (cfg.TemperatureDomain is int sel && !indexes.Contains(sel)) indexes = [.. indexes, sel]; // выбранный, но сейчас молчит
+        if (indexes.Length == 0) return;
+
+        ui.AddGroup(this, "settings.temp.group");
+        int?[] values = [null, .. indexes.Select(i => (int?)i)];
+        int cur = Math.Max(0, Array.IndexOf(values, cfg.TemperatureDomain));
+        var combo = ui.Combo([.. values.Select(v => Label(v, snapshot))], cur, i =>
+        {
+            cfg.TemperatureDomain = values[i];
+            cfg.Save(); // «Монитор» и трей спрашивают выбор на каждом чтении — применится само
+        }, ui.Sc(200));
+        ui.AddRow(this, "settings.temp.sensor", "settings.temp.sensor.desc", combo);
+
+        // свежие цифры — с пула; вкладка могла закрыться, пока шёл WMI
+        HandleCreated += (_, _) => Task.Run(() =>
+        {
+            using var dptf = new SystemIntegration.DptfTemperature();
+            if (dptf.ReadDomains() is not { } fresh) return;
+            try
+            {
+                BeginInvoke(() =>
+                {
+                    if (combo.IsDisposed) return;
+                    for (int i = 1; i < values.Length; i++) combo.Items[i] = Label(values[i], fresh);
+                });
+            }
+            catch (InvalidOperationException) { /* вкладку уже закрыли — обновлять нечего */ }
+        });
+
+        static string Label(int? index, IReadOnlyList<SystemIntegration.DptfDomain> domains)
+        {
+            if (index is not int n) return Loc.T("settings.temp.sensor.hottest");
+            var d = domains.FirstOrDefault(x => x.Index == n);
+            return SystemIntegration.DptfDomains.Plausible(d.Celsius) && d.Index == n
+                ? Loc.T("settings.temp.sensor.n", n, d.Celsius)
+                : Loc.T("settings.temp.sensor.silent", n);
+        }
     }
 
     // Индекс языка с данной культурой в списке (−1 — нет; вызывающий приведёт к 0).
