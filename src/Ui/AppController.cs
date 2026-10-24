@@ -112,6 +112,8 @@ public sealed class AppController
             // самопочинка: после обновления/переноса exe задача указывает на пропавший путь
             // и молча не стартует — пересоздаём на текущий exe
             if (_autoStart) Safe(() => { AutoStart.RepairIfBroken(); return true; }, true);
+            // то же для ярлыка в «Пуске» (XIC-106): нет ярлыка — ничего не создаём
+            Safe(() => { StartMenuShortcut.RepairIfBroken(); return true; }, true);
         });
 
         // Тактильные настройки тачпада живут в нём самом — только прочитать для вкладки
@@ -833,6 +835,18 @@ public sealed class AppController
             _cfg.AutoStart = _autoStart;
             _cfg.Save();
         });
+    }
+
+    /// <summary>Ярлык в меню «Пуск» есть (XIC-106). Без кэша: проверка — один File.Exists, а
+    /// удалить ярлык могут и руками.</summary>
+    public static bool StartMenuEnabled => StartMenuShortcut.Exists();
+
+    /// <summary>Ярлык в «Пуск»: создать на текущий exe или убрать. Файл и COM — миллисекунды,
+    /// воркер не нужен. Возвращает итоговое состояние.</summary>
+    public static bool ToggleStartMenu(bool on)
+    {
+        StartMenuShortcut.Set(on);
+        return StartMenuEnabled;
     }
 
     /// <summary>Доступные языки (культура + родное название) — для комбо настроек.</summary>

@@ -20,6 +20,8 @@ public sealed class SettingsActions
 {
     public required Func<bool> GetAutoStart;
     public required Action<bool> SetAutoStart;
+    public required Func<bool> GetStartMenu;     // ярлык в меню «Пуск» (XIC-106)
+    public required Action<bool> SetStartMenu;
     public required Func<IReadOnlyList<LangInfo>> Languages;  // доступные языки (data-driven)
     public required Func<string> CurrentLanguage;             // текущий культурный код
     public required Action<string> SetLanguage;              // сменить язык по культурному коду

@@ -34,6 +34,8 @@
   "settings.language.desc": "菜单、面板和提示的语言。",
   "settings.autostart": "开机自启动",
   "settings.autostart.desc": "通过任务计划程序，无需 UAC 提示。",
+  "settings.startmenu": "“开始”菜单快捷方式",
+  "settings.startmenu.desc": "从“开始”菜单启动会打开设置窗口；若 XiControl 已在运行，则唤出它，而不会再启动一个副本。",
   "settings.general.comfort": "便捷功能",
   "settings.brightness.desc": "分别用于电源和电池，无需电源配置。",
   "settings.battery.sub": "充电阈值、出行模式与充电完成提示音。",
@@ -524,6 +526,10 @@
   "theme.system": "跟随 Windows",
   "toast.firstrun.title": "XiControl 正在系统托盘中运行",
   "toast.firstrun.text": "点击托盘图标打开快捷面板，右键打开菜单。长按 Mi 键也可打开面板。",
+  "toast.firstrun.startmenu": "点击此通知，即可将 XiControl 添加到“开始”菜单。",
+  "toast.startmenu.added": "已将 XiControl 添加到“开始”菜单。可在 设置 → 常规 中移除快捷方式。",
+  "toast.startmenu.failed": "未能添加“开始”菜单快捷方式，详情请查看日志。",
   "err.title": "错误",
+  "err.running.elsewhere": "XiControl 已在运行：可能属于本机的其他用户，或是无法从此处唤出的旧版本。如需启动此副本，请先关闭那个：托盘菜单 → 退出。",
   "err.noiface": "未找到 MIFS 接口。需要管理员权限和兼容的小米/红米（Redmi）笔记本电脑。"
 }

@@ -95,6 +95,13 @@ public sealed class SettingsForm : Form
         BuildAll();
         FitToScreen(Screen.FromPoint(Cursor.Position)); // открываемся по центру экрана с курсором
         Show();
+        Reveal();
+    }
+
+    /// <summary>Вывести уже показанное окно вперёд без пересборки (XIC-106: повторный запуск
+    /// ярлыком не должен сбрасывать открытую вкладку).</summary>
+    public void Reveal()
+    {
         if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
         Activate();
         BringToFront();
