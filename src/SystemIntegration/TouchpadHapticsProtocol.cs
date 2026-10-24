@@ -137,6 +137,35 @@ public static class TouchpadHapticsProtocol
     public static string FirmwareVersion(IReadOnlyList<ushort> v) =>
         $"{v[0] & 0xFF}.{v[0] >> 8}.{v[1] & 0xFF}.{v[1] >> 8}";
 
+    // ---- COL04: канал контроллера касаний BL7853 (XIC-104) ----
+
+    /// <summary>Report ID коллекции COL04 (UsagePage 0xFF00) — канал самого контроллера касаний;
+    /// COL05 — канал MCU силы и вибрации за ним.</summary>
+    public const byte ControllerReportId = 0x0E;
+    private const byte CmdControllerVersion = 0xB6;
+
+    /// <summary>
+    /// Запрос версии прошивки BL7853 — единственный кадр, который мы шлём в COL04, и он не
+    /// собирается, а взят как есть из <c>FirmwareTouchPadTool.exe</c> OEM (запись по смещению
+    /// 0x1C7EA: <c>0E 07 B4 00 00 01 00 04 B6</c>, дальше нули). Разбор — docs/16; первым его
+    /// опубликовал gxcreator в issue #99.
+    /// </summary>
+    public static byte[] ControllerVersionRequest()
+    {
+        var f = new byte[FrameLength];
+        byte[] oem = [0x0E, 0x07, 0xB4, 0x00, 0x00, 0x01, 0x00, 0x04, CmdControllerVersion];
+        oem.CopyTo(f, 0);
+        return f;
+    }
+
+    /// <summary>Ответ на <see cref="ControllerVersionRequest"/>: проверка как у OEM — ID 0x0E,
+    /// <c>[1] = 6</c>, <c>[2]</c> = эхо команды (суммы в этом канале нет); версия — байты
+    /// <c>[7].[6].[4].[5]</c> десятичными (<c>3.5.13.1</c>). null — ответ не тот.</summary>
+    public static string? ParseControllerVersion(byte[] r) =>
+        r.Length >= 8 && r[0] == ControllerReportId && r[1] == 6 && r[2] == CmdControllerVersion
+            ? $"{r[7]}.{r[6]}.{r[4]}.{r[5]}"
+            : null;
+
     /// <summary>XOR байтов [3..31] плюс 1 — одна формула для кадров и ответов.</summary>
     public static byte Checksum(byte[] f)
     {

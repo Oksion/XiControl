@@ -103,7 +103,13 @@ public sealed class DriversTab : SettingsPane
         if (drivers.Any(x => x.State == DriverState.Newer)) ui.AddNote(this, "settings.drivers.summary.note");
     }
 
-    private static string FirmwareText(DriverRow f)
+    // у тачпада две прошивки в одной строке — объясняем, где какая
+    private static string FirmwareText(DriverRow f) =>
+        f.Module == OemProtocol.TouchpadFirmware && f.Catalog.Contains(DriverMatch.PartSeparator, StringComparison.Ordinal)
+            ? FirmwareVerdict(f) + "\n" + Loc.T("settings.drivers.firmware.tp.parts")
+            : FirmwareVerdict(f);
+
+    private static string FirmwareVerdict(DriverRow f)
     {
         string pkg = PackageText(f.Package);
         return f.State switch

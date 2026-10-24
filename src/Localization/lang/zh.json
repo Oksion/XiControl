@@ -291,6 +291,7 @@
   "settings.drivers.firmware.newer": "已安装 {0}，目录 {1}——你的版本更新 · {2}",
   "settings.drivers.firmware.v.same": "已是最新",
   "settings.drivers.firmware.v.newer": "比目录新",
+  "settings.drivers.firmware.tp.parts": "触控板有两套固件：第一个版本是触控控制器，第二个是压感与振动。",
   "settings.drivers.download": "打开链接",
   "settings.drivers.download.confirm": "在浏览器中打开？",
   "settings.drivers.nolink": "无链接",

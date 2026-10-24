@@ -195,20 +195,29 @@ public static class DriverMatch
             ? va.CompareTo(vb)
             : string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Разделитель частей версии тачпада в строке: «контроллер / сила».</summary>
+    internal const string PartSeparator = " / ";
+
     /// <summary>
-    /// Версия прошивки тачпада из каталожной: последние четыре числа
-    /// (<c>3.5.13.01.44.25.13.0</c> → <c>44.25.13.0</c>). В пакете две прошивки: <c>3.5.13.01</c> —
-    /// контроллер касаний Betterlife BL7853, <c>44.25.13.0</c> — отдельный MCU силы и вибрации (папка
-    /// <c>Force</c> архива). Командой 0x10 тачпад отдаёт версию второго — с ней и сравниваем;
-    /// версию BL7853 читать нечем. null — строка другого вида, сравнивать не с чем.
+    /// Каталожная версия тачпада по частям. В пакете две прошивки: <c>3.5.13.01.44.25.13.0</c> —
+    /// это контроллер касаний Betterlife BL7853 (<c>3.5.13.01</c>, он же <c>3.5.13.1</c>) и отдельный
+    /// MCU силы и вибрации (<c>44.25.13.0</c>, папка <c>Force</c> архива). Сила — последние четыре
+    /// числа, контроллер — первые четыре, если они есть. null — строка другого вида.
     /// </summary>
-    internal static string? TouchpadCatalogVersion(string catalog)
+    internal static (string? Controller, string Force)? TouchpadCatalogParts(string catalog)
     {
         var parts = catalog.Split('.');
-        if (parts.Length < 4) return null;
-        var tail = parts[^4..];
-        return tail.All(p => p.Length > 0 && p.All(char.IsAsciiDigit)) ? string.Join('.', tail) : null;
+        if (parts.Length is not (4 or 8) || !parts.All(p => p.Length > 0 && p.All(char.IsAsciiDigit))) return null;
+        string force = string.Join('.', parts[^4..]);
+        // ведущие нули — как в каталоге (01), сам контроллер отдаёт числами (1)
+        string? controller = parts.Length == 8 ? Version.Parse(string.Join('.', parts[..4])).ToString() : null;
+        return (controller, force);
     }
+
+    /// <summary>Текущая версия тачпада одной строкой, в том же порядке, что каталог: «контроллер / сила»
+    /// или одна сила, если COL04 не ответил. Без версии силы — null: сравнивать не с чем.</summary>
+    internal static string? TouchpadCurrent(string? controller, string? force) =>
+        force is null ? null : controller is null ? force : controller + PartSeparator + force;
 
     /// <summary>
     /// Строки сверки. Версия — из записи ЭТОГО hardware-id, не «пакета»: один zip везёт драйверы
@@ -218,7 +227,8 @@ public static class DriverMatch
     /// (<c>USB\VID_6789&amp;PID_1234&amp;REV_1236</c> у экрана), такого устройства в системе нет.
     /// Строка — одна на модуль с пакетом; в <c>Device</c> — код модуля, имя ему даёт UI по локализации.
     /// Текущая версия прошивки — из <paramref name="firmware"/> (код модуля → прочитанное, XIC-104):
-    /// у тачпада она сравнивается с хвостом каталожной, у экрана только встаёт рядом — ROM Ver панели
+    /// у тачпада сравнивается по частям (контроллер и сила; «обновление», если старее хоть одна),
+    /// у экрана только встаёт рядом — ROM Ver панели
     /// отличается от каталожного старшим байтом, и «старее» это или другой вариант панели, по номеру
     /// не сказать (docs/16).
     /// </summary>
@@ -251,13 +261,18 @@ public static class DriverMatch
     {
         string catalog = m.HardwareIds.Count > 0 ? m.HardwareIds[0].Version : "";
         var state = DriverState.Firmware;
-        if (m.Name == OemProtocol.TouchpadFirmware && TouchpadCatalogVersion(catalog) is { } tail)
+        if (m.Name == OemProtocol.TouchpadFirmware && TouchpadCatalogParts(catalog) is { } cat)
         {
-            catalog = tail;
-            if (current is not null)
+            // часть, которую не прочитали, не сравниваем и не показываем — пары должны совпадать
+            string? ctl = null, force = current;
+            if (current?.Split(PartSeparator) is [var a, var b]) (ctl, force) = (a, b);
+            bool both = ctl is not null && cat.Controller is not null;
+            catalog = both ? cat.Controller + PartSeparator + cat.Force : cat.Force;
+            if (force is not null)
             {
-                int c = CompareVersions(tail, current);
-                state = c > 0 ? DriverState.Update : c < 0 ? DriverState.Newer : DriverState.Same;
+                int f = CompareVersions(cat.Force, force), c = both ? CompareVersions(cat.Controller!, ctl!) : 0;
+                state = f > 0 || c > 0 ? DriverState.Update : f < 0 || c < 0 ? DriverState.Newer : DriverState.Same;
+                current = both ? current : force;
             }
         }
         return new DriverRow(m.Name, m.Name, current, catalog, state, m.Package);

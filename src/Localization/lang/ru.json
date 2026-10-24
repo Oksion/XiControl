@@ -291,6 +291,7 @@
   "settings.drivers.firmware.newer": "Установлена {0}, в каталоге {1} — у вас новее · {2}",
   "settings.drivers.firmware.v.same": "актуальна",
   "settings.drivers.firmware.v.newer": "новее каталога",
+  "settings.drivers.firmware.tp.parts": "В тачпаде две прошивки: первая версия — контроллер касаний, вторая — сила нажатия и вибрация.",
   "settings.drivers.download": "Открыть ссылку",
   "settings.drivers.download.confirm": "Открыть в браузере?",
   "settings.drivers.nolink": "нет ссылки",

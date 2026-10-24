@@ -291,6 +291,7 @@
   "settings.drivers.firmware.newer": "Installed {0}, catalog {1} — yours is newer · {2}",
   "settings.drivers.firmware.v.same": "up to date",
   "settings.drivers.firmware.v.newer": "newer than catalog",
+  "settings.drivers.firmware.tp.parts": "The touchpad has two firmwares: the first version is the touch controller, the second is force and haptics.",
   "settings.drivers.download": "Open link",
   "settings.drivers.download.confirm": "Open in browser?",
   "settings.drivers.nolink": "no link",

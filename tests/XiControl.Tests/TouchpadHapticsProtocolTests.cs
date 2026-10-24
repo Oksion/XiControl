@@ -94,6 +94,19 @@ public sealed class TouchpadHapticsProtocolTests
         FirmwareVersion([0x192C, 0x000D]).Should().Be("44.25.13.0"); // каталожная — для сверки формата
     }
 
+    // версия контроллера касаний через COL04 (XIC-104): кадр OEM как есть — из FirmwareTouchPadTool.exe
+    [Fact]
+    public void Controller_version_request_is_OEM_frame() =>
+        ControllerVersionRequest().Should().Equal(Padded("0E 07 B4 00 00 01 00 04 B6"));
+
+    [Theory]
+    [InlineData("0E 06 B6 00 0D 01 05 03", "3.5.13.1")]  // [7].[6].[4].[5], как печатает OEM
+    [InlineData("0E 06 B5 00 0D 01 05 03", null)]        // не эхо нашей команды
+    [InlineData("0E 05 B6 00 0D 01 05 03", null)]        // не тот размер
+    [InlineData("0D 06 B6 00 0D 01 05 03", null)]        // ответ COL05, не COL04
+    public void Controller_version_parsed_as_OEM(string response, string? expected) =>
+        ParseControllerVersion(Padded(response)).Should().Be(expected);
+
     [Fact]
     public void Empty_response_means_not_ready()
     {

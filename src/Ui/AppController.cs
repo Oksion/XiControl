@@ -959,11 +959,11 @@ public sealed class AppController
         finally { Volatile.Write(ref _driverCheckRunning, 0); }
     }
 
-    // Текущие версии прошивок (XIC-104): тачпад — нашим каналом COL05 (в тестах _haptics нет),
-    // экран — ROM Ver контроллера панели через IGCL
+    // Текущие версии прошивок (XIC-104): тачпад — контроллер касаний через COL04 и MCU силы через
+    // COL05 (в тестах _haptics нет), экран — ROM Ver контроллера панели через IGCL
     private string? CurrentFirmware(string module) => module switch
     {
-        OemProtocol.TouchpadFirmware => _haptics?.ReadFirmwareVersion(),
+        OemProtocol.TouchpadFirmware when _haptics is { } h => DriverMatch.TouchpadCurrent(h.ReadControllerVersion(), h.ReadFirmwareVersion()),
         OemProtocol.PanelFirmware => PanelFirmware.ReadRomVersion(),
         _ => null,
     };
