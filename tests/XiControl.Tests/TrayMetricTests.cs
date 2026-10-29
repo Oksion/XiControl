@@ -172,4 +172,52 @@ public class TrayMetricTests
     [Fact]
     public void ThermalZone_ПустойСписок_ЭтоNaN() =>
         float.IsNaN(ThermalZone.MaxCelsius([])).Should().BeTrue();
+
+    // ---- Домены DPTF: выбор датчика температуры (XIC-105) ----
+
+    // снято с TM2424 в простое: 15 доменов без имён, половина молчит нулём
+    private static readonly DptfDomain[] Tm2424 =
+    [
+        new(0, 40, 19), new(1, 40, 3), new(2, 40, 0), new(3, 0, 0), new(5, 38, 0),
+        new(8, 30, 0), new(10, 36, 28), new(14, 0, 0),
+    ];
+
+    [Theory]
+    [InlineData(@"PCI\VEN_8086&DEV_B01D&SUBSYS_24241D72&REV_04\3&11583659&0&20_0", 0)]
+    [InlineData(@"PCI\VEN_8086&DEV_B01D&SUBSYS_24241D72&REV_04\3&11583659&0&20_14", 14)]
+    [InlineData(@"PCI\VEN_8086&DEV_B01D\3&11583659&0&20_x", null)]   // хвост не число
+    [InlineData("БезПодчёркивания", null)]
+    [InlineData(null, null)]
+    public void DptfDomains_НомерИзInstanceName(string? instance, int? expected) =>
+        DptfDomains.IndexOf(instance).Should().Be(expected);
+
+    [Fact]
+    public void DptfDomains_БезВыбора_СамыйГорячий() =>
+        DptfDomains.Pick(Tm2424, null).Should().Be(40);
+
+    [Fact]
+    public void DptfDomains_ВыбранныйДомен_ЕгоТемпература() =>
+        DptfDomains.Pick(Tm2424, 8).Should().Be(30);
+
+    [Theory]
+    [InlineData(3)]    // домен есть, но молчит нулём
+    [InlineData(99)]   // домена нет: сменился драйвер или конфиг с другой машины
+    public void DptfDomains_ВыбранныйМолчит_ОткатКМаксимуму_АНеПрочерк(int selected) =>
+        DptfDomains.Pick(Tm2424, selected).Should().Be(40);
+
+    [Fact]
+    public void DptfDomains_ВышеСтаТридцати_ЭтоМусор()
+    {
+        DptfDomain[] domains = [new(0, 255, 0), new(1, 52, 0)];
+        DptfDomains.Pick(domains, null).Should().Be(52);
+        DptfDomains.Pick(domains, 0).Should().Be(52);   // выбранный отдаёт мусор — тоже откат
+    }
+
+    [Fact]
+    public void DptfDomains_НетПравдоподобных_ЭтоNaN() =>
+        float.IsNaN(DptfDomains.Pick([new(0, 0, 0), new(1, 200, 0)], null)).Should().BeTrue();
+
+    [Fact]
+    public void DptfDomains_СтрокаДляЖурнала_ВсеДоменыИВаттыГдеЕсть() =>
+        DptfDomains.Describe([new(0, 40, 19), new(3, 0, 0)]).Should().Be("_0 40 °C 19 Вт, _3 0 °C");
 }

@@ -47,7 +47,7 @@ public sealed class TrayMetricIcon : IDisposable
     public void Start()
     {
         _kind = TrayMetricFormat.ParseKind(_cfg.TrayMetricKind);
-        _source = new TrayMetricSource(_kind, _cfg.ForceAcpiTemperature);
+        _source = new TrayMetricSource(_kind, _cfg.ForceAcpiTemperature, () => _cfg.TemperatureDomain);
         _light = Theme.TaskbarIsLight();
         _tray = new NotifyIcon { Text = Loc.T("app.name") };
         Apply("—", null);
@@ -67,7 +67,7 @@ public sealed class TrayMetricIcon : IDisposable
         {
             _kind = kind;
             _source?.Dispose();
-            _source = new TrayMetricSource(kind, _cfg.ForceAcpiTemperature);
+            _source = new TrayMetricSource(kind, _cfg.ForceAcpiTemperature, () => _cfg.TemperatureDomain);
             _text = null; // «12» ватт и «12» процентов — разные значения, перерисовать
         }
         _timer.Stop();

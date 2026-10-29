@@ -139,11 +139,58 @@ public static class MemoryLoad
     }
 }
 
+/// <summary>Домен Intel DPTF: номер (хвост InstanceName), температура °C и мощность (у большинства 0).</summary>
+public readonly record struct DptfDomain(int Index, int Celsius, int Power);
+
 /// <summary>
-/// Температура «горячей точки» через Intel DPTF (WMI EsifDeviceInformation) — driver-free:
-/// провайдер идёт со штатными драйверами Intel. Максимум среди активных доменов — честная
-/// температура самого горячего узла. Класса нет на модели → тихо выключаемся навсегда.
-/// (Логика — из «Монитора», вынесена для переиспользования индикатором трея.)
+/// Отбор температуры среди доменов DPTF — чистая логика под тестами (XIC-105). Имён у доменов
+/// нет: на TM2424 все 15 висят на одном устройстве «Intel Innovation Platform Framework Processor
+/// Participant» и различаются только хвостом InstanceName (`…&amp;20_0` … `…&amp;20_14`). Поэтому
+/// ядро не узнать по имени — его выбирает человек, глядя, какой датчик растёт под нагрузкой.
+/// </summary>
+public static class DptfDomains
+{
+    /// <summary>Номер домена — число после последнего «_» в InstanceName; null — не разобрали.</summary>
+    public static int? IndexOf(string? instanceName)
+    {
+        int i = instanceName?.LastIndexOf('_') ?? -1;
+        return i >= 0 && int.TryParse(instanceName.AsSpan(i + 1), NumberStyles.None,
+            CultureInfo.InvariantCulture, out int n) ? n : null;
+    }
+
+    /// <summary>Ноль — неинициализированный домен, выше 130 °C железо не живёт (общее с ACPI-зоной).</summary>
+    public static bool Plausible(int celsius) => celsius is > 0 and < 130;
+
+    /// <summary>
+    /// Температура по выбору: выбранный домен, если он есть и отдаёт правдоподобное; иначе максимум
+    /// по доменам — прежнее поведение. Пропавший домен (сменился драйвер, конфиг с другой машины)
+    /// не превращается в прочерк. NaN — правдоподобных значений нет вовсе.
+    /// </summary>
+    public static float Pick(IEnumerable<DptfDomain> domains, int? selected)
+    {
+        int max = 0;
+        foreach (var d in domains)
+        {
+            if (!Plausible(d.Celsius)) continue;
+            if (d.Index == selected) return d.Celsius;
+            if (d.Celsius > max) max = d.Celsius;
+        }
+        return max > 0 ? max : float.NaN;
+    }
+
+    /// <summary>Строка для журнала: все домены как есть, включая нули, — по ней видно, какой из
+    /// них ядро на чужой модели.</summary>
+    public static string Describe(IEnumerable<DptfDomain> domains) =>
+        string.Join(", ", domains.Select(d => d.Power > 0
+            ? $"_{d.Index} {d.Celsius} °C {d.Power} Вт"
+            : $"_{d.Index} {d.Celsius} °C"));
+}
+
+/// <summary>
+/// Температура через Intel DPTF (WMI EsifDeviceInformation) — driver-free: провайдер идёт со
+/// штатными драйверами Intel. По умолчанию — максимум среди доменов, температура самого горячего
+/// узла; можно выбрать конкретный домен (XIC-105, правила — <see cref="DptfDomains.Pick"/>).
+/// Класса нет на модели → тихо выключаемся навсегда.
 /// </summary>
 public sealed class DptfTemperature : IDisposable
 {
@@ -153,28 +200,37 @@ public sealed class DptfTemperature : IDisposable
     /// <summary>Класс DPTF на этой модели есть (хотя бы один домен отвечал).</summary>
     public bool Present { get; private set; }
 
-    /// <summary>Максимальная температура доменов, °C; NaN — данных нет (или класс отсутствует).</summary>
-    public float ReadMaxC()
+    /// <summary>Последний прочитанный любым экземпляром набор доменов — для списка в настройках:
+    /// окно строится в UI-потоке и ждать WMI не должно (XIC-81). Пусто — ещё не читали или DPTF нет.</summary>
+    public static IReadOnlyList<DptfDomain> LastDomains { get; private set; } = [];
+
+    /// <summary>Температура, °C: выбранный домен или максимум; NaN — данных нет (или класс отсутствует).</summary>
+    public float ReadC(int? domain) => ReadDomains() is { } d ? DptfDomains.Pick(d, domain) : float.NaN;
+
+    /// <summary>Все домены по порядку WMI; null — класса нет или WMI отказал.</summary>
+    public IReadOnlyList<DptfDomain>? ReadDomains()
     {
-        if (_off) return float.NaN;
+        if (_off) return null;
         try
         {
             _q ??= new ManagementObjectSearcher(@"root\wmi",
-                "SELECT Temperature FROM EsifDeviceInformation");
-            int max = 0; bool any = false;
+                "SELECT InstanceName, Temperature, Power FROM EsifDeviceInformation");
+            var list = new List<DptfDomain>();
             foreach (ManagementObject o in _q.Get())
             {
-                any = true;
-                object? t = o["Temperature"];
+                int? index = DptfDomains.IndexOf(o["InstanceName"] as string);
+                int c = ToInt(o["Temperature"]), w = ToInt(o["Power"]);
                 o.Dispose();
-                if (t is null) continue;
-                int c = Convert.ToInt32(t, CultureInfo.InvariantCulture);
-                if (c > max && c < 130) max = c; // >130 °C — неинициализированный домен, отбрасываем
+                list.Add(new DptfDomain(index ?? list.Count, c, w)); // без номера — по порядку
             }
-            if (any) Present = true; else _off = true;
-            return max > 0 ? max : float.NaN;
+            if (list.Count == 0) { _off = true; return null; }
+            Present = true;
+            LastDomains = list;
+            return list;
         }
-        catch (Exception ex) { Log.Ex("Dptf", ex); _q?.Dispose(); _q = null; _off = true; return float.NaN; }
+        catch (Exception ex) { Log.Ex("Dptf", ex); _q?.Dispose(); _q = null; _off = true; return null; }
+
+        static int ToInt(object? v) => v is null ? 0 : Convert.ToInt32(v, CultureInfo.InvariantCulture);
     }
 
     public void Dispose() => _q?.Dispose();
@@ -263,10 +319,17 @@ public sealed class TemperatureSource : IDisposable
     private readonly DptfTemperature _dptf = new();
     private readonly AcpiZoneTemperature _zone = new();
     private readonly bool _forceZone;
+    private readonly Func<int?>? _domain;
 
     /// <param name="forceZone">Отладка: читать зону, даже если DPTF доступен. На Intel-машине
     /// иначе не прогнать путь фолбэка — DPTF там есть всегда.</param>
-    public TemperatureSource(bool forceZone = false) => _forceZone = forceZone;
+    /// <param name="domain">Выбранный домен DPTF (XIC-105) — спрашивается на каждом чтении, чтобы
+    /// выбор в настройках действовал сразу; null или пустой ответ — самый горячий узел.</param>
+    public TemperatureSource(bool forceZone = false, Func<int?>? domain = null)
+    {
+        _forceZone = forceZone;
+        _domain = domain;
+    }
 
     /// <summary>Источник последнего удавшегося чтения; None — температур на модели нет.</summary>
     public TempSource Source { get; private set; }
@@ -274,11 +337,12 @@ public sealed class TemperatureSource : IDisposable
     /// <summary>Хоть один источник ответил — «Монитору» можно резервировать строку.</summary>
     public bool Present => Source != TempSource.None;
 
-    public float ReadMaxC()
+    /// <summary>Температура, °C: DPTF (выбранный домен или самый горячий), иначе ACPI-зона.</summary>
+    public float ReadC()
     {
         if (!_forceZone && Source != TempSource.AcpiZone)
         {
-            float c = _dptf.ReadMaxC();
+            float c = _dptf.ReadC(_domain?.Invoke());
             if (!float.IsNaN(c)) { Choose(TempSource.Dptf); return c; }
             if (_dptf.Present) return float.NaN; // DPTF на модели есть — ждём его, не подменяем
         }
@@ -364,11 +428,13 @@ public sealed class TrayMetricSource : IDisposable
     private NpuLoad? _npu;
     private bool? _npuPresent; // реестр спрашиваем один раз, а не на каждом тике
     private readonly bool _forceAcpiTemp;
+    private readonly Func<int?>? _tempDomain; // выбранный домен DPTF (XIC-105)
 
-    public TrayMetricSource(TrayMetric kind, bool forceAcpiTemp = false)
+    public TrayMetricSource(TrayMetric kind, bool forceAcpiTemp = false, Func<int?>? tempDomain = null)
     {
         _kind = kind;
         _forceAcpiTemp = forceAcpiTemp;
+        _tempDomain = tempDomain;
     }
 
     /// <summary>Последнее значение Power пришло не с датчика батареи, а из RAPL — это мощность
@@ -422,8 +488,8 @@ public sealed class TrayMetricSource : IDisposable
 
     private float ReadTemp()
     {
-        _temp ??= new TemperatureSource(_forceAcpiTemp);
-        float c = _temp.ReadMaxC();
+        _temp ??= new TemperatureSource(_forceAcpiTemp, _tempDomain);
+        float c = _temp.ReadC();
         TempFromAcpiZone = _temp.Source == TempSource.AcpiZone;
         return c;
     }

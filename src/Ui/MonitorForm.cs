@@ -100,7 +100,7 @@ public sealed class MonitorForm : FlyoutForm
     {
         _cfg = cfg;
         _mifs = mifs;
-        _tempSrc = new SystemIntegration.TemperatureSource(cfg.ForceAcpiTemperature);
+        _tempSrc = new SystemIntegration.TemperatureSource(cfg.ForceAcpiTemperature, () => cfg.TemperatureDomain);
         _tempWmi = new(ReadTemp, new TempReading(float.NaN, false, 0f), "Monitor.Temp");
         _adapterWmi = new(_mifs.GetAdapterWatts, 0, "Monitor.Adapter");
         _batteryWmi = new(SamplePowerWattsWmi, float.NaN, "Monitor.Power");
@@ -417,7 +417,7 @@ public sealed class MonitorForm : FlyoutForm
     // На пуле, не больше одного чтения сразу (LatestValue) — _critTried поэтому без замка.
     private TempReading ReadTemp()
     {
-        float c = _tempSrc.ReadMaxC();
+        float c = _tempSrc.ReadC();
         bool present = _tempSrc.Present;
         // источник есть → крит-порог, один раз и отдельной задачей: ACPI-класс капризный и
         // небыстрый, а первое значение температуры ждёт раскладка окна (FirstWaitMs).
