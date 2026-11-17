@@ -168,6 +168,11 @@ public sealed class AppConfig
     /// через Raw Input. Требует Precision Touchpad; выключено по умолчанию.</summary>
     public bool TouchpadEdgeSliders { get; set; } = false;
 
+    /// <summary>Свой индикатор уровня для краёв тачпада (XIC-97): одна плашка в стиле Windows и
+    /// для яркости, и для громкости (громкость тогда пишется через Core Audio, без клавиш).
+    /// Выключено — громкость клавишами с окном Windows, яркость без индикатора.</summary>
+    public bool TouchpadEdgeLevelOsd { get; set; } = true;
+
     /// <summary>Ширина краевой полосы, мм. Потолок не косметический: измерено, что заведомо
     /// большое значение PTP-маппер игнорирует вовсе и зона просто не работает.</summary>
     public int TouchpadEdgeWidthMm { get; set; } = SystemIntegration.TouchpadEdgeSliders.DefaultWidthMm;

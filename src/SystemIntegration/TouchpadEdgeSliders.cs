@@ -45,8 +45,10 @@ public sealed class TouchpadEdgeSliders : IDisposable
     private readonly TouchpadInput _input;
     private readonly bool _ownsInput;  // свой источник только в тестах — общий диспоузит DI
     private bool _attached;            // подписаны и держим читатель (Start/Stop зовутся парами не всегда)
-    private readonly Action<int> _volume;
+    private readonly Action<int>? _volumeOverride; // только в тестах
     private readonly Action<int> _brightness;
+    private VolumeControl? _audio;     // Core Audio — лениво, только при своём индикаторе (XIC-97)
+    private volatile bool _volResync = true; // переполучить устройство вывода: жест начался заново
     private EdgeSlideScale _scale;
     private readonly IAppTimer _pump;
     private readonly object _lock = new();
@@ -71,7 +73,7 @@ public sealed class TouchpadEdgeSliders : IDisposable
         _cfg = cfg;
         _pad = pad;
         _pulse = haptics is null ? null : haptics.Pulse; // null в тестах: мотор настоящего тачпада не трогаем
-        _volume = volume ?? KeyActions.VolumeStep;
+        _volumeOverride = volume;
         _brightness = brightness ?? BrightnessStep;
         _gesture = new TouchpadEdgeGesture(WidthFraction(cfg), EdgeSlideScale.StepFraction);
         _scale = new EdgeSlideScale(cfg.TouchpadEdgeSwipesPerRange);
@@ -188,6 +190,7 @@ public sealed class TouchpadEdgeSliders : IDisposable
                 // и поток чтения касаний вставал бы на нём в очередь.
                 _scale.Reset();
                 _resync = true;
+                _volResync = true;
                 _pulseFresh = true;
                 return;
             }
@@ -234,7 +237,7 @@ public sealed class TouchpadEdgeSliders : IDisposable
                 _pendingBrightness = 0;
                 _pendingTaps = 0;
             }
-            if (taps != 0) _volume(taps);
+            if (taps != 0) VolumeStep(taps);
             if (percent != 0) _brightness(percent);
             if (taps != 0 || percent != 0) Pulse();
         }
@@ -307,15 +310,45 @@ public sealed class TouchpadEdgeSliders : IDisposable
             _resync = false;
         }
         int next = Math.Clamp(_level + percent, 0, 100);
-        if (next == _level) return;
-        _level = next;
-        Brightness.SetAsUser(next);
+        if (next != _level)
+        {
+            _level = next;
+            Brightness.SetAsUser(next);
+        }
+        // и упёршись в край — человек должен видеть, что дальше некуда (XIC-97)
+        BrightnessChanged?.Invoke(next);
+    }
+
+    /// <summary>Яркость жестом выставлена (поток воркера!): уровень 0–100 для индикатора (XIC-97).</summary>
+    public event Action<int>? BrightnessChanged;
+
+    /// <summary>Громкость жестом выставлена через Core Audio (поток воркера!): уровень 0–100.</summary>
+    public event Action<int>? VolumeChanged;
+
+    /// <summary>Громкость сменил не жест — Windows покажет своё окно (поток Core Audio!).</summary>
+    public event Action? VolumeChangedElsewhere;
+
+    // Громкость. Свой индикатор выключен — как раньше, клавишами: Windows покажет своё окно.
+    // Включён — напрямую через Core Audio: иначе окно Windows и наша плашка яркости висели бы
+    // рядом, а системное окно программно не закрыть. Шаг тот же, 2 % на «нажатие».
+    private void VolumeStep(int taps)
+    {
+        if (_volumeOverride is not null) { _volumeOverride(taps); return; }
+        if (!_cfg.TouchpadEdgeLevelOsd) { KeyActions.VolumeStep(taps); return; }
+        if (_audio is null)
+        {
+            _audio = new VolumeControl();
+            _audio.ForeignChange += () => VolumeChangedElsewhere?.Invoke();
+        }
+        if (_volResync) { _audio.Refresh(); _volResync = false; }
+        if (_audio.Step((int)(taps * EdgeSlideScale.VolumeTapPercent)) is int level) VolumeChanged?.Invoke(level);
     }
 
     public void Dispose()
     {
         Stop();
         _pump.Dispose();
+        _audio?.Dispose();
         if (_ownsInput) _input.Dispose();
     }
 }

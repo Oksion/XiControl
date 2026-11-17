@@ -59,6 +59,8 @@ public sealed class AppController
     public Action<bool>? TouchscreenToggled;   // сенсорный экран вкл/выкл (тоже фон)
     public Action? FirmwareFailed;             // команда прошивке не прошла — UI показывает честную ошибку
     public Action? TouchpadHeavyPressed;       // сильное нажатие на тачпад (поток касаний!) — XIC-78
+    public Action<EdgeLevel, int>? EdgeLevelChanged;      // яркость/громкость с края тачпада, уровень для индикатора (поток воркера!) — XIC-97
+    public Action<EdgeLevel, int>? LevelChangedElsewhere; // чужая правка (Fn, приложение; уровень или −1) — индикатор уступает окну Windows
 
     public AppController(IMifsClient mifs, AppConfig cfg, IPowerEvents power, ILocalizer loc,
         ChargeGuard charge, RefreshRateGuard hz, PowerProfileGuard profiles, BrightnessCapGuard capGuard,
@@ -88,6 +90,14 @@ public sealed class AppController
         _heavy = heavy;     // тоже null в тестах — касаний настоящего тачпада там нет
         _modeSync = modeSync; // null в тестах: живой overlay питания юнитами не трогаем
         if (_heavy is not null) _heavy.Pressed += () => TouchpadHeavyPressed?.Invoke();
+        // индикатор краёв тачпада (XIC-97): свои шаги — показать, чужие правки — уступить окну Windows
+        _edges.BrightnessChanged += level =>
+        {
+            if (_cfg.TouchpadEdgeLevelOsd) EdgeLevelChanged?.Invoke(EdgeLevel.Brightness, level);
+        };
+        _edges.VolumeChanged += level => EdgeLevelChanged?.Invoke(EdgeLevel.Volume, level);
+        _edges.VolumeChangedElsewhere += () => LevelChangedElsewhere?.Invoke(EdgeLevel.Volume, -1);
+        _profiles.BrightnessObserved = level => LevelChangedElsewhere?.Invoke(EdgeLevel.Brightness, level);
         ApplyModeVisibility();
     }
 

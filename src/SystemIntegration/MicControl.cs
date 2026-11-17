@@ -72,8 +72,13 @@ internal interface IMMDevice
 [ComImport, Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IAudioEndpointVolume
 {
-    int f0(); int f1(); int f2(); int f3(); int f4(); int f5();
-    int f6(); int f7(); int f8(); int f9(); int f10();                 // слоты 0..10 (не используем)
+    int RegisterControlChangeNotify(IAudioEndpointVolumeCallback client);   // слот 0 (громкость, XIC-97)
+    int UnregisterControlChangeNotify(IAudioEndpointVolumeCallback client); // слот 1
+    int f2(); int f3();                                                     // слоты 2..3 (не используем)
+    int SetMasterVolumeLevelScalar(float fLevel, IntPtr pguidEventContext); // слот 4
+    int f5();
+    int GetMasterVolumeLevelScalar(out float pfLevel);                      // слот 6
+    int f7(); int f8(); int f9(); int f10();                                // слоты 7..10 (не используем)
     int SetMute([MarshalAs(UnmanagedType.Bool)] bool bMute, IntPtr pguidEventContext); // слот 11
     int GetMute([MarshalAs(UnmanagedType.Bool)] out bool pbMute);                       // слот 12
 }

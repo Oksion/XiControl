@@ -47,6 +47,11 @@ public sealed class TouchpadTab : SettingsPane
         swap.Enabled = cfg.TouchpadEdgeSliders;
         ui.AddRow(this, "settings.touchpad.edges.swap", "settings.touchpad.edges.swap.desc", swap);
 
+        // одна плашка на оба края: системное окно громкости рядом с нашей яркостью не закрыть (XIC-97)
+        var level = ui.Toggle(cfg.TouchpadEdgeLevelOsd, on => { cfg.TouchpadEdgeLevelOsd = on; cfg.Save(); });
+        level.Enabled = cfg.TouchpadEdgeSliders;
+        ui.AddRow(this, "settings.touchpad.edges.osd", "settings.touchpad.edges.osd.desc", level);
+
         // Щелчок на шаге (XIC-73) — только там, где тачпад ответил по вендорскому каналу:
         // на другой модели тумблер ничего бы не делал, а молча неработающая опция хуже никакой
         var haptics = act.GetTouchpadHaptics();

@@ -227,6 +227,8 @@
   "settings.touchpad.edges.speed.3": "Плавно",
   "settings.touchpad.edges.swap": "Поменять края местами",
   "settings.touchpad.edges.swap.desc": "Слева станет громкость, справа яркость.",
+  "settings.touchpad.edges.osd": "Свой индикатор уровня",
+  "settings.touchpad.edges.osd.desc": "Одна плашка в стиле Windows внизу экрана и для яркости, и для громкости. Выключено — громкость показывает окно Windows, яркость меняется без индикатора.",
   "settings.touchpad.edges.haptics": "Щелчок на каждом шаге",
   "settings.touchpad.edges.haptics.desc": "Тачпад коротко вибрирует, когда меняется яркость или громкость, — сразу понятно, что жест пойман. Как в Xiaomi PC Manager.",
   "settings.touchpad.edges.haptics.strength": "Сила щелчка",
