@@ -579,12 +579,6 @@ public sealed class TrayApp : IDisposable
     // и UI. Повторная запись была бы лишней и могла бы вызвать второй переход прошивки.
     private void OnPerformanceKey(byte value)
     {
-        if (ModeUi.FromHotkeyValue(value) is not PerfMode announced)
-        {
-            Log.Write($"Key: неизвестное значение режима value=0x{value:X2}");
-            return;
-        }
-
         // Значению из уведомления верить НЕЛЬЗЯ. На TM2113 штатная Fn+K перебирает три кода
         // (0x01/0x03/0x02), а прошивка принимает только два: на 0x03 клавиша объявляет Турбо,
         // в который машина не входит — владелец так и написал, «pretends to change the mode»
@@ -592,10 +586,10 @@ public sealed class TrayApp : IDisposable
         // «Турбо» и запомнили режим, которого нет. Правило то же, что для ответа на запись:
         // спрашиваем прошивку. Не ответила — показываем объявленное, но помечаем в журнале.
         var actual = Safe<PerfMode?>(() => _mifs.GetPerfMode(), null);
-        if (actual is null)
-            Log.Write($"Key: режим не сверен с прошивкой, показываю объявленный 0x{value:X2}");
-        else if (actual != announced)
-            Log.Write($"Key: клавиша объявила 0x{value:X2}, прошивка в 0x{(byte)actual:X2} — верим прошивке");
+        // каждое событие — в журнал, и неизвестные коды тоже (0x07/0x08 у RedmiBook Pro 16 2025):
+        // без этого отчёт «режим сам сбрасывается» не разобрать (XIC-110)
+        Log.Write(ModeUi.EventLine(value, actual, _power.IsOnline));
+        if (ModeUi.FromHotkeyValue(value) is not PerfMode announced) return;
 
         // 0x16 приходит на ЛЮБУЮ смену режима — и на чужую, и на нашу собственную, причём на
         // TM2424 парами: в журнале 45 событий, всегда по два на одно переключение (на TM2113 —
@@ -662,6 +656,22 @@ public sealed class TrayApp : IDisposable
         _controller.ReloadModeVisibility();
 
         ShowPowerOsd(online);
+        LogModeAfterPower(online);
+    }
+
+    // На части моделей прошивка сама сбрасывает режим при смене питания (issue #109). Режим
+    // сразу и через паузу — по паре строк видно, кто и когда его сменил (XIC-110). На пуле:
+    // ожидание и WMI-чтение UI-потоку ни к чему.
+    private void LogModeAfterPower(bool online)
+    {
+        const int LaterMs = 3000;
+        _ = Task.Run(async () =>
+        {
+            var right = Safe<PerfMode?>(() => _mifs.GetPerfMode(), null);
+            await Task.Delay(LaterMs);
+            var later = Safe<PerfMode?>(() => _mifs.GetPerfMode(), null);
+            Log.Write(ModeUi.PowerLine(online, right, later, LaterMs));
+        });
     }
 
     private void ShowPowerOsd(bool online)

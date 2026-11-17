@@ -1,5 +1,6 @@
 using FluentAssertions;
 using XiControl.Ui;
+using XiControl.Wmi;
 using Xunit;
 
 namespace XiControl.Tests;
@@ -48,4 +49,30 @@ public sealed class ModeUiTests
         ModeUi.Kind(alien).Should().Be(ModeUi.Kind(Wmi.PerfMode.Auto));
         ModeUi.Accent(alien).Should().Be(ModeUi.Accent(Wmi.PerfMode.Auto));
     }
+
+    // XIC-110: каждое 0x16 — строкой журнала, и неизвестные коды тоже
+    [Fact]
+    public void EventLine_Обычная() =>
+        ModeUi.EventLine(0x0A, PerfMode.Eco, online: true)
+            .Should().Be("Режим: событие 0x0A (Eco), прошивка Eco, сеть");
+
+    [Fact]
+    public void EventLine_НеизвестныйКод() =>
+        ModeUi.EventLine(0x07, PerfMode.Auto, online: false)
+            .Should().Be("Режим: событие 0x07 (неизвестно), прошивка Auto, батарея");
+
+    [Fact]
+    public void EventLine_ПрошивкаНеСогласна() =>
+        ModeUi.EventLine(0x03, PerfMode.Quiet, online: true)
+            .Should().Be("Режим: событие 0x03 (Turbo), прошивка Quiet, сеть — верим прошивке");
+
+    [Fact]
+    public void EventLine_ПрошивкаМолчит() =>
+        ModeUi.EventLine(0x09, null, online: true)
+            .Should().Be("Режим: событие 0x09 (Auto), прошивка не ответила, сеть");
+
+    [Fact]
+    public void PowerLine_СбросВиден() =>
+        ModeUi.PowerLine(online: true, PerfMode.Turbo, PerfMode.Auto, 3000)
+            .Should().Be("Режим: питание → сеть, сразу Turbo, через 3 с Auto");
 }
