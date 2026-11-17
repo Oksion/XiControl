@@ -99,7 +99,7 @@ public sealed class TrayMetricIcon : IDisposable
             float v = src.Read();
             string text = TrayMetricFormat.IconText(_kind, v);
             // флаги читаем сразу за Read — они про этот же тик
-            string tip = Tip(v, src.PowerFromCpuPackage, src.TempFromAcpiZone);
+            string tip = Tip(v, src.PowerFromCpuPackage, src.TempSource);
             if (_ui.IsHandleCreated) _ui.BeginInvoke(new Action(() => Apply(text, tip)));
         }
         catch (Exception ex) { Log.Ex("TrayMetric", ex); }
@@ -122,13 +122,15 @@ public sealed class TrayMetricIcon : IDisposable
     // Тултип: имя приложения • метрика: точное значение с единицами (форматы — из «Монитора»).
     // cpuPackage — значение пришло из RAPL вместо датчика батареи: величина другая, и назвать
     // её надо иначе, иначе ватты пакета CPU читаются как потребление всей системы.
-    private string Tip(float v, bool cpuPackage, bool acpiZone)
+    private string Tip(float v, bool cpuPackage, TempSource temp)
     {
-        // подменённую величину называем своим именем — иначе число читается как враньё
-        string name = Loc.T((_kind, cpuPackage, acpiZone) switch
+        // подменённую величину называем своим именем — иначе число читается как враньё;
+        // прочерк от драйвера Intel — тоже, иначе он выглядит как сломанный индикатор (XIC-109)
+        string name = Loc.T((_kind, cpuPackage, temp) switch
         {
             (TrayMetric.Power, true, _) => "traymetric.power.cpu",
-            (TrayMetric.Temp, _, true) => "traymetric.temp.zone",
+            (TrayMetric.Temp, _, TempSource.AcpiZone) => "traymetric.temp.zone",
+            (TrayMetric.Temp, _, TempSource.DriverNoData) => "traymetric.temp.nodriver",
             _ => "traymetric." + TrayMetricFormat.Key(_kind),
         });
         string val = float.IsNaN(v) ? "—" : _kind switch

@@ -24,6 +24,26 @@ public static class AutoStart
     private static string SchTasks =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "schtasks.exe");
 
+    /// <summary>
+    /// Включена «Защита администратора» Windows 11 (XIC-111, issue #108): права администратора
+    /// выдаются только через интерактивное подтверждение, и задача с HighestAvailable при входе
+    /// молча не стартует. Подтверждено владельцем: 1 (классический UAC, дефолт) — работает, 2 — нет.
+    /// Чинить нечем без службы, поэтому только честно говорим об этом у тумблера.
+    /// </summary>
+    public static bool AdminProtectionOn()
+    {
+        try
+        {
+            return IsAdminProtection(Microsoft.Win32.Registry.GetValue(
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System",
+                "TypeOfAdminApprovalMode", null));
+        }
+        catch (Exception ex) { Log.Ex("AutoStart.AdminProtection", ex); return false; }
+    }
+
+    /// <summary>Значение TypeOfAdminApprovalMode: 2 — защита администратора; нет значения — классика.</summary>
+    internal static bool IsAdminProtection(object? typeOfAdminApprovalMode) => typeOfAdminApprovalMode is 2;
+
     /// <summary>Автозапуск включён: своя задача или доставшаяся от старой версии (только наша).</summary>
     public static bool IsEnabled() => Run("/query", "/tn", TaskName) == 0 || LegacyIsOurs();
 
@@ -82,6 +102,8 @@ public static class AutoStart
         if (Environment.ProcessPath is null) return;
         var cmd = TaskCommand();
         if (cmd is null) return; // задачи нет — чинить нечего
+        // задача есть, но при входе не стартует — в чужом отчёте причина видна сразу (XIC-111)
+        if (AdminProtectionOn()) Log.Write("AutoStart: включена защита администратора Windows — задача при входе не стартует");
 
         if (!File.Exists(cmd))
         {

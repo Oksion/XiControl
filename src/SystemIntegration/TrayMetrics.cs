@@ -305,8 +305,48 @@ public sealed class AcpiZoneTemperature : IDisposable
     public void Dispose() => _q?.Dispose();
 }
 
-/// <summary>Чем измерена температура: у ACPI-зоны другой физический смысл, и UI обязан сказать это.</summary>
-public enum TempSource { None, Dptf, AcpiZone }
+/// <summary>Чем измерена температура: у ACPI-зоны другой физический смысл, и UI обязан сказать это.
+/// <see cref="DriverNoData"/> — машина на Intel IPF, но драйвер температур не отдаёт (XIC-109):
+/// строка есть, значение — прочерк с объяснением.</summary>
+public enum TempSource { None, Dptf, AcpiZone, DriverNoData }
+
+/// <summary>
+/// Intel Innovation Platform Framework (бывший DTT/DPTF) на машине — по ACPI-объекту менеджера
+/// <c>IETM</c> (`ACPI\INTC10D4\IETM` на TM2424, `INT3400` у старых поколений). Нужен, чтобы
+/// отличить «DPTF-класса нет, потому что не Intel» от «Intel есть, а класс пропал»: драйвер IPF
+/// 2.4.10400 из Windows Update убрал `EsifDeviceInformation` (issue #110, XIC-109).
+/// </summary>
+public static class IntelThermalFramework
+{
+    private const string ManagerFilter = @"DeviceID LIKE 'ACPI\\%\\IETM'";
+
+    /// <summary>Устройство-менеджер IPF есть. Win32_PnPEntity — ~0,4 с, звать с пула и один раз.</summary>
+    public static bool ManagerPresent()
+    {
+        try
+        {
+            using var s = new ManagementObjectSearcher(@"root\cimv2",
+                $"SELECT DeviceID FROM Win32_PnPEntity WHERE {ManagerFilter}");
+            using var found = s.Get();
+            return found.Count > 0;
+        }
+        catch (Exception ex) { Log.Ex("Ipf.Manager", ex); return false; }
+    }
+
+    /// <summary>Версия драйвера менеджера — для журнала. Win32_PnPSignedDriver медленный (~2,5 с).</summary>
+    public static string? DriverVersion()
+    {
+        try
+        {
+            using var s = new ManagementObjectSearcher(@"root\cimv2",
+                $"SELECT DriverVersion FROM Win32_PnPSignedDriver WHERE {ManagerFilter}");
+            foreach (ManagementObject o in s.Get())
+                using (o) if (o["DriverVersion"] is string v) return v;
+            return null;
+        }
+        catch (Exception ex) { Log.Ex("Ipf.Version", ex); return null; }
+    }
+}
 
 /// <summary>
 /// Температура с выбором источника (XIC-41): DPTF первичен, ACPI-термозона — фолбэк там, где его
@@ -320,6 +360,7 @@ public sealed class TemperatureSource : IDisposable
     private readonly AcpiZoneTemperature _zone = new();
     private readonly bool _forceZone;
     private readonly Func<int?>? _domain;
+    private bool? _ipf; // менеджер Intel IPF на машине — спрошен при первом молчании DPTF
 
     /// <param name="forceZone">Отладка: читать зону, даже если DPTF доступен. На Intel-машине
     /// иначе не прогнать путь фолбэка — DPTF там есть всегда.</param>
@@ -344,21 +385,50 @@ public sealed class TemperatureSource : IDisposable
         {
             float c = _dptf.ReadC(_domain?.Invoke());
             if (!float.IsNaN(c)) { Choose(TempSource.Dptf); return c; }
-            if (_dptf.Present) return float.NaN; // DPTF на модели есть — ждём его, не подменяем
+            // менеджер IPF спрашиваем один раз и только когда класса нет: не-Intel платит ~0,4 с однажды
+            if (!_dptf.Present) _ipf ??= IntelThermalFramework.ManagerPresent();
+            switch (WhenDptfSilent(_dptf.Present, _ipf == true))
+            {
+                case TempSource.Dptf: return float.NaN; // DPTF на модели есть — ждём его, не подменяем
+                case TempSource.DriverNoData: Choose(TempSource.DriverNoData); return float.NaN;
+            }
         }
         float z = _zone.ReadMaxC();
         if (!float.IsNaN(z)) { Choose(TempSource.AcpiZone); return z; }
         return float.NaN;
     }
 
+    /// <summary>
+    /// Куда идти, когда DPTF не дал значения. Класс на модели есть — ждём его. Класса нет, но
+    /// машина на Intel IPF — значит, драйвер перестал отдавать температуры (IPF 2.4, XIC-109), и
+    /// ACPI-зона была бы подменой: на TM2424/TM2425 она стоит на ~27 °C. Зона — только для машин
+    /// без Intel IPF, ради которых она и делалась (XIC-41).
+    /// </summary>
+    internal static TempSource WhenDptfSilent(bool dptfPresent, bool ipfManager) =>
+        dptfPresent ? TempSource.Dptf
+        : ipfManager ? TempSource.DriverNoData
+        : TempSource.AcpiZone;
+
     // Полевая диагностика: по этой строке в отчёте видно, что показывал «Монитор» на чужой машине.
     private void Choose(TempSource source)
     {
         if (Source == source) return;
         Source = source;
-        Log.Write(source == TempSource.Dptf
-            ? "Температура: источник — Intel DPTF (максимум по доменам)"
-            : "Температура: источник — ACPI-термозона (нет DPTF; это температура платы, точность ниже)");
+        switch (source)
+        {
+            case TempSource.Dptf:
+                Log.Write("Температура: источник — Intel DPTF (максимум по доменам)");
+                break;
+            case TempSource.AcpiZone:
+                Log.Write("Температура: источник — ACPI-термозона (нет DPTF; это температура платы, точность ниже)");
+                break;
+            case TempSource.DriverNoData:
+                // версия — отдельной задачей: запрос медленный, а первое значение ждёт раскладка «Монитора»
+                _ = Task.Run(() => Log.Write(
+                    $"Температура: драйвер Intel IPF {IntelThermalFramework.DriverVersion() ?? "?"} не отдаёт " +
+                    "EsifDeviceInformation — показываю прочерк, не температуру платы (ForceAcpiTemperature — зона)"));
+                break;
+        }
     }
 
     public void Dispose()
@@ -445,7 +515,10 @@ public sealed class TrayMetricSource : IDisposable
     /// <summary>Температура прочитана не из DPTF, а из ACPI-термозоны — это температура платы,
     /// другая величина (XIC-41). Как и с ваттами пакета, в значок влезает только число, поэтому
     /// сказать об этом обязан тултип.</summary>
-    public bool TempFromAcpiZone { get; private set; }
+    public bool TempFromAcpiZone => TempSource == TempSource.AcpiZone;
+
+    /// <summary>Источник последней температуры: тултип называет и зону, и прочерк от драйвера Intel (XIC-109).</summary>
+    public TempSource TempSource { get; private set; }
 
     public float Read() => _kind switch
     {
@@ -490,7 +563,7 @@ public sealed class TrayMetricSource : IDisposable
     {
         _temp ??= new TemperatureSource(_forceAcpiTemp, _tempDomain);
         float c = _temp.ReadC();
-        TempFromAcpiZone = _temp.Source == TempSource.AcpiZone;
+        TempSource = _temp.Source;
         return c;
     }
 
