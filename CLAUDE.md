@@ -166,7 +166,10 @@ WMI-событий). `Program.cs`: single-instance mutex (вторая копи�
   `TravelChargeMonitor` (SystemIntegration).
 - `src/Ui/` остальное: `QuickPanelForm` (панель по удержанию Mi / клику по трею — чистый view
   над контроллером, навигация с клавиатуры; ширина фиксированная — при скрытых режимах
-  растягиваются ячейки), `OsdForm` (всплывашки), `MonitorForm` (виджет Вт/CPU/GPU/NPU/RAM/°C),
+  растягиваются ячейки), `OsdForm` (всплывашки), `LevelFlyout` (индикатор уровня с краёв тачпада в стиле окна Windows 11, XIC-97:
+  одна плашка на яркость и громкость — громкость тогда через Core Audio `VolumeControl`, а не клавишами,
+  иначе рядом висело бы незакрываемое окно Windows; чужая правка (Fn, приложение) прячет её сразу —
+  громкость по контексту записи, яркость по эху WMI), `MonitorForm` (виджет Вт/CPU/GPU/NPU/RAM/°C),
   `FlyoutForm` + `FlyoutPalette` (общая база флайаутов: borderless tool-window, Region, Esc;
   палитра — единственный источник тёмных цветов флайаутов), `FormChrome` (DWM-тёмный
   заголовок + WM_SETREDRAW), `ModeUi` (режим → ключ локализации / вид OSD / акцент),

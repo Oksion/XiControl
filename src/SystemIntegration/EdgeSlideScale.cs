@@ -24,7 +24,7 @@ public sealed class EdgeSlideScale(int swipesPerRange)
 
     /// <summary>Шаг громкости Windows по <c>VK_VOLUME_UP</c> — 2% шкалы. Отсюда и пересчёт
     /// процентов в нажатия: дробить мельче нечем.</summary>
-    private const double VolumeTapPercent = 2.0;
+    internal const double VolumeTapPercent = 2.0;
 
     /// <summary>Пресеты для настроек: сколько проходов на всю шкалу.</summary>
     public static readonly int[] Presets = [1, 2, 3];

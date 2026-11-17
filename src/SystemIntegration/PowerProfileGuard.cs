@@ -36,6 +36,10 @@ public sealed class PowerProfileGuard : IDisposable
     /// <summary>Вызывается (на потоке пула) после применения режима — обновить значок трея.</summary>
     public Action? ModeApplied;
 
+    /// <summary>Любое событие яркости (поток пула) — индикатору краёв тачпада, чтобы уступить
+    /// место окну Windows при Fn+F5/F6 (XIC-97). Подписчик WMI по-прежнему один — этот guard.</summary>
+    public Action<int>? BrightnessObserved;
+
     public PowerProfileGuard(IMifsClient mifs, AppConfig cfg, IPowerEvents power,
         BrightnessCapGuard cap, AutoBrightnessGuard auto, IAppTimer? debounce = null)
     {
@@ -129,6 +133,7 @@ public sealed class PowerProfileGuard : IDisposable
         bool settling = Environment.TickCount - _settleUntil < 0;
         _cap.OnBrightness(level, own, settling);  // лимиту — все события: свои шаги он не считает протестом
         _auto.OnBrightness(level, own, settling); // авто-яркости — тоже: правка человека учит кривую
+        BrightnessObserved?.Invoke(level);
 
         // дальше — запоминание пользовательского выбора в слот текущего питания
         if (own) return;                      // восстановление слота / шаг лимита — не выбор человека

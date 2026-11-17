@@ -16,6 +16,7 @@ public sealed class TrayApp : IDisposable
     private readonly IMifsClient _mifs;
     private readonly AppConfig _cfg;
     private readonly OsdForm _osd = new();
+    private readonly LevelFlyout _level = new(); // яркость с края тачпада — как системное окно (XIC-97)
     private readonly IKeyEventSource _events;
     private readonly IPowerEvents _power;
     private readonly QuickPanelForm _panel;
@@ -330,6 +331,9 @@ public sealed class TrayApp : IDisposable
         // клавиш, и тем же путём: из потока касаний в UI-поток, там — роутер
         _controller.TouchpadHeavyPressed = () => _panel.BeginInvoke(() =>
             _router.Run(_cfg.TouchpadHeavyPressAction, _cfg.TouchpadHeavyPressCommand));
+        // Яркость с края тачпада (XIC-97): шаги идут пачками раз в 50 мс, плашка обновляется на месте
+        _controller.EdgeLevelChanged = (kind, level) => _panel.BeginInvoke(() => _level.ShowLevel(kind, level));
+        _controller.LevelChangedElsewhere = (kind, level) => _panel.BeginInvoke(() => _level.Elsewhere(kind, level));
 
         // Реакция на смену темы Windows
         SystemEvents.UserPreferenceChanged += OnUserPref;
@@ -938,6 +942,7 @@ public sealed class TrayApp : IDisposable
     private void OsdApplied()
     {
         _osd.DurationMs = _cfg.OsdDurationMs;
+        _level.DurationMs = _cfg.OsdDurationMs;
         _osd.Position = _cfg.OsdPosition;
         _osd.SetTransparency(_cfg.OsdTransparencyPercent);
     }
@@ -988,6 +993,7 @@ public sealed class TrayApp : IDisposable
         // (в обратном порядке создания), TrayApp ими не владеет
         _metric?.Dispose(); // значок индикатора гасится до основного (Visible=false внутри)
         _osd.Dispose();
+        _level.Dispose();
         _panel.Dispose();
         _settings?.Dispose();
         _monitor?.Dispose();

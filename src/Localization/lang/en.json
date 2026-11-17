@@ -227,6 +227,8 @@
   "settings.touchpad.edges.speed.3": "Smooth",
   "settings.touchpad.edges.swap": "Swap the edges",
   "settings.touchpad.edges.swap.desc": "Volume on the left, brightness on the right.",
+  "settings.touchpad.edges.osd": "Own level indicator",
+  "settings.touchpad.edges.osd.desc": "One Windows-style bar at the bottom of the screen for both brightness and volume. Off — volume shows the Windows window, brightness changes without an indicator.",
   "settings.touchpad.edges.haptics": "Click on every step",
   "settings.touchpad.edges.haptics.desc": "The touchpad gives a short vibration each time brightness or volume changes, so you know the gesture was caught. Like in Xiaomi PC Manager.",
   "settings.touchpad.edges.haptics.strength": "Click strength",

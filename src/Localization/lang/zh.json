@@ -227,6 +227,8 @@
   "settings.touchpad.edges.speed.3": "平缓",
   "settings.touchpad.edges.swap": "左右互换",
   "settings.touchpad.edges.swap.desc": "左侧调音量，右侧调亮度。",
+  "settings.touchpad.edges.osd": "自有级别指示条",
+  "settings.touchpad.edges.osd.desc": "亮度和音量共用一个屏幕底部的 Windows 样式提示条。关闭时音量显示 Windows 窗口，亮度调节无指示条。",
   "settings.touchpad.edges.haptics": "每一档轻振一下",
   "settings.touchpad.edges.haptics.desc": "亮度或音量每变化一档，触控板都会轻振一下，立刻知道手势已生效。与小米电脑管家相同。",
   "settings.touchpad.edges.haptics.strength": "轻振强度",
