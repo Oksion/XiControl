@@ -43,6 +43,26 @@ internal static class ModeUi
         _ => null,
     };
 
+    /// <summary>
+    /// Строка журнала на каждое событие смены режима (0x16, XIC-110): объявленный код, что
+    /// ответила прошивка и от чего питаемся. Раньше писались только расхождения — и отчёт «режим
+    /// сам сбрасывается при зарядке» (issue #109) было не разобрать: обычных смен в журнале нет.
+    /// </summary>
+    public static string EventLine(byte value, PerfMode? actual, bool online)
+    {
+        PerfMode? announced = FromHotkeyValue(value);
+        string said = announced is PerfMode a ? a.ToString() : "неизвестно";
+        string fw = actual is PerfMode m ? m.ToString() : "не ответила";
+        string trust = actual is not null && announced is not null && actual != announced ? " — верим прошивке" : "";
+        return $"Режим: событие 0x{value:X2} ({said}), прошивка {fw}, {(online ? "сеть" : "батарея")}{trust}";
+    }
+
+    /// <summary>Строка журнала на смену питания: режим сразу и через паузу — сброс прошивкой виден сам.</summary>
+    public static string PowerLine(bool online, PerfMode? right, PerfMode? later, int laterMs) =>
+        $"Режим: питание → {(online ? "сеть" : "батарея")}, сразу {Name(right)}, через {laterMs / 1000} с {Name(later)}";
+
+    private static string Name(PerfMode? m) => m?.ToString() ?? "—";
+
     public static OsdKind Kind(PerfMode m) => m switch
     {
         PerfMode.Eco => OsdKind.Eco,
