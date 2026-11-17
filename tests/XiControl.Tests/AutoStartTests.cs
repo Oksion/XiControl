@@ -77,4 +77,15 @@ public sealed class AutoStartTests
     {
         AutoStart.IsOutdated(taskVersion, Version.Parse("0.9.0")).Should().BeFalse();
     }
+
+    // XIC-111: 2 — «Защита администратора», 1 и отсутствие значения — классический UAC
+    [Theory]
+    [InlineData(2, true)]
+    [InlineData(1, false)]
+    [InlineData(0, false)]
+    [InlineData(null, false)]
+    public void IsAdminProtection_OnlyMode2(int? value, bool expected)
+    {
+        AutoStart.IsAdminProtection(value).Should().Be(expected);
+    }
 }

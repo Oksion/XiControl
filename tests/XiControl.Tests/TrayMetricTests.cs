@@ -220,4 +220,13 @@ public class TrayMetricTests
     [Fact]
     public void DptfDomains_СтрокаДляЖурнала_ВсеДоменыИВаттыГдеЕсть() =>
         DptfDomains.Describe([new(0, 40, 19), new(3, 0, 0)]).Should().Be("_0 40 °C 19 Вт, _3 0 °C");
+
+    // XIC-109: IPF 2.4 убрал EsifDeviceInformation — на Intel не подменяем его температурой платы
+    [Theory]
+    [InlineData(true, false, TempSource.Dptf)]          // класс есть, просто молчит — ждём его
+    [InlineData(true, true, TempSource.Dptf)]
+    [InlineData(false, true, TempSource.DriverNoData)]  // Intel IPF есть, класса нет — прочерк
+    [InlineData(false, false, TempSource.AcpiZone)]     // не Intel — зона, как в XIC-41
+    public void TemperatureSource_КогдаDptfМолчит(bool dptfPresent, bool ipf, TempSource expected) =>
+        TemperatureSource.WhenDptfSilent(dptfPresent, ipf).Should().Be(expected);
 }

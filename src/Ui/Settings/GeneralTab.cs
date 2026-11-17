@@ -18,7 +18,10 @@ public sealed class GeneralTab : SettingsPane
                 act.SetLanguage(langs[i].Culture);
                 rebuild(); // пересобрать окно на новом языке (после выхода из обработчика)
             }, ui.Sc(150)));
-        ui.AddRow(this, "settings.autostart", "settings.autostart.desc",
+        // при «Защите администратора» задача при входе молча не стартует — говорим это вместо
+        // обещания «без запроса UAC» (XIC-111); тумблер оставляем: режим UAC могут вернуть
+        ui.AddRow(this, "settings.autostart",
+            SystemIntegration.AutoStart.AdminProtectionOn() ? "settings.autostart.desc.adminprot" : "settings.autostart.desc",
             ui.Toggle(act.GetAutoStart(), act.SetAutoStart));
         // winget-пакет portable и сам ярлыков не создаёт — кладём свой, только по тумблеру (XIC-106)
         ui.AddRow(this, "settings.startmenu", "settings.startmenu.desc",

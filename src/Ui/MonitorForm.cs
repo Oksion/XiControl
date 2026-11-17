@@ -555,6 +555,8 @@ public sealed class MonitorForm : FlyoutForm
                 // у ACPI-зоны другой смысл (плата, не горячая точка) — подпись строки это говорит
                 Loc.T(_tempSrc.Source == SystemIntegration.TempSource.AcpiZone ? "monitor.temp.zone" : "monitor.temp"),
                 float.IsNaN(tc) ? "—" : Loc.T("monitor.temp.c", (int)tc), now, _temp, TempMax,
+                // драйвер Intel без данных — под прочерком причина, иначе он читается как сбой (XIC-109)
+                sub: _tempSrc.Source == SystemIntegration.TempSource.DriverNoData ? Loc.T("monitor.temp.nodriver") : null,
                 scaleLabel: Loc.T("monitor.temp.c", (int)TempMax),
                 pick: v => v >= HotAt ? TempHotCol : TempCol); // горячая зона на графике — вишнёвая
         }
