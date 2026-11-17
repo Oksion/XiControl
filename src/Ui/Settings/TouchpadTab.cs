@@ -92,7 +92,8 @@ public sealed class TouchpadTab : SettingsPane
     /// добавляет поле команды (как слот клавиши на вкладке «Клавиши»).</summary>
     private void AddHeavyPressSlot(AppConfig cfg, SettingsActions act, Action rebuild)
     {
-        string[] values = KeysTab.KeyActionValues;
+        // клики мышью — только здесь: у клавиш они бессмысленны (XIC-108)
+        string[] values = [.. SystemIntegration.HeavyPressMouse.Actions, .. KeysTab.KeyActionValues];
         string cur = cfg.TouchpadHeavyPressAction ?? "none";
         int idx = Array.IndexOf(values, cur);
         if (idx < 0) idx = Array.IndexOf(values, "none"); // неизвестное значение из конфига
