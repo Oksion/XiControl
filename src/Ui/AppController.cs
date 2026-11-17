@@ -1120,8 +1120,9 @@ public sealed class AppController
         bool was = _heavy?.Enabled ?? false;
         _cfg.TouchpadHeavyPressAction = action;
         _cfg.Save();
-        if (_heavy is { } heavy && heavy.Enabled != was)
-            Task.Run(() => Safe(() => { heavy.Apply(); return true; }, false));
+        if (_heavy is not { } heavy) return;
+        if (heavy.Enabled != was) Task.Run(() => Safe(() => { heavy.Apply(); return true; }, false));
+        else heavy.SyncMouse(); // клик мышью ↔ прочее действие: хук мыши только под клики (XIC-108)
     }
 
     /// <summary>Команда для действия «Запустить программу» на сильном нажатии.</summary>
